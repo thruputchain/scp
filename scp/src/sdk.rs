@@ -32,7 +32,7 @@ pub trait SCP2User {
         slot_index: SCPSlotIndex,
         value: &SCPValue,
         cancel: CancellationToken,
-    ) -> ValidationLevel;
+    ) -> Result<ValidationLevel, CancelledError>;
 
     /// Asks the SCP user to validate a value for a given slot conclusively.
     /// Calls to validate_fully will always be preceded by a call to validate_tentatively for a given slot,
@@ -42,7 +42,7 @@ pub trait SCP2User {
         slot_index: SCPSlotIndex,
         value: &SCPValue,
         cancel: CancellationToken,
-    ) -> ValidationLevel;
+    ) -> Result<ValidationLevel, CancelledError>;
 
     /// Notifies the SCP user that a value has been externalized for a given slot.
     fn externalized(&self, slot_index: SCPSlotIndex, value: SCPValue);
@@ -59,9 +59,6 @@ pub trait SCP2World {
 pub trait World2SCP {
     fn received(&mut self, msg: BytesM);
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TimeoutError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CancelledError;

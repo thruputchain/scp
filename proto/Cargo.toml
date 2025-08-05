@@ -1,0 +1,22 @@
+[package]
+name = "proto"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+
+[dependencies.xdr_common]
+git = "ssh://git@github.com/groundhogchain/xdr_common.git"
+
+[dependencies.xdrs]
+git = "ssh://git@github.com/groundhogchain/xdrs.git"
+features = ["alloc", "derive", "cxs", "txs", "strict"]
+
+[dependencies.serde]
+optional = true
+version = "1.0.219"
+default-features = false
+features = ["derive"]

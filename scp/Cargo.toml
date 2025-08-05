@@ -3,4 +3,19 @@ name = "scp"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "scp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "scp"
+path = "src/main.rs"
+
 [dependencies]
+proto = { path = "../proto" }
+async-trait = "0.1"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+
+[dependencies.xdr_common]
+git = "ssh://git@github.com/groundhogchain/xdr_common.git"

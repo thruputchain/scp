@@ -25,3 +25,6 @@ features = ["derive"]
 
 [dependencies.ed25519-dalek]
 version = "3.0.0-pre.0"
+
+[dependencies.thiserror]
+version = "2.0"

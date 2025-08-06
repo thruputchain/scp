@@ -1,5 +1,8 @@
 use crate as proto;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
+use thiserror::Error;
+use xdrs::serialize_txs;
+use xdrs::write_xdr::WriteXDR;
 
 /// Creates an ed25519_dalek::SigningKey from a proto::Ed25519SecretKey
 fn signing_key_from_secret_key(secret_key: &proto::Ed25519SecretKey) -> SigningKey {
@@ -53,4 +56,39 @@ pub fn sign_bytes(secret_key: &proto::SecretKey, msg: &[u8]) -> proto::Signature
     proto::Signature::Ed25519 {
         ed25519: sign_bytes_ed25519(ed25519_key, msg),
     }
+}
+
+#[derive(Copy, Clone, Debug, Error)]
+pub enum SigningError {
+    #[error("encoding error")]
+    EncodingError(xdrs::serialize::writer::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum VerifyingError {
+    #[error("encoding error")]
+    EncodingError(xdrs::serialize::writer::Error),
+
+    #[error("verifying error")]
+    VerifyingError(SignatureError),
+}
+
+pub fn sign_xdr<T>(secret_key: &proto::SecretKey, v: &T) -> Result<proto::Signature, SigningError>
+where
+    T: WriteXDR + ?Sized,
+{
+    let x = serialize_txs::encode(v).map_err(|e| SigningError::EncodingError(e))?;
+    Ok(sign_bytes(secret_key, x.as_slice()))
+}
+
+pub fn verify_xdr<T>(
+    public_key: &proto::PublicKey,
+    v: &T,
+    signature: &proto::Signature,
+) -> Result<(), VerifyingError>
+where
+    T: WriteXDR + ?Sized,
+{
+    let x = serialize_txs::encode(v).map_err(|e| VerifyingError::EncodingError(e))?;
+    verify_bytes(public_key, x.as_slice(), signature).map_err(|e| VerifyingError::VerifyingError(e))
 }

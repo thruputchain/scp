@@ -4,7 +4,7 @@ use std::process::Command;
 fn change_extension(filename: &str, new_extension: &str) -> String {
     let path = Path::new(filename);
     let stem = path.file_stem().unwrap_or_default();
-    format!("{}.{}", stem.to_string_lossy(), new_extension)
+    format!("{}_x.{}", stem.to_string_lossy(), new_extension)
 }
 
 fn main() {

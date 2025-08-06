@@ -1,19 +1,28 @@
 pub mod sign;
 pub use sign::*;
 
-// proto mods
-
-#[rustfmt::skip]
-pub mod types;
-pub use types::*;
-
-#[rustfmt::skip]
 pub mod scp;
 pub use scp::*;
 
+pub mod slot;
+pub use slot::*;
+
+pub mod ballot;
+pub use ballot::*;
+
+// proto mods
+
+#[rustfmt::skip]
+pub mod types_x;
+pub use types_x::*;
+
+#[rustfmt::skip]
+pub mod scp_x;
+pub use scp_x::*;
+
 #[cfg(test)]
 mod tests {
-    use crate::types::*;
+    use crate::types_x::*;
     use xdr_common::*;
     use xdrs::serialize_txs;
 

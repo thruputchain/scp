@@ -1,15 +1,6 @@
 pub mod sign;
 pub use sign::*;
 
-pub mod scp;
-pub use scp::*;
-
-pub mod slot;
-pub use slot::*;
-
-pub mod ballot;
-pub use ballot::*;
-
 // proto mods
 
 #[rustfmt::skip]

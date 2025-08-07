@@ -1,3 +1,6 @@
+- paxos
+- cascade theorem
+
 
 # https://datatracker.ietf.org/doc/draft-mazieres-dinrg-scp/
 - https://github.com/stanford-scs/scp-spec

@@ -59,7 +59,7 @@ pub enum SCPStatementType {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
-pub struct SCPNomination {
+pub struct SCPStatementNominate {
     // D
     pub quorum_set_hash: SCPHash,
     // X
@@ -71,7 +71,7 @@ pub struct SCPNomination {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
-pub struct SCPStatement_pledges_prepare {
+pub struct SCPStatementPrepare {
     // D
     pub quorum_set_hash: SCPHash,
     // b
@@ -89,7 +89,7 @@ pub struct SCPStatement_pledges_prepare {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
-pub struct SCPStatement_pledges_confirm {
+pub struct SCPStatementConfirm {
     // b
     pub ballot: SCPBallot,
     // p.n
@@ -105,7 +105,7 @@ pub struct SCPStatement_pledges_confirm {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
-pub struct SCPStatement_pledges_externalize {
+pub struct SCPStatementExternalize {
     // c
     pub commit: SCPBallot,
     // h.n
@@ -119,17 +119,17 @@ pub struct SCPStatement_pledges_externalize {
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 pub enum SCPStatement_pledges {
     // case SCP_ST_PREPARE:
-    //   prepare prepare;
-    SCP_ST_PREPARE { prepare: SCPStatement_pledges_prepare } = SCPStatementType::SCP_ST_PREPARE as i32,
+    //   SCPStatementPrepare prepare;
+    SCP_ST_PREPARE { prepare: SCPStatementPrepare } = SCPStatementType::SCP_ST_PREPARE as i32,
     // case SCP_ST_CONFIRM:
-    //   confirm confirm;
-    SCP_ST_CONFIRM { confirm: SCPStatement_pledges_confirm } = SCPStatementType::SCP_ST_CONFIRM as i32,
+    //   SCPStatementConfirm confirm;
+    SCP_ST_CONFIRM { confirm: SCPStatementConfirm } = SCPStatementType::SCP_ST_CONFIRM as i32,
     // case SCP_ST_EXTERNALIZE:
-    //   externalize externalize;
-    SCP_ST_EXTERNALIZE { externalize: SCPStatement_pledges_externalize } = SCPStatementType::SCP_ST_EXTERNALIZE as i32,
+    //   SCPStatementExternalize externalize;
+    SCP_ST_EXTERNALIZE { externalize: SCPStatementExternalize } = SCPStatementType::SCP_ST_EXTERNALIZE as i32,
     // case SCP_ST_NOMINATE:
-    //   SCPNomination nominate;
-    SCP_ST_NOMINATE { nominate: SCPNomination } = SCPStatementType::SCP_ST_NOMINATE as i32,
+    //   SCPStatementNominate nominate;
+    SCP_ST_NOMINATE { nominate: SCPStatementNominate } = SCPStatementType::SCP_ST_NOMINATE as i32,
     
 }
 

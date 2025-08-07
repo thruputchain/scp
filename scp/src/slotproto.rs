@@ -1,5 +1,5 @@
 use crate::*;
 
-pub struct Slot<'a> {
+pub struct SlotProto<'a> {
     scp: &'a SCP,
 }

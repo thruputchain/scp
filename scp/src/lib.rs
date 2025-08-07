@@ -6,14 +6,17 @@ pub use sdk::*;
 pub mod scp;
 pub use scp::*;
 
-pub mod slot;
-pub use slot::*;
+pub mod slotproto;
+pub use slotproto::*;
 
 pub mod ballot;
 pub use ballot::*;
 
-pub mod fv;
-pub use fv::*;
+pub mod phase;
+pub use phase::*;
 
 pub mod statement;
 pub use statement::*;
+
+pub mod ballotproto;
+pub use ballotproto::*;

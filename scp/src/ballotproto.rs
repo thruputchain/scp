@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::HashMap;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 pub struct BallotState {
     heard_from_quorum: bool,
@@ -85,39 +85,57 @@ impl<'a, A: App> BallotProto<'a, A> {
         let statement = &env.statement;
         let node_id = &statement.node_id;
 
-        let mut check_valid = || -> EnvelopeState {
-            if self.slot_state.is_statement_sane(statement, ours) {
+        fn check_valid(
+            slot_state: &mut SlotState,
+            statement: &proto::SCPStatement,
+            ours: bool,
+            env: &proto::SCPEnvelope,
+        ) -> EnvelopeState {
+            if slot_state.is_statement_sane(statement, ours) {
                 if ours {
                     error!(env = ?env, "not sane statement from self, skipping");
                 }
                 return EnvelopeState::Invalid;
             }
-            if !self.state().is_newer_statement(node_id, statement) {
+            if !slot_state.ballot_mut().is_newer_statement(&statement.node_id, statement) {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
-                    error!(
-                        slot_index = self.slot_state.slot_index(),
+                    trace!(
+                        slot_index = slot_state.slot_index(),
                         "stale statement, skipping"
                     )
                 }
                 return EnvelopeState::Invalid;
             }
             EnvelopeState::Valid
-        };
+        }
 
-        match check_valid() {
+        match check_valid(self.slot_state, statement, ours, env) {
             EnvelopeState::Invalid => return EnvelopeState::Invalid,
             _ => {}
         }
 
-        // 188
-        match self.validate_values(statement).await {
-            ValidationLevel::Invalid => panic!("XXX"),
-            ValidationLevel::MaybeValid => panic!("XXX"),
-            ValidationLevel::FullyValid => panic!("XXX"),
+        let validation_result = self.validate_values(statement).await;
+        match validation_result {
+            ValidationLevel::Invalid => {
+                if ours {
+                    error!(env = ?env, "invalid value from self, skipping")
+                } else {
+                    trace!(slot_index = self.slot_state.slot_index(), "invalid value")
+                }
+                return EnvelopeState::Invalid;
+            }
+            _ => {}
         }
 
+        // check if validity has changed since the call into the app
+        match check_valid(self.slot_state, statement, ours, env) {
+            EnvelopeState::Invalid => return EnvelopeState::Invalid,
+            _ => {}
+        }
+
+        // 206
         panic!("XXX")
     }
 

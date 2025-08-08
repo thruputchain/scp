@@ -1,14 +1,16 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: 209696f38cf7f9ec03319f005911da5396112421
+// Generated from xdrc commit: 73ac135b6b8a14396074dde8ea20f0e6b671175c
 
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(unexpected_cfgs)]
 #![allow(unused_variables)]
+#![allow(clippy::unnecessary_cast)]
 
 use crate::*;
 use core::option::Option;
@@ -35,7 +37,8 @@ pub type SCPSlotIndex = u64;
 
 pub type SCPValue = BytesM;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPBallot {
@@ -45,18 +48,21 @@ pub struct SCPBallot {
     pub value: SCPValue,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Copy)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(i32)]
 pub enum SCPStatementType {
-    SCP_ST_PREPARE = 0,
-    SCP_ST_CONFIRM = 1,
-    SCP_ST_EXTERNALIZE = 2,
-    SCP_ST_NOMINATE = 3,
-}
+    SCP_ST_PREPARE = 0 as i32,
+    SCP_ST_CONFIRM = 1 as i32,
+    SCP_ST_EXTERNALIZE = 2 as i32,
+    SCP_ST_NOMINATE = 3 as i32,
+}pub use SCPStatementType::*;
 
-#[derive(PartialEq, Debug, Clone)]
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPStatementNominate {
@@ -68,7 +74,8 @@ pub struct SCPStatementNominate {
     pub accepted: VecM<SCPValue>,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPStatementPrepare {
@@ -86,7 +93,8 @@ pub struct SCPStatementPrepare {
     pub n_h: SCPCount,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPStatementConfirm {
@@ -102,7 +110,8 @@ pub struct SCPStatementConfirm {
     pub quorum_set_hash: SCPHash,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPStatementExternalize {
@@ -114,9 +123,9 @@ pub struct SCPStatementExternalize {
     pub commit_quorum_set_hash: SCPHash,
 }
 
-#[repr(i32)]
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
+#[repr(i32)]
 pub enum SCPStatement_pledges {
     // case SCP_ST_PREPARE:
     //   SCPStatementPrepare prepare;
@@ -133,7 +142,8 @@ pub enum SCPStatement_pledges {
     
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPStatement {
@@ -144,7 +154,8 @@ pub struct SCPStatement {
     pub pledges: SCPStatement_pledges,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPEnvelope {
@@ -154,7 +165,8 @@ pub struct SCPEnvelope {
 
 // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
 // only allows 2 levels of nesting
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[repr(C)]
 pub struct SCPQuorumSet {

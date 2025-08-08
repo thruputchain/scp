@@ -1,10 +1,7 @@
 use crate::*;
 use std::collections::HashMap;
 
-/// BallotProtocol
-pub struct BallotProto<'a> {
-    slot: &'a SlotProto<'a>,
-
+pub struct BallotState {
     heard_from_quorum: bool,
 
     current: Option<proto::SCPBallot>,        // b
@@ -23,10 +20,9 @@ pub struct BallotProto<'a> {
     last_envelope_emit: Option<proto::SCPEnvelope>, // last envelope emitted by this node
 }
 
-impl<'a> BallotProto<'a> {
-    pub fn new(slot: &'a SlotProto<'a>) -> Self {
-        BallotProto {
-            slot,
+impl BallotState {
+    pub fn new() -> Self {
+        BallotState {
             heard_from_quorum: false,
             current: None,
             prepared: None,
@@ -42,8 +38,41 @@ impl<'a> BallotProto<'a> {
             last_envelope_emit: None,
         }
     }
+}
 
-    pub fn is_newer_statement(node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
-        panic!("XXX")
+struct BallotProto<'a> {
+    slot_state: &'a mut SlotState,
+}
+
+impl<'a> BallotProto<'a> {
+    pub fn new(slot_state: &'a mut SlotState) -> Self {
+        BallotProto { slot_state }
+    }
+
+    fn state(&self) -> &BallotState {
+        self.slot_state.ballot()
+    }
+
+    fn state_mut(&mut self) -> &mut BallotState {
+        self.slot_state.ballot_mut()
+    }
+
+    fn slot_proto<'s>(&'s mut self) -> SlotProto<'s> {
+        SlotProto::<'s>::new(self.slot_state)
+    }
+
+    fn is_newer_statement(&self, node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
+        match self.state().latest_envelopes.get(node_id) {
+            Some(old) => is_newer_statement(&old.statement, st),
+            None => true,
+        }
+    }
+
+    fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
+        let node_id = env.statement.node_id.clone();
+        self.state_mut()
+            .latest_envelopes
+            .insert(node_id, env.clone());
+        self.slot_proto().record_envelope(env);
     }
 }

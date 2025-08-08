@@ -9,9 +9,9 @@ pub enum ValidationLevel {
     FullyValid, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
-/// SCP2User defines the calls that SCP makes to the user.
+/// App defines the calls that SCP makes to the user.
 #[async_trait]
-pub trait SCP2User {
+pub trait App {
     /// Prompts the SCP user to nominate a value for the given slot.
     /// Nomination can consume time, so SCP reserves the right to
     /// cancel a nomination request via the given cancellation token.
@@ -48,15 +48,15 @@ pub trait SCP2User {
     fn externalized(&self, slot_index: SCPSlotIndex, value: SCPValue);
 }
 
-/// SCP2World specifies the functionality that SCP requires in order to communicate
+/// Send specifies the functionality that SCP requires in order to communicate
 /// with peers, which includes networking and a sense of time.
 #[async_trait]
-pub trait SCP2World {
+pub trait Send {
     async fn disseminate(&self, msg: BytesM);
 }
 
-/// World2SCP specifies the external events that SCP handles.
-pub trait World2SCP {
+/// Receive specifies the external events that SCP handles.
+pub trait Receive {
     fn received(&mut self, msg: BytesM);
 }
 

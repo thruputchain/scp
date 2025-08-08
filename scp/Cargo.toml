@@ -17,6 +17,7 @@ async-trait = "0.1"
 derive_more = { version = "2", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
+tracing = "0.1"
 
 [dependencies.xdr_common]
 git = "ssh://git@github.com/groundhogchain/xdr_common.git"

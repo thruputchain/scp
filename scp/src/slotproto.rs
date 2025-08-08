@@ -1,7 +1,9 @@
 use crate::*;
 
+pub type SlotIndex = u64;
+
 pub struct SlotState {
-    slot_index: i64,
+    slot_index: SlotIndex,
     ballot_state: BallotState,
 }
 
@@ -19,6 +21,14 @@ impl SlotState {
 
     pub fn ballot_mut(&mut self) -> &mut BallotState {
         &mut self.ballot_state
+    }
+
+    pub fn slot_index(&self) -> SlotIndex {
+        self.slot_index
+    }
+
+    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
+        panic!("XXX")
     }
 }
 

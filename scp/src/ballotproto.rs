@@ -1,5 +1,6 @@
 use crate::*;
 use std::collections::HashMap;
+use tracing::{error, info};
 
 pub struct BallotState {
     heard_from_quorum: bool,
@@ -38,6 +39,13 @@ impl BallotState {
             last_envelope_emit: None,
         }
     }
+
+    pub fn is_newer_statement(&self, node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
+        match self.latest_envelopes.get(node_id) {
+            Some(old) => is_newer_statement(&old.statement, st),
+            None => true,
+        }
+    }
 }
 
 struct BallotProto<'a> {
@@ -49,11 +57,7 @@ impl<'a> BallotProto<'a> {
         BallotProto { slot_state }
     }
 
-    fn state(&self) -> &BallotState {
-        self.slot_state.ballot()
-    }
-
-    fn state_mut(&mut self) -> &mut BallotState {
+    fn state(&mut self) -> &mut BallotState {
         self.slot_state.ballot_mut()
     }
 
@@ -61,18 +65,50 @@ impl<'a> BallotProto<'a> {
         SlotProto::<'s>::new(self.slot_state)
     }
 
-    fn is_newer_statement(&self, node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
-        match self.state().latest_envelopes.get(node_id) {
-            Some(old) => is_newer_statement(&old.statement, st),
-            None => true,
-        }
-    }
-
     fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
-        self.state_mut()
-            .latest_envelopes
-            .insert(node_id, env.clone());
+        self.state().latest_envelopes.insert(node_id, env.clone());
         self.slot_proto().record_envelope(env);
+    }
+
+    pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
+        assert!(env.statement.slot_index == self.slot_state.slot_index());
+        let statement = &env.statement;
+        let node_id = &statement.node_id;
+        if self.slot_state.is_statement_sane(statement, ours) {
+            if ours {
+                error!(env = ?env, "not sane statement from self, skipping");
+            }
+            return EnvelopeState::Invalid;
+        }
+        if !self.state().is_newer_statement(node_id, statement) {
+            if ours {
+                error!(env = ?env, "stale statement from self, skipping")
+            } else {
+                error!(
+                    slot_index = self.slot_state.slot_index(),
+                    "stale statement, skipping"
+                )
+            }
+            return EnvelopeState::Invalid;
+        }
+        // 188
+        match self.validate_values(statement) {
+            ValidationLevel::Invalid => panic!("XXX"),
+            ValidationLevel::MaybeValid => panic!("XXX"),
+            ValidationLevel::FullyValid => panic!("XXX"),
+        }
+        panic!("XXX")
+    }
+
+    fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
+        panic!("XXX")
+    }
+
+    pub fn example_method(&mut self) {
+        info!(
+            "BallotProto example method called - tracking ballot state phase: {:?}",
+            self.state().phase
+        );
     }
 }

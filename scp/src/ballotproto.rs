@@ -48,13 +48,17 @@ impl BallotState {
     }
 }
 
-struct BallotProto<'a> {
+struct BallotProto<'a, A: App> {
+    app: A,
     slot_state: &'a mut SlotState,
 }
 
-impl<'a> BallotProto<'a> {
-    pub fn new(slot_state: &'a mut SlotState) -> Self {
-        BallotProto { slot_state }
+impl<'a, A: App> BallotProto<'a, A> {
+    pub fn new(app: A, slot_state: &'a mut SlotState) -> Self {
+        BallotProto {
+            app: app,
+            slot_state: slot_state,
+        }
     }
 
     fn state(&mut self) -> &mut BallotState {
@@ -71,37 +75,53 @@ impl<'a> BallotProto<'a> {
         self.slot_proto().record_envelope(env);
     }
 
-    pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
+    pub async fn process_envelope(
+        &mut self,
+        env: &proto::SCPEnvelope,
+        ours: bool,
+    ) -> EnvelopeState {
         assert!(env.statement.slot_index == self.slot_state.slot_index());
+
         let statement = &env.statement;
         let node_id = &statement.node_id;
-        if self.slot_state.is_statement_sane(statement, ours) {
-            if ours {
-                error!(env = ?env, "not sane statement from self, skipping");
+
+        let mut check_valid = || -> EnvelopeState {
+            if self.slot_state.is_statement_sane(statement, ours) {
+                if ours {
+                    error!(env = ?env, "not sane statement from self, skipping");
+                }
+                return EnvelopeState::Invalid;
             }
-            return EnvelopeState::Invalid;
-        }
-        if !self.state().is_newer_statement(node_id, statement) {
-            if ours {
-                error!(env = ?env, "stale statement from self, skipping")
-            } else {
-                error!(
-                    slot_index = self.slot_state.slot_index(),
-                    "stale statement, skipping"
-                )
+            if !self.state().is_newer_statement(node_id, statement) {
+                if ours {
+                    error!(env = ?env, "stale statement from self, skipping")
+                } else {
+                    error!(
+                        slot_index = self.slot_state.slot_index(),
+                        "stale statement, skipping"
+                    )
+                }
+                return EnvelopeState::Invalid;
             }
-            return EnvelopeState::Invalid;
+            EnvelopeState::Valid
+        };
+
+        match check_valid() {
+            EnvelopeState::Invalid => return EnvelopeState::Invalid,
+            _ => {}
         }
+
         // 188
-        match self.validate_values(statement) {
+        match self.validate_values(statement).await {
             ValidationLevel::Invalid => panic!("XXX"),
             ValidationLevel::MaybeValid => panic!("XXX"),
             ValidationLevel::FullyValid => panic!("XXX"),
         }
+
         panic!("XXX")
     }
 
-    fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
+    async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }
 

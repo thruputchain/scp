@@ -52,7 +52,7 @@ pub trait App {
 /// with peers, which includes networking and a sense of time.
 #[async_trait]
 pub trait Send {
-    async fn disseminate(&self, msg: BytesM);
+    async fn send(&self, msg: BytesM);
 }
 
 /// Receive specifies the external events that SCP handles.

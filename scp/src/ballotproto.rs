@@ -1,4 +1,5 @@
 use crate::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use tracing::{debug, error, info, trace};
 
@@ -10,9 +11,9 @@ pub struct BallotState {
     prepared_prime: Option<proto::SCPBallot>, // p'
     high: Option<proto::SCPBallot>,           // h
     commit: Option<proto::SCPBallot>,         // c
-    value: Option<proto::SCPBallot>,          // z
+    value_override: Option<proto::SCPBallot>, // z
     latest_envelopes: HashMap<proto::SCPNodeID, proto::SCPEnvelope>, // M
-    phase: SCPPhase,                          // phi
+    phase: Phase,                             // phi
 
     msg_level: i64,       // number of messages triggered in one run
     timer_exp_count: i64, // number of times the timer has expired; used for the quorum endpoint
@@ -30,9 +31,9 @@ impl BallotState {
             prepared_prime: None,
             high: None,
             commit: None,
-            value: None,
+            value_override: None,
             latest_envelopes: HashMap::new(),
-            phase: SCPPhase::Prepare,
+            phase: Phase::Prepare,
             msg_level: 0,
             timer_exp_count: 0,
             last_envelope_gen: None,
@@ -130,7 +131,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             return EnvelopeState::Invalid;
         }
 
-        if !matches!(self.ballot_state.phase, SCPPhase::Externalize) {
+        if !matches!(self.ballot_state.phase, Phase::Externalize) {
             if let ValidationLevel::MaybeValid = validation_result {
                 self.slot_proto.set_fully_validated(false);
             }
@@ -284,11 +285,105 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
     }
 
     fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
-        panic!("XXX");
+        let n = match &self.ballot_state.current {
+            Some(b) => {
+                if !force {
+                    return false;
+                }
+                b.counter + 1
+            }
+            None => 1,
+        };
+        self.bump_state_n(value, n)
     }
 
     fn bump_state_n(&mut self, value: proto::SCPValue, n: u32) -> bool {
-        panic!("XXX");
+        return match self.ballot_state.phase {
+            Phase::Prepare | Phase::Confirm => {
+                //363
+                let newv = match &self.ballot_state.value_override {
+                    Some(v) => v.value.clone(),
+                    None => value,
+                };
+                let newb = proto::SCPBallot {
+                    counter: n,
+                    value: newv,
+                };
+                trace!(
+                    slot_index = self.slot_proto.slot_index(),
+                    ballot = ?newb,
+                    "ballot protocol bump state"
+                );
+                let updated = self.update_current_value(newb);
+                if updated {
+                    self.emit_current_state_statement();
+                    self.check_heard_from_quorum();
+                };
+                updated
+            }
+            Phase::Externalize | Phase::Num => false,
+        };
+    }
+
+    /// updates the local state based to the specified ballot
+    /// (that could be a prepared ballot) enforcing invariants
+    fn update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
+        if self.ballot_state.phase != Phase::Prepare && self.ballot_state.phase != Phase::Confirm {
+            return false;
+        };
+        let updated = match &self.ballot_state.current {
+            None => {
+                self.bump_to_ballot(new_ballot, true);
+                true
+            }
+            Some(current) => {
+                assert!(compare_ballots(current, &new_ballot) != Ordering::Greater);
+                if let Some(commit) = &self.ballot_state.commit {
+                    if !are_ballots_compatible(commit, &new_ballot) {
+                        return false;
+                    }
+                }
+                match compare_ballots(current, &new_ballot) {
+                    Ordering::Less => {
+                        self.bump_to_ballot(new_ballot, true);
+                        true
+                    }
+                    Ordering::Equal => false,
+                    Ordering::Greater => {
+                        // this code probably changes with the final version
+                        // of the conciliator
+                        // this case may happen if the other nodes are not
+                        // following the protocol (and we end up with a smaller value)
+                        // not sure what is the best way to deal
+                        // with this situation
+                        error!(
+                            "ballot protocol update_current_value attempt to bump to a smaller value"
+                        );
+                        // can't just bump to the value as we may already have
+                        // statements at counter+1
+                        return false;
+                    }
+                }
+            }
+        };
+        self.check_invariants();
+        updated
+    }
+
+    fn bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
+        panic!("XXX")
+    }
+
+    fn emit_current_state_statement(&mut self) {
+        panic!("XXX")
+    }
+
+    fn check_heard_from_quorum(&mut self) {
+        panic!("XXX")
+    }
+
+    fn check_invariants(&mut self) {
+        panic!("XXX")
     }
 
     async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {

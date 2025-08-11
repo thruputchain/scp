@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::HashMap;
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace};
 
 pub struct BallotState {
     heard_from_quorum: bool,
@@ -48,31 +48,29 @@ impl BallotState {
     }
 }
 
-struct BallotProto<'a, A: Consensus> {
-    app: A,
+struct BallotProto<'a, C: Consensus, D: Driver> {
+    slot_proto: &'a mut SlotProto<'a, C, D>,
     slot_state: &'a mut SlotState,
 }
 
-impl<'a, A: Consensus> BallotProto<'a, A> {
-    pub fn new(app: A, slot_state: &'a mut SlotState) -> Self {
+impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
+    pub fn new(slot_proto: &'a mut SlotProto<'a, C, D>, slot_state: &'a mut SlotState) -> Self {
         BallotProto {
-            app: app,
-            slot_state: slot_state,
+            slot_proto,
+            slot_state,
         }
     }
 
-    fn state(&mut self) -> &mut BallotState {
+    fn ballot_state(&mut self) -> &mut BallotState {
         self.slot_state.ballot_mut()
-    }
-
-    fn slot_proto<'s>(&'s mut self) -> SlotProto<'s> {
-        SlotProto::<'s>::new(self.slot_state)
     }
 
     fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
-        self.state().latest_envelopes.insert(node_id, env.clone());
-        self.slot_proto().record_envelope(env);
+        self.ballot_state()
+            .latest_envelopes
+            .insert(node_id, env.clone());
+        self.slot_proto.record_envelope(env);
     }
 
     pub async fn process_envelope(
@@ -136,18 +134,132 @@ impl<'a, A: Consensus> BallotProto<'a, A> {
             return EnvelopeState::Invalid;
         }
 
-        // 206
-        panic!("XXX")
+        if !matches!(self.ballot_state().phase, SCPPhase::Externalize) {
+            if let ValidationLevel::MaybeValid = validation_result {
+                self.slot_proto.set_fully_validated(false);
+            }
+            self.record_envelope(env);
+            self.advance_slot(statement); //XXX:async?
+            return EnvelopeState::Valid;
+        }
+
+        // this handles also our own messages
+        // in particular our final EXTERNALIZE message
+        match &self.ballot_state().commit {
+            Some(c) => {
+                if c.value == get_working_ballot(statement).value {
+                    self.record_envelope(env);
+                    return EnvelopeState::Valid;
+                }
+            }
+            _ => assert!(false),
+        }
+
+        if ours {
+            error!(env = ?env, "externalize statement with invalid value from self, skipping");
+        }
+
+        return EnvelopeState::Invalid;
+    }
+
+    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
+        match &self.slot_proto.get_qset_from_statement(statement) {
+            Some(qset) => {
+                if let Result::Err(e) = is_qset_sane(qset, false) {
+                    debug!(err = ?e, "invalid quorum set received");
+                    return false;
+                }
+            }
+            None => {
+                debug!(statement = ?statement, "unknown quorum set");
+                return false;
+            }
+        }
+
+        match &statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                // self is allowed to have b = 0 (as long as it never gets emitted)
+                if !(ours || prepare.ballot.counter > 0) {
+                    trace!(statement = ?statement, "malformed PREPARE message");
+                    return false;
+                }
+                match (&prepare.prepared_prime, &prepare.prepared) {
+                    (Some(pp), Some(p)) => {
+                        if !are_ballots_less_and_incompatible(pp, p) {
+                            trace!(statement = ?statement, "malformed PREPARE message");
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+                if prepare.n_h != 0 {
+                    match &prepare.prepared {
+                        Some(p) => {
+                            if prepare.n_h > p.counter {
+                                trace!(statement = ?statement, "malformed PREPARE message");
+                                return false;
+                            }
+                        }
+                        _ => {
+                            trace!(statement = ?statement, "malformed PREPARE message");
+                            return false;
+                        }
+                    }
+                }
+                // c != 0 -> c <= h <= b
+                if prepare.n_c != 0 {
+                    if !(prepare.n_h != 0
+                        && prepare.ballot.counter >= prepare.n_h
+                        && prepare.n_h >= prepare.n_c)
+                    {
+                        trace!(statement = ?statement, "malformed PREPARE message");
+                        return false;
+                    }
+                }
+                return true;
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                // c <= h <= b
+                if confirm.ballot.counter <= 0 {
+                    trace!(statement = ?statement, "malformed CONFIRM message");
+                    return false;
+                }
+                if confirm.n_h > confirm.ballot.counter {
+                    trace!(statement = ?statement, "malformed CONFIRM message");
+                    return false;
+                }
+                if confirm.n_commit > confirm.n_h {
+                    trace!(statement = ?statement, "malformed CONFIRM message");
+                    return false;
+                }
+                return true;
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                if externalize.commit.counter <= 0 {
+                    trace!(statement = ?statement, "malformed EXTERNALIZE message");
+                    return false;
+                }
+                if externalize.n_h < externalize.commit.counter {
+                    trace!(statement = ?statement, "malformed EXTERNALIZE message");
+                    return false;
+                }
+                return true;
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: _ } => {
+                panic!("unreachable");
+            }
+        }
     }
 
     async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }
 
-    pub fn example_method(&mut self) {
-        info!(
-            "BallotProto example method called - tracking ballot state phase: {:?}",
-            self.state().phase
-        );
+    // attempts to make progress using the latest statement as a hint
+    // calls into the various attempt* methods, emits message
+    // to make progress
+    //XXX: async?
+    fn advance_slot(&mut self, statement: &proto::SCPStatement) {
+        panic!("XXX")
     }
 }

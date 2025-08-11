@@ -21,3 +21,6 @@ tracing = "0.1"
 
 [dependencies.xdr_common]
 git = "ssh://git@github.com/groundhogchain/xdr_common.git"
+
+[dependencies.thiserror]
+version = "2.0"

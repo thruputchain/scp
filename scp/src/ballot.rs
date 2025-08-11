@@ -10,3 +10,10 @@ pub fn compare_opt_ballots(
 ) -> Ordering {
     panic!("XXX")
 }
+
+pub fn are_ballots_less_and_incompatible(
+    left: &proto::SCPBallot,
+    right: &proto::SCPBallot,
+) -> bool {
+    panic!("XXX")
+}

@@ -3,11 +3,17 @@ pub use proto::*;
 mod consensus;
 pub use consensus::*;
 
-pub mod scp;
-pub use scp::*;
+mod driver;
+pub use driver::*;
+
+pub mod stellar;
+pub use stellar::*;
 
 pub mod slotproto;
 pub use slotproto::*;
+
+pub mod qset;
+pub use qset::*;
 
 pub mod ballot;
 pub use ballot::*;

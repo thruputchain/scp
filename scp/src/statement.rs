@@ -59,3 +59,9 @@ pub fn is_newer_statement(older: &proto::SCPStatement, newer: &proto::SCPStateme
         }
     }
 }
+
+// helper function to retrieve b for PREPARE, P for CONFIRM or
+// c for EXTERNALIZE messages
+pub fn get_working_ballot(statement: &proto::SCPStatement) -> &proto::SCPBallot {
+    panic!("XXX")
+}

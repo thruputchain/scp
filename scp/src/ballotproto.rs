@@ -48,12 +48,12 @@ impl BallotState {
     }
 }
 
-struct BallotProto<'a, A: App> {
+struct BallotProto<'a, A: Consensus> {
     app: A,
     slot_state: &'a mut SlotState,
 }
 
-impl<'a, A: App> BallotProto<'a, A> {
+impl<'a, A: Consensus> BallotProto<'a, A> {
     pub fn new(app: A, slot_state: &'a mut SlotState) -> Self {
         BallotProto {
             app: app,
@@ -97,7 +97,10 @@ impl<'a, A: App> BallotProto<'a, A> {
                 }
                 return EnvelopeState::Invalid;
             }
-            if !slot_state.ballot_mut().is_newer_statement(&statement.node_id, statement) {
+            if !slot_state
+                .ballot_mut()
+                .is_newer_statement(&statement.node_id, statement)
+            {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
@@ -111,9 +114,8 @@ impl<'a, A: App> BallotProto<'a, A> {
             EnvelopeState::Valid
         }
 
-        match check_valid(self.slot_state, statement, ours, env) {
-            EnvelopeState::Invalid => return EnvelopeState::Invalid,
-            _ => {}
+        if let EnvelopeState::Invalid = check_valid(self.slot_state, statement, ours, env) {
+            return EnvelopeState::Invalid;
         }
 
         let validation_result = self.validate_values(statement).await;
@@ -130,9 +132,8 @@ impl<'a, A: App> BallotProto<'a, A> {
         }
 
         // check if validity has changed since the call into the app
-        match check_valid(self.slot_state, statement, ours, env) {
-            EnvelopeState::Invalid => return EnvelopeState::Invalid,
-            _ => {}
+        if let EnvelopeState::Invalid = check_valid(self.slot_state, statement, ours, env) {
+            return EnvelopeState::Invalid;
         }
 
         // 206

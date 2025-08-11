@@ -1,7 +1,7 @@
 pub use proto::*;
 
-mod sdk;
-pub use sdk::*;
+mod consensus;
+pub use consensus::*;
 
 pub mod scp;
 pub use scp::*;

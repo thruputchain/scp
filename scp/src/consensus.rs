@@ -11,7 +11,7 @@ pub enum ValidationLevel {
 
 /// App defines the calls that SCP makes to the user.
 #[async_trait]
-pub trait App {
+pub trait Consensus {
     /// Prompts the SCP user to nominate a value for the given slot.
     /// Nomination can consume time, so SCP reserves the right to
     /// cancel a nomination request via the given cancellation token.

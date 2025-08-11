@@ -3,14 +3,18 @@ use crate::*;
 pub type SlotIndex = u64;
 
 pub struct SlotState {
-    slot_index: SlotIndex,
+    slot_meta: SlotMeta,
     ballot_state: BallotState,
+}
+
+pub struct SlotMeta {
+    slot_index: SlotIndex,
 }
 
 impl SlotState {
     pub fn new() -> Self {
         SlotState {
-            slot_index: 0,
+            slot_meta: SlotMeta { slot_index: 0 },
             ballot_state: BallotState::new(),
         }
     }
@@ -22,27 +26,27 @@ impl SlotState {
     pub fn ballot_mut(&mut self) -> &mut BallotState {
         &mut self.ballot_state
     }
-
-    pub fn slot_index(&self) -> SlotIndex {
-        self.slot_index
-    }
-
-    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
-        panic!("XXX")
-    }
 }
 
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
     stellar_proto: &'a StellarProto<C, D>,
-    slot_state: &'a mut SlotState,
+    slot_meta: &'a mut SlotMeta,
 }
 
 impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
-    pub fn new(stellar_proto: &'a mut StellarProto<C, D>, slot_state: &'a mut SlotState) -> Self {
+    pub fn new(stellar_proto: &'a mut StellarProto<C, D>, slot_meta: &'a mut SlotMeta) -> Self {
         SlotProto {
             stellar_proto,
-            slot_state,
+            slot_meta,
         }
+    }
+
+    pub fn slot_index(&self) -> SlotIndex {
+        self.slot_meta.slot_index
+    }
+
+    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
+        panic!("XXX")
     }
 
     pub fn get_qset_from_statement(
@@ -57,6 +61,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     pub fn set_fully_validated(&mut self, validated: bool) {
+        panic!("XXX")
+    }
+
+    pub fn get_latest_composite_candidate(&self) -> Option<&proto::SCPValue> {
         panic!("XXX")
     }
 }

@@ -50,24 +50,20 @@ impl BallotState {
 
 struct BallotProto<'a, C: Consensus, D: Driver> {
     slot_proto: &'a mut SlotProto<'a, C, D>,
-    slot_state: &'a mut SlotState,
+    ballot_state: &'a mut BallotState,
 }
 
 impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
-    pub fn new(slot_proto: &'a mut SlotProto<'a, C, D>, slot_state: &'a mut SlotState) -> Self {
+    pub fn new(slot_proto: &'a mut SlotProto<'a, C, D>, ballot_state: &'a mut BallotState) -> Self {
         BallotProto {
             slot_proto,
-            slot_state,
+            ballot_state,
         }
-    }
-
-    fn ballot_state(&mut self) -> &mut BallotState {
-        self.slot_state.ballot_mut()
     }
 
     fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
-        self.ballot_state()
+        self.ballot_state
             .latest_envelopes
             .insert(node_id, env.clone());
         self.slot_proto.record_envelope(env);
@@ -78,32 +74,32 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         env: &proto::SCPEnvelope,
         ours: bool,
     ) -> EnvelopeState {
-        assert!(env.statement.slot_index == self.slot_state.slot_index());
+        assert!(env.statement.slot_index == self.slot_proto.slot_index());
 
         let statement = &env.statement;
         let node_id = &statement.node_id;
 
-        fn check_valid(
-            slot_state: &mut SlotState,
+        fn check_valid<'a, C: Consensus, D: Driver>(
+            ballot_proto: &mut BallotProto<'a, C, D>,
             statement: &proto::SCPStatement,
             ours: bool,
             env: &proto::SCPEnvelope,
         ) -> EnvelopeState {
-            if slot_state.is_statement_sane(statement, ours) {
+            if ballot_proto.slot_proto.is_statement_sane(statement, ours) {
                 if ours {
                     error!(env = ?env, "not sane statement from self, skipping");
                 }
                 return EnvelopeState::Invalid;
             }
-            if !slot_state
-                .ballot_mut()
+            if !ballot_proto
+                .ballot_state
                 .is_newer_statement(&statement.node_id, statement)
             {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
                     trace!(
-                        slot_index = slot_state.slot_index(),
+                        slot_index = ballot_proto.slot_proto.slot_index(),
                         "stale statement, skipping"
                     )
                 }
@@ -112,7 +108,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             EnvelopeState::Valid
         }
 
-        if let EnvelopeState::Invalid = check_valid(self.slot_state, statement, ours, env) {
+        if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
             return EnvelopeState::Invalid;
         }
 
@@ -122,7 +118,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                 if ours {
                     error!(env = ?env, "invalid value from self, skipping")
                 } else {
-                    trace!(slot_index = self.slot_state.slot_index(), "invalid value")
+                    trace!(slot_index = self.slot_proto.slot_index(), "invalid value")
                 }
                 return EnvelopeState::Invalid;
             }
@@ -130,11 +126,11 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
 
         // check if validity has changed since the call into the app
-        if let EnvelopeState::Invalid = check_valid(self.slot_state, statement, ours, env) {
+        if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
             return EnvelopeState::Invalid;
         }
 
-        if !matches!(self.ballot_state().phase, SCPPhase::Externalize) {
+        if !matches!(self.ballot_state.phase, SCPPhase::Externalize) {
             if let ValidationLevel::MaybeValid = validation_result {
                 self.slot_proto.set_fully_validated(false);
             }
@@ -145,7 +141,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
 
         // this handles also our own messages
         // in particular our final EXTERNALIZE message
-        match &self.ballot_state().commit {
+        match &self.ballot_state.commit {
             Some(c) => {
                 if c.value == get_working_ballot(statement).value {
                     self.record_envelope(env);
@@ -249,6 +245,50 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                 panic!("unreachable");
             }
         }
+    }
+
+    fn abandon_ballot(&mut self, n: u32) -> bool {
+        trace!("abandoning ballot");
+        let v = match self.slot_proto.get_latest_composite_candidate() {
+            Some(w) => {
+                if w.is_empty() {
+                    match &self.ballot_state.current {
+                        Some(cv) => Some(cv.value.clone()),
+                        None => None,
+                    }
+                } else {
+                    Some(w.clone())
+                }
+            }
+            None => match &self.ballot_state.current {
+                Some(cv) => Some(cv.value.clone()),
+                None => None,
+            },
+        };
+        match v {
+            Some(w) => {
+                if w.is_empty() {
+                    return false;
+                } else {
+                    if n == 0 {
+                        return self.bump_state(w, true);
+                    } else {
+                        return self.bump_state_n(w, n);
+                    }
+                }
+            }
+            None => {
+                return false;
+            }
+        }
+    }
+
+    fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
+        panic!("XXX");
+    }
+
+    fn bump_state_n(&mut self, value: proto::SCPValue, n: u32) -> bool {
+        panic!("XXX");
     }
 
     async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {

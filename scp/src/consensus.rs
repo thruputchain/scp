@@ -1,3 +1,4 @@
+use crate::*;
 use async_trait::async_trait;
 use proto::*;
 use tokio_util::sync::CancellationToken;
@@ -11,7 +12,7 @@ pub enum ValidationLevel {
 
 /// App defines the calls that SCP makes to the user.
 #[async_trait]
-pub trait Consensus {
+pub trait Consensus: StellarConsensus {
     /// Prompts the SCP user to nominate a value for the given slot.
     /// Nomination can consume time, so SCP reserves the right to
     /// cancel a nomination request via the given cancellation token.
@@ -46,6 +47,10 @@ pub trait Consensus {
 
     /// Notifies the SCP user that a value has been externalized for a given slot.
     fn externalized(&self, slot_index: SCPSlotIndex, value: SCPValue);
+}
+
+pub trait StellarConsensus {
+    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
 }
 
 /// Send specifies the functionality that SCP requires in order to communicate

@@ -371,7 +371,53 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
     }
 
     fn bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
-        panic!("XXX")
+        trace!(
+            slot_index = self.slot_proto.slot_index(),
+            ballot = ?ballot,
+            "ballot proto bump_to_ballot"
+        );
+
+        // `bump_to_ballot` should be never called once we committed
+        assert!(self.ballot_state.phase != Phase::Externalize);
+
+        if check {
+            match &self.ballot_state.current {
+                Some(current) => assert!(compare_ballots(&ballot, current) != Ordering::Less),
+                None => {}
+            }
+        }
+
+        let got_bumped = match &self.ballot_state.current {
+            Some(current) => current.counter != ballot.counter,
+            None => true,
+        };
+
+        match &self.ballot_state.current {
+            None => {
+                self.slot_proto
+                    .stellar_proto
+                    .consensus
+                    .started_ballot_proto(self.slot_proto.slot_index(), &ballot);
+            }
+            Some(_) => {}
+        }
+
+        self.ballot_state.current = Some(ballot);
+
+        // we have to clear some fields (and recompute them based on latest
+        // messages)
+        // invariant: h.value = b.value
+        if let Some(high) = &self.ballot_state.high {
+            if !are_ballots_compatible(self.ballot_state.current.as_ref().unwrap(), high) {
+                self.ballot_state.high = None;
+                // invariant: c set only when h is set
+                self.ballot_state.commit = None;
+            }
+        }
+
+        if got_bumped {
+            self.ballot_state.heard_from_quorum = false;
+        }
     }
 
     fn emit_current_state_statement(&mut self) {

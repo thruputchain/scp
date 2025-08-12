@@ -420,6 +420,29 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
     }
 
+    fn start_ballot_proto_timer(&mut self) {
+        let driver = &self.slot_proto.stellar_proto.driver;
+        let timeout =
+            driver.compute_timeout(self.ballot_state.current.as_ref().unwrap().counter, false);
+        driver.start_timer(self.slot_proto.slot_index(), Timer::Ballot, timeout, || {
+            self.ballot_proto_timer_expired(); //XXX: FnMut. How does this work?
+        });
+    }
+
+    fn stop_ballot_proto_timer(&mut self) {
+        let driver = &self.slot_proto.stellar_proto.driver;
+        driver.stop_timer(self.slot_proto.slot_index(), Timer::Ballot);
+    }
+
+    fn ballot_proto_timer_expired(&mut self) {
+        self.ballot_state.timer_exp_count += 1;
+        self.abandon_ballot(0);
+    }
+
+    fn create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
+        panic!("XXX")
+    }
+
     fn emit_current_state_statement(&mut self) {
         panic!("XXX")
     }

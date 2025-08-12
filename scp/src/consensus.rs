@@ -1,6 +1,5 @@
 use crate::*;
 use async_trait::async_trait;
-use proto::*;
 use tokio_util::sync::CancellationToken;
 use xdr_common::*;
 

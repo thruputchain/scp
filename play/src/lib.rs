@@ -1,15 +1,36 @@
-struct A {
-    b: B,
+use std::sync::{Arc, Mutex, MutexGuard};
+
+struct State {
+    x: i64,
 }
 
-impl A {
-    fn x(&mut self) {
-        // self.b.f(&self.b)
+impl State {
+    fn f(&mut self) {
+        self.x = 3;
     }
 }
 
-struct B {}
+struct AState(Arc<Mutex<State>>);
 
-impl B {
-    fn f(&mut self, self2: &B) {}
+impl AState {
+    fn acquire(&self) -> MutexGuard<'_, State> {
+        self.0.lock().unwrap()
+    }
+    fn f(&self) {
+        self.acquire().f()
+    }
+    fn g(&self) -> AState {
+        self.clone()
+    }
+    fn h(&self) -> impl Fn() {
+        move || {
+            self.g();
+        }
+    }
+}
+
+impl Clone for AState {
+    fn clone(&self) -> Self {
+        AState(Arc::clone(&self.0))
+    }
 }

@@ -1,12 +1,12 @@
 use crate::*;
 
-pub struct StellarProto<C: Consensus, D: Driver> {
-    pub consensus: C,
-    pub driver: D,
+pub struct StellarProto<'a, C: Consensus, D: Driver> {
+    pub consensus: &'a C,
+    pub driver: &'a D,
 }
 
-impl<C: Consensus, D: Driver> StellarProto<C, D> {
-    pub fn new(consensus: C, driver: D) -> StellarProto<C, D> {
+impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
+    pub fn new(consensus: &'a C, driver: &'a D) -> StellarProto<'a, C, D> {
         return StellarProto { consensus, driver };
     }
 }

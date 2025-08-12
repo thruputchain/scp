@@ -29,7 +29,7 @@ impl SlotState {
 }
 
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
-    pub stellar_proto: &'a StellarProto<C, D>,
+    pub stellar_proto: &'a StellarProto<'a, C, D>,
     slot_meta: &'a mut SlotMeta,
 }
 

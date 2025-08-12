@@ -424,9 +424,14 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         let driver = &self.slot_proto.stellar_proto.driver;
         let timeout =
             driver.compute_timeout(self.ballot_state.current.as_ref().unwrap().counter, false);
-        driver.start_timer(self.slot_proto.slot_index(), Timer::Ballot, timeout, || {
-            self.ballot_proto_timer_expired(); //XXX: FnMut. How does this work?
-        });
+        driver.start_timer(
+            self.slot_proto.slot_index(),
+            Timer::Ballot,
+            timeout,
+            move || {
+                self.ballot_proto_timer_expired(); //XXX: FnMut. How does this work?
+            },
+        );
     }
 
     fn stop_ballot_proto_timer(&mut self) {
@@ -440,7 +445,79 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
     }
 
     fn create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
-        panic!("XXX")
+        self.check_invariants();
+
+        let pledges = match typ {
+            proto::SCPStatementType::SCP_ST_PREPARE => {
+                let mut prepare = proto::SCPStatementPrepare {
+                    quorum_set_hash: [0u8; 32], // XXX: get from local node
+                    ballot: proto::SCPBallot {
+                        counter: 0,
+                        value: Default::default(),
+                    },
+                    prepared: None,
+                    prepared_prime: None,
+                    n_c: 0,
+                    n_h: 0,
+                };
+
+                if let Some(ref current) = self.ballot_state.current {
+                    prepare.ballot = current.clone();
+                }
+
+                if let Some(ref commit) = self.ballot_state.commit {
+                    prepare.n_c = commit.counter;
+                }
+
+                if let Some(ref prepared) = self.ballot_state.prepared {
+                    prepare.prepared = Some(prepared.clone());
+                }
+
+                if let Some(ref prepared_prime) = self.ballot_state.prepared_prime {
+                    prepare.prepared_prime = Some(prepared_prime.clone());
+                }
+
+                if let Some(ref high) = self.ballot_state.high {
+                    prepare.n_h = high.counter;
+                }
+
+                proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare }
+            }
+
+            proto::SCPStatementType::SCP_ST_CONFIRM => {
+                let confirm = proto::SCPStatementConfirm {
+                    ballot: self.ballot_state.current.as_ref().unwrap().clone(),
+                    n_prepared: self.ballot_state.prepared.as_ref().unwrap().counter,
+                    n_commit: self.ballot_state.commit.as_ref().unwrap().counter,
+                    n_h: self.ballot_state.high.as_ref().unwrap().counter,
+                    quorum_set_hash: [0u8; 32], // XXX: get from local node
+                };
+
+                proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
+            }
+
+            proto::SCPStatementType::SCP_ST_EXTERNALIZE => {
+                let externalize = proto::SCPStatementExternalize {
+                    commit: self.ballot_state.commit.as_ref().unwrap().clone(),
+                    n_h: self.ballot_state.high.as_ref().unwrap().counter,
+                    commit_quorum_set_hash: [0u8; 32], // XXX: get from local node
+                };
+
+                proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
+            }
+
+            proto::SCPStatementType::SCP_ST_NOMINATE => {
+                panic!("create_statement should not be called with SCP_ST_NOMINATE");
+            }
+        };
+
+        proto::SCPStatement {
+            node_id: proto::PublicKey::Ed25519 {
+                ed25519: proto::Ed25519PublicKey::new([0u8; 32]),
+            }, // XXX: get from local node
+            slot_index: self.slot_proto.slot_index(),
+            pledges,
+        }
     }
 
     fn emit_current_state_statement(&mut self) {
@@ -451,7 +528,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         panic!("XXX")
     }
 
-    fn check_invariants(&mut self) {
+    fn check_invariants(&self) {
         panic!("XXX")
     }
 

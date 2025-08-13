@@ -61,7 +61,9 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         self.slot_mut().ballot_mut()
     }
 
-    fn ballot_record_envelope(&mut self, env: &proto::SCPEnvelope) {
+    // proto
+
+    fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
         self.ballot_mut()
             .latest_envelopes
@@ -69,18 +71,14 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         self.slot_mut().record_envelope(env);
     }
 
-    pub fn ballot_is_newer_statement(
-        &self,
-        node_id: &proto::SCPNodeID,
-        st: &proto::SCPStatement,
-    ) -> bool {
+    pub fn is_newer_statement(&self, node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
         match self.ballot().latest_envelopes.get(node_id) {
             Some(old) => is_newer_statement(&old.statement, st),
             None => true,
         }
     }
 
-    pub async fn ballot_process_envelope(
+    pub async fn process_envelope(
         &mut self,
         env: &proto::SCPEnvelope,
         ours: bool,
@@ -96,13 +94,13 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             ours: bool,
             env: &proto::SCPEnvelope,
         ) -> EnvelopeState {
-            if ballot_proto.ballot_is_statement_sane(statement, ours) {
+            if ballot_proto.is_statement_sane(statement, ours) {
                 if ours {
                     error!(env = ?env, "not sane statement from self, skipping");
                 }
                 return EnvelopeState::Invalid;
             }
-            if !ballot_proto.ballot_is_newer_statement(&statement.node_id, statement) {
+            if !ballot_proto.is_newer_statement(&statement.node_id, statement) {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
@@ -120,7 +118,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             return EnvelopeState::Invalid;
         }
 
-        let validation_result = self.ballot_validate_values(statement).await;
+        let validation_result = self.validate_values(statement).await;
         match validation_result {
             ValidationLevel::Invalid => {
                 if ours {
@@ -142,8 +140,8 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             if let ValidationLevel::MaybeValid = validation_result {
                 self.slot_mut().set_fully_validated(false);
             }
-            self.ballot_record_envelope(env);
-            self.ballot_advance_slot(statement); //XXX:async?
+            self.record_envelope(env);
+            self.advance_slot(statement); //XXX:async?
             return EnvelopeState::Valid;
         }
 
@@ -152,7 +150,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         match &self.ballot().commit {
             Some(c) => {
                 if c.value == get_working_ballot(statement).value {
-                    self.ballot_record_envelope(env);
+                    self.record_envelope(env);
                     return EnvelopeState::Valid;
                 }
             }
@@ -166,7 +164,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         return EnvelopeState::Invalid;
     }
 
-    pub fn ballot_is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
+    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
         match &self.slot().get_qset_from_statement(statement) {
             Some(qset) => {
                 if let Result::Err(e) = is_qset_sane(qset, false) {
@@ -255,7 +253,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
     }
 
-    fn ballot_abandon_ballot(&mut self, n: u32) -> bool {
+    fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot().get_latest_composite_candidate() {
             Some(w) => {
@@ -279,9 +277,9 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                     return false;
                 } else {
                     if n == 0 {
-                        return self.ballot_bump_state(w, true);
+                        return self.bump_state(w, true);
                     } else {
-                        return self.ballot_bump_state_n(w, n);
+                        return self.bump_state_n(w, n);
                     }
                 }
             }
@@ -291,7 +289,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
     }
 
-    fn ballot_bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
+    fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
         let n = match &self.ballot().current {
             Some(b) => {
                 if !force {
@@ -301,10 +299,10 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
             }
             None => 1,
         };
-        self.ballot_bump_state_n(value, n)
+        self.bump_state_n(value, n)
     }
 
-    fn ballot_bump_state_n(&mut self, value: proto::SCPValue, n: u32) -> bool {
+    fn bump_state_n(&mut self, value: proto::SCPValue, n: u32) -> bool {
         return match self.ballot().phase {
             Phase::Prepare | Phase::Confirm => {
                 let newv = match &self.ballot().value_override {
@@ -320,10 +318,10 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                     ballot = ?newb,
                     "ballot protocol bump state"
                 );
-                let updated = self.ballot_update_current_value(newb);
+                let updated = self.update_current_value(newb);
                 if updated {
-                    self.ballot_emit_current_state_statement();
-                    self.ballot_check_heard_from_quorum();
+                    self.emit_current_state_statement();
+                    self.check_heard_from_quorum();
                 };
                 updated
             }
@@ -333,13 +331,13 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
 
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
-    fn ballot_update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
+    fn update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
         if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
             return false;
         };
         let updated = match &self.ballot().current {
             None => {
-                self.ballot_bump_to_ballot(new_ballot, true);
+                self.bump_to_ballot(new_ballot, true);
                 true
             }
             Some(current) => {
@@ -351,7 +349,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                 }
                 match compare_ballots(current, &new_ballot) {
                     Ordering::Less => {
-                        self.ballot_bump_to_ballot(new_ballot, true);
+                        self.bump_to_ballot(new_ballot, true);
                         true
                     }
                     Ordering::Equal => false,
@@ -372,11 +370,11 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
                 }
             }
         };
-        self.ballot_check_invariants();
+        self.check_invariants();
         updated
     }
 
-    fn ballot_bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
+    fn bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
         trace!(
             slot_index = self.slot().index(),
             ballot = ?ballot,
@@ -426,27 +424,27 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
     }
 
-    fn ballot_start_proto_timer(&mut self) {
+    fn start_timer(&mut self) {
         let driver = &self.slot().cd.driver;
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
         driver.start_timer(self.slot().index(), Timer::Ballot, timeout, move || {
-            self.ballot_proto_timer_expired(); //XXX: FnMut. How does this work?
+            self.timer_expired(); //XXX: FnMut. How does this work?
         });
     }
 
-    fn ballot_stop_proto_timer(&mut self) {
+    fn stop_timer(&mut self) {
         let driver = &self.slot().cd.driver;
         driver.stop_timer(self.slot().index(), Timer::Ballot);
     }
 
-    fn ballot_proto_timer_expired(&mut self) {
+    fn timer_expired(&mut self) {
         self.ballot_mut().timer_exp_count += 1;
-        self.ballot_abandon_ballot(0);
+        self.abandon_ballot(0);
     }
 
-    fn ballot_create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
-        self.ballot_check_invariants();
+    fn create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
+        self.check_invariants();
 
         let pledges = match typ {
             proto::SCPStatementType::SCP_ST_PREPARE => {
@@ -521,19 +519,19 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         }
     }
 
-    fn ballot_emit_current_state_statement(&mut self) {
+    fn emit_current_state_statement(&mut self) {
         panic!("XXX")
     }
 
-    fn ballot_check_heard_from_quorum(&mut self) {
+    fn check_heard_from_quorum(&mut self) {
         panic!("XXX")
     }
 
-    fn ballot_check_invariants(&self) {
+    fn check_invariants(&self) {
         panic!("XXX")
     }
 
-    async fn ballot_validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
+    async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }
 
@@ -541,7 +539,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
     // calls into the various attempt* methods, emits message
     // to make progress
     //XXX: async?
-    fn ballot_advance_slot(&mut self, statement: &proto::SCPStatement) {
+    fn advance_slot(&mut self, statement: &proto::SCPStatement) {
         panic!("XXX")
     }
 }

@@ -672,6 +672,20 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         candidates
     }
 
+    fn update_current_if_needed(&mut self, h: &proto::SCPBallot) -> bool {
+        let should_update = match &self.ballot().current {
+            None => true,
+            Some(current) => compare_ballots(current, h) == Ordering::Less,
+        };
+
+        if should_update {
+            self.bump_to_ballot(h.clone(), true);
+            true
+        } else {
+            false
+        }
+    }
+
     fn check_heard_from_quorum(&mut self) {
         panic!("XXX")
     }

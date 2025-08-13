@@ -1,36 +1,36 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-struct State {
+struct Slot {
     x: i64,
+    ballot: Option<Ballot>,
 }
 
-impl State {
-    fn f(&mut self) {
-        self.x = 3;
+impl Slot {
+    fn new() -> Rc<RefCell<Slot>> {
+        let slot = Rc::new(RefCell::new(Slot { x: 4, ballot: None }));
+        let ballot = Ballot::new(slot.clone());
+        slot.borrow_mut().ballot = Some(ballot);
+        slot
     }
+
+    fn mut_fn(&mut self) {}
 }
 
-struct AState(Arc<Mutex<State>>);
-
-impl AState {
-    fn acquire(&self) -> MutexGuard<'_, State> {
-        self.0.lock().unwrap()
-    }
-    fn f(&self) {
-        self.acquire().f()
-    }
-    fn g(&self) -> AState {
-        self.clone()
-    }
-    fn h(&self) -> impl Fn() {
-        move || {
-            self.g();
-        }
-    }
+struct Ballot {
+    slot: Rc<RefCell<Slot>>,
 }
 
-impl Clone for AState {
-    fn clone(&self) -> Self {
-        AState(Arc::clone(&self.0))
+impl Ballot {
+    fn new(slot: Rc<RefCell<Slot>>) -> Ballot {
+        Ballot { slot }
+    }
+
+    fn mut_slot(&self) -> std::cell::RefMut<Slot> {
+        self.slot.borrow_mut()
+    }
+
+    fn other(&self) {
+        self.mut_slot().mut_fn();
     }
 }

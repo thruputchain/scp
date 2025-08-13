@@ -2,51 +2,29 @@ use crate::*;
 
 pub type SlotIndex = u64;
 
-pub struct SlotState {
-    slot_meta: SlotMeta,
-    ballot_state: BallotState,
+pub struct Slot {
+    pub slot_index: SlotIndex,
+    pub ballot: Ballot,
 }
 
-pub struct SlotMeta {
-    slot_index: SlotIndex,
-}
-
-impl SlotState {
+impl Slot {
     pub fn new() -> Self {
-        SlotState {
-            slot_meta: SlotMeta { slot_index: 0 },
-            ballot_state: BallotState::new(),
+        Slot {
+            slot_index: 0,
+            ballot: Ballot::new(),
         }
-    }
-
-    pub fn ballot(&self) -> &BallotState {
-        &self.ballot_state
-    }
-
-    pub fn ballot_mut(&mut self) -> &mut BallotState {
-        &mut self.ballot_state
     }
 }
 
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
-    pub stellar_proto: &'a StellarProto<'a, C, D>,
-    slot_meta: &'a mut SlotMeta,
+    pub cd: &'a ConsensusDriver<'a, C, D>,
+    pub local: &'a mut Local,
+    pub slot: &'a mut Slot,
 }
 
 impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
-    pub fn new(stellar_proto: &'a mut StellarProto<C, D>, slot_meta: &'a mut SlotMeta) -> Self {
-        SlotProto {
-            stellar_proto,
-            slot_meta,
-        }
-    }
-
     pub fn slot_index(&self) -> SlotIndex {
-        self.slot_meta.slot_index
-    }
-
-    pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
-        panic!("XXX")
+        self.slot.slot_index
     }
 
     pub fn get_qset_from_statement(
@@ -56,7 +34,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         panic!("XXX")
     }
 
-    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
+    pub fn slot_record_envelope(&mut self, env: &proto::SCPEnvelope) {
         panic!("XXX")
     }
 

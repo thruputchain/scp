@@ -1,4 +1,3 @@
-use crate::ballot::are_ballots_less_and_compatible;
 use crate::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -512,8 +511,73 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    fn send_latest_envelope(&mut self) {
+        // emit current envelope if needed
+        if self.ballot().msg_level == 0 && self.slot().is_fully_validated() {
+            let driver = self.slot().cd.driver;
+            let ballot_mut = self.ballot_mut();
+            if let Some(last_gen) = &ballot_mut.last_envelope_gen {
+                let should_emit = match &ballot_mut.last_envelope_emit {
+                    None => true,
+                    Some(last_emit) => last_gen != last_emit,
+                };
+
+                if should_emit {
+                    ballot_mut.last_envelope_emit = Some(last_gen.clone());
+                    driver.send(last_gen.clone());
+                }
+            }
+        }
+    }
+
     fn emit_current_state_statement(&mut self) {
-        panic!("XXX")
+        let statement_type = match self.ballot().phase {
+            Phase::Prepare => proto::SCPStatementType::SCP_ST_PREPARE,
+            Phase::Confirm => proto::SCPStatementType::SCP_ST_CONFIRM,
+            Phase::Externalize => proto::SCPStatementType::SCP_ST_EXTERNALIZE,
+            Phase::Num => panic!("bug"),
+        };
+
+        let statement = self.create_statement(statement_type);
+        let envelope = self.slot().create_envelope(statement);
+
+        let can_emit = self.ballot().current.is_some();
+
+        // if we generate the same envelope, don't process it again
+        // this can occur when updating h in PREPARE phase
+        // as statements only keep track of h.n (but h.x could be different)
+        let local_node_id = self.slot().local.get_node_id();
+        let last_env = self.ballot().latest_envelopes.get(local_node_id);
+
+        let should_process = match last_env {
+            None => true,
+            Some(last_envelope) => last_envelope != &envelope,
+        };
+
+        if should_process {
+            let envelope_state = self.process_envelope(&envelope, true);
+            if envelope_state == EnvelopeState::Valid {
+                let should_emit = can_emit && {
+                    match &self.ballot().last_envelope_gen {
+                        None => true,
+                        Some(last_gen) => {
+                            is_newer_statement(&last_gen.statement, &envelope.statement)
+                        }
+                    }
+                };
+
+                if should_emit {
+                    self.ballot_mut().last_envelope_gen = Some(envelope.clone());
+                    // this will no-op if invoked from advanceSlot
+                    // as advanceSlot consolidates all messages sent
+                    self.send_latest_envelope();
+                }
+            } else {
+                // there is a bug in the application if it queued up
+                // a statement for itself that it considers invalid
+                panic!("moved to a bad state (ballot protocol)");
+            }
+        }
     }
 
     fn check_heard_from_quorum(&mut self) {

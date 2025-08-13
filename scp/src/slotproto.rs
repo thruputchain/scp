@@ -64,4 +64,12 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     pub fn get_latest_composite_candidate(&self) -> Option<&proto::SCPValue> {
         panic!("XXX")
     }
+
+    pub fn create_envelope(&self, statement: proto::SCPStatement) -> proto::SCPEnvelope {
+        panic!("XXX")
+    }
+
+    pub fn is_fully_validated(&self) -> bool {
+        panic!("XXX")
+    }
 }

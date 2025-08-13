@@ -42,14 +42,31 @@ impl Ballot {
     }
 }
 
-impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
+pub struct BallotProto<'a, C: Consensus, D: Driver>(pub &'a mut SlotProto<'a, C, D>);
+
+impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
+    fn slot_mut(&mut self) -> &mut SlotProto<'a, C, D> {
+        self.0
+    }
+
+    fn slot(&self) -> &SlotProto<'a, C, D> {
+        self.0
+    }
+
+    fn ballot(&self) -> &Ballot {
+        self.slot().ballot()
+    }
+
+    fn ballot_mut(&mut self) -> &mut Ballot {
+        self.slot_mut().ballot_mut()
+    }
+
     fn ballot_record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
-        self.slot
-            .ballot
+        self.ballot_mut()
             .latest_envelopes
             .insert(node_id, env.clone());
-        self.slot_record_envelope(env);
+        self.slot_mut().record_envelope(env);
     }
 
     pub fn ballot_is_newer_statement(
@@ -57,7 +74,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         node_id: &proto::SCPNodeID,
         st: &proto::SCPStatement,
     ) -> bool {
-        match self.slot.ballot.latest_envelopes.get(node_id) {
+        match self.ballot().latest_envelopes.get(node_id) {
             Some(old) => is_newer_statement(&old.statement, st),
             None => true,
         }
@@ -68,29 +85,29 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         env: &proto::SCPEnvelope,
         ours: bool,
     ) -> EnvelopeState {
-        assert!(env.statement.slot_index == self.slot_index());
+        assert!(env.statement.slot_index == self.slot().index());
 
         let statement = &env.statement;
         let node_id = &statement.node_id;
 
         fn check_valid<'a, C: Consensus, D: Driver>(
-            slot_proto: &mut SlotProto<'a, C, D>,
+            ballot_proto: &mut BallotProto<'a, C, D>,
             statement: &proto::SCPStatement,
             ours: bool,
             env: &proto::SCPEnvelope,
         ) -> EnvelopeState {
-            if slot_proto.ballot_is_statement_sane(statement, ours) {
+            if ballot_proto.ballot_is_statement_sane(statement, ours) {
                 if ours {
                     error!(env = ?env, "not sane statement from self, skipping");
                 }
                 return EnvelopeState::Invalid;
             }
-            if !slot_proto.ballot_is_newer_statement(&statement.node_id, statement) {
+            if !ballot_proto.ballot_is_newer_statement(&statement.node_id, statement) {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
                     trace!(
-                        slot_index = slot_proto.slot_index(),
+                        slot_index = ballot_proto.slot().index(),
                         "stale statement, skipping"
                     )
                 }
@@ -109,7 +126,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
                 if ours {
                     error!(env = ?env, "invalid value from self, skipping")
                 } else {
-                    trace!(slot_index = self.slot_index(), "invalid value")
+                    trace!(slot_index = self.slot().index(), "invalid value")
                 }
                 return EnvelopeState::Invalid;
             }
@@ -121,9 +138,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             return EnvelopeState::Invalid;
         }
 
-        if !matches!(self.slot.ballot.phase, Phase::Externalize) {
+        if !matches!(self.ballot().phase, Phase::Externalize) {
             if let ValidationLevel::MaybeValid = validation_result {
-                self.set_fully_validated(false);
+                self.slot_mut().set_fully_validated(false);
             }
             self.ballot_record_envelope(env);
             self.ballot_advance_slot(statement); //XXX:async?
@@ -132,7 +149,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
         // this handles also our own messages
         // in particular our final EXTERNALIZE message
-        match &self.slot.ballot.commit {
+        match &self.ballot().commit {
             Some(c) => {
                 if c.value == get_working_ballot(statement).value {
                     self.ballot_record_envelope(env);
@@ -150,7 +167,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     pub fn ballot_is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
-        match &self.get_qset_from_statement(statement) {
+        match &self.slot().get_qset_from_statement(statement) {
             Some(qset) => {
                 if let Result::Err(e) = is_qset_sane(qset, false) {
                     debug!(err = ?e, "invalid quorum set received");
@@ -240,10 +257,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     fn ballot_abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
-        let v = match self.get_latest_composite_candidate() {
+        let v = match self.slot().get_latest_composite_candidate() {
             Some(w) => {
                 if w.is_empty() {
-                    match &self.slot.ballot.current {
+                    match &self.ballot().current {
                         Some(cv) => Some(cv.value.clone()),
                         None => None,
                     }
@@ -251,7 +268,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
                     Some(w.clone())
                 }
             }
-            None => match &self.slot.ballot.current {
+            None => match &self.ballot().current {
                 Some(cv) => Some(cv.value.clone()),
                 None => None,
             },
@@ -275,7 +292,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     fn ballot_bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
-        let n = match &self.slot.ballot.current {
+        let n = match &self.ballot().current {
             Some(b) => {
                 if !force {
                     return false;
@@ -288,9 +305,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     fn ballot_bump_state_n(&mut self, value: proto::SCPValue, n: u32) -> bool {
-        return match self.slot.ballot.phase {
+        return match self.ballot().phase {
             Phase::Prepare | Phase::Confirm => {
-                let newv = match &self.slot.ballot.value_override {
+                let newv = match &self.ballot().value_override {
                     Some(v) => v.value.clone(),
                     None => value,
                 };
@@ -299,7 +316,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
                     value: newv,
                 };
                 trace!(
-                    slot_index = self.slot_index(),
+                    slot_index = self.slot().index(),
                     ballot = ?newb,
                     "ballot protocol bump state"
                 );
@@ -317,17 +334,17 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
     fn ballot_update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
-        if self.slot.ballot.phase != Phase::Prepare && self.slot.ballot.phase != Phase::Confirm {
+        if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
             return false;
         };
-        let updated = match &self.slot.ballot.current {
+        let updated = match &self.ballot().current {
             None => {
                 self.ballot_bump_to_ballot(new_ballot, true);
                 true
             }
             Some(current) => {
                 assert!(compare_ballots(current, &new_ballot) != Ordering::Greater);
-                if let Some(commit) = &self.slot.ballot.commit {
+                if let Some(commit) = &self.ballot().commit {
                     if !are_ballots_compatible(commit, &new_ballot) {
                         return false;
                     }
@@ -361,69 +378,70 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     fn ballot_bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
         trace!(
-            slot_index = self.slot_index(),
+            slot_index = self.slot().index(),
             ballot = ?ballot,
             "ballot proto bump_to_ballot"
         );
 
         // `bump_to_ballot` should be never called once we committed
-        assert!(self.slot.ballot.phase != Phase::Externalize);
+        assert!(self.ballot().phase != Phase::Externalize);
 
         if check {
-            match &self.slot.ballot.current {
+            match &self.ballot().current {
                 Some(current) => assert!(compare_ballots(&ballot, current) != Ordering::Less),
                 None => {}
             }
         }
 
-        let got_bumped = match &self.slot.ballot.current {
+        let got_bumped = match &self.ballot().current {
             Some(current) => current.counter != ballot.counter,
             None => true,
         };
 
-        match &self.slot.ballot.current {
+        match &self.ballot().current {
             None => {
-                self.cd
+                self.slot()
+                    .cd
                     .consensus
-                    .started_ballot_proto(self.slot_index(), &ballot);
+                    .started_ballot_proto(self.slot().index(), &ballot);
             }
             Some(_) => {}
         }
 
-        self.slot.ballot.current = Some(ballot);
+        self.ballot_mut().current = Some(ballot);
 
         // we have to clear some fields (and recompute them based on latest
         // messages)
         // invariant: h.value = b.value
-        if let Some(high) = &self.slot.ballot.high {
-            if !are_ballots_compatible(self.slot.ballot.current.as_ref().unwrap(), high) {
-                self.slot.ballot.high = None;
+        if let Some(high) = &self.ballot().high {
+            if !are_ballots_compatible(self.ballot().current.as_ref().unwrap(), high) {
+                self.ballot_mut().high = None;
                 // invariant: c set only when h is set
-                self.slot.ballot.commit = None;
+                self.ballot_mut().commit = None;
             }
         }
 
         if got_bumped {
-            self.slot.ballot.heard_from_quorum = false;
+            self.ballot_mut().heard_from_quorum = false;
         }
     }
 
     fn ballot_start_proto_timer(&mut self) {
-        let driver = &self.cd.driver;
+        let driver = &self.slot().cd.driver;
         let timeout =
-            driver.compute_timeout(self.slot.ballot.current.as_ref().unwrap().counter, false);
-        driver.start_timer(self.slot_index(), Timer::Ballot, timeout, move || {
+            driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
+        driver.start_timer(self.slot().index(), Timer::Ballot, timeout, move || {
             self.ballot_proto_timer_expired(); //XXX: FnMut. How does this work?
         });
     }
 
     fn ballot_stop_proto_timer(&mut self) {
-        let driver = &self.cd.driver;
-        driver.stop_timer(self.slot_index(), Timer::Ballot);
+        let driver = &self.slot().cd.driver;
+        driver.stop_timer(self.slot().index(), Timer::Ballot);
     }
 
     fn ballot_proto_timer_expired(&mut self) {
-        self.slot.ballot.timer_exp_count += 1;
+        self.ballot_mut().timer_exp_count += 1;
         self.ballot_abandon_ballot(0);
     }
 
@@ -444,23 +462,23 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
                     n_h: 0,
                 };
 
-                if let Some(ref current) = self.slot.ballot.current {
+                if let Some(ref current) = self.ballot().current {
                     prepare.ballot = current.clone();
                 }
 
-                if let Some(ref commit) = self.slot.ballot.commit {
+                if let Some(ref commit) = self.ballot().commit {
                     prepare.n_c = commit.counter;
                 }
 
-                if let Some(ref prepared) = self.slot.ballot.prepared {
+                if let Some(ref prepared) = self.ballot().prepared {
                     prepare.prepared = Some(prepared.clone());
                 }
 
-                if let Some(ref prepared_prime) = self.slot.ballot.prepared_prime {
+                if let Some(ref prepared_prime) = self.ballot().prepared_prime {
                     prepare.prepared_prime = Some(prepared_prime.clone());
                 }
 
-                if let Some(ref high) = self.slot.ballot.high {
+                if let Some(ref high) = self.ballot().high {
                     prepare.n_h = high.counter;
                 }
 
@@ -469,10 +487,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
             proto::SCPStatementType::SCP_ST_CONFIRM => {
                 let confirm = proto::SCPStatementConfirm {
-                    ballot: self.slot.ballot.current.as_ref().unwrap().clone(),
-                    n_prepared: self.slot.ballot.prepared.as_ref().unwrap().counter,
-                    n_commit: self.slot.ballot.commit.as_ref().unwrap().counter,
-                    n_h: self.slot.ballot.high.as_ref().unwrap().counter,
+                    ballot: self.ballot().current.as_ref().unwrap().clone(),
+                    n_prepared: self.ballot().prepared.as_ref().unwrap().counter,
+                    n_commit: self.ballot().commit.as_ref().unwrap().counter,
+                    n_h: self.ballot().high.as_ref().unwrap().counter,
                     quorum_set_hash: [0u8; 32], // XXX: get from local node
                 };
 
@@ -481,8 +499,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
             proto::SCPStatementType::SCP_ST_EXTERNALIZE => {
                 let externalize = proto::SCPStatementExternalize {
-                    commit: self.slot.ballot.commit.as_ref().unwrap().clone(),
-                    n_h: self.slot.ballot.high.as_ref().unwrap().counter,
+                    commit: self.ballot().commit.as_ref().unwrap().clone(),
+                    n_h: self.ballot().high.as_ref().unwrap().counter,
                     commit_quorum_set_hash: [0u8; 32], // XXX: get from local node
                 };
 
@@ -498,7 +516,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             node_id: proto::PublicKey::Ed25519 {
                 ed25519: proto::Ed25519PublicKey::new([0u8; 32]),
             }, // XXX: get from local node
-            slot_index: self.slot_index(),
+            slot_index: self.slot().index(),
             pledges,
         }
     }

@@ -23,8 +23,20 @@ pub struct SlotProto<'a, C: Consensus, D: Driver> {
 }
 
 impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
-    pub fn slot_index(&self) -> SlotIndex {
+    pub fn ballot_proto(&'a mut self) -> BallotProto<'a, C, D> {
+        crate::ballotproto::BallotProto(self)
+    }
+
+    pub fn index(&self) -> SlotIndex {
         self.slot.slot_index
+    }
+
+    pub fn ballot(&self) -> &Ballot {
+        &self.slot.ballot
+    }
+
+    pub fn ballot_mut(&mut self) -> &mut Ballot {
+        &mut self.slot.ballot
     }
 
     pub fn get_qset_from_statement(
@@ -34,7 +46,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         panic!("XXX")
     }
 
-    pub fn slot_record_envelope(&mut self, env: &proto::SCPEnvelope) {
+    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         panic!("XXX")
     }
 

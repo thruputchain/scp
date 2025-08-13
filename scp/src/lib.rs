@@ -12,14 +12,14 @@ pub use stellar::*;
 pub mod local;
 pub use local::*;
 
-pub mod slotproto;
-pub use slotproto::*;
+pub mod slot;
+pub use slot::*;
 
 pub mod qset;
 pub use qset::*;
 
-pub mod ballot;
-pub use ballot::*;
+pub mod ballotutil;
+pub use ballotutil::*;
 
 pub mod phase;
 pub use phase::*;
@@ -30,5 +30,5 @@ pub use envelope::*;
 pub mod statement;
 pub use statement::*;
 
-pub mod ballotproto;
-pub use ballotproto::*;
+pub mod ballot;
+pub use ballot::*;

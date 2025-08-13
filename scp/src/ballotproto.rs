@@ -1,6 +1,6 @@
 use crate::*;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, trace};
 
 pub struct Ballot {
@@ -578,6 +578,98 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 panic!("moved to a bad state (ballot protocol)");
             }
         }
+    }
+
+    fn get_prepare_candidates(&self, hint: &proto::SCPStatement) -> HashSet<proto::SCPBallot> {
+        let mut hint_ballots = HashSet::new();
+
+        match &hint.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                hint_ballots.insert(prepare.ballot.clone());
+                if let Some(ref prepared) = prepare.prepared {
+                    hint_ballots.insert(prepared.clone());
+                }
+                if let Some(ref prepared_prime) = prepare.prepared_prime {
+                    hint_ballots.insert(prepared_prime.clone());
+                }
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                hint_ballots.insert(proto::SCPBallot {
+                    counter: confirm.n_prepared,
+                    value: confirm.ballot.value.clone(),
+                });
+                hint_ballots.insert(proto::SCPBallot {
+                    counter: u32::MAX,
+                    value: confirm.ballot.value.clone(),
+                });
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                hint_ballots.insert(proto::SCPBallot {
+                    counter: u32::MAX,
+                    value: externalize.commit.value.clone(),
+                });
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                panic!("getPrepareCandidates should not be called with SCP_ST_NOMINATE");
+            }
+        }
+
+        let mut candidates = HashSet::new();
+
+        // Process hint ballots from highest to lowest
+        while !hint_ballots.is_empty() {
+            // Find the highest ballot (by counter, then by value)
+            let top_vote = hint_ballots
+                .iter()
+                .max_by(|a, b| compare_ballots(a, b))
+                .unwrap()
+                .clone();
+            hint_ballots.remove(&top_vote);
+
+            let val = &top_vote.value;
+
+            // Find candidates that may have been prepared
+            for envelope in self.ballot().latest_envelopes.values() {
+                match &envelope.statement.pledges {
+                    proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                        if are_ballots_less_and_compatible(&prepare.ballot, &top_vote) {
+                            candidates.insert(prepare.ballot.clone());
+                        }
+                        if let Some(ref prepared) = prepare.prepared {
+                            if are_ballots_less_and_compatible(prepared, &top_vote) {
+                                candidates.insert(prepared.clone());
+                            }
+                        }
+                        if let Some(ref prepared_prime) = prepare.prepared_prime {
+                            if are_ballots_less_and_compatible(prepared_prime, &top_vote) {
+                                candidates.insert(prepared_prime.clone());
+                            }
+                        }
+                    }
+                    proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                        if are_ballots_compatible(&top_vote, &confirm.ballot) {
+                            candidates.insert(top_vote.clone());
+                            if confirm.n_prepared < top_vote.counter {
+                                candidates.insert(proto::SCPBallot {
+                                    counter: confirm.n_prepared,
+                                    value: val.clone(),
+                                });
+                            }
+                        }
+                    }
+                    proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                        if are_ballots_compatible(&top_vote, &externalize.commit) {
+                            candidates.insert(top_vote.clone());
+                        }
+                    }
+                    proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                        panic!("bug");
+                    }
+                }
+            }
+        }
+
+        candidates
     }
 
     fn check_heard_from_quorum(&mut self) {

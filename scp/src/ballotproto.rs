@@ -42,14 +42,14 @@ impl Ballot {
     }
 }
 
-pub struct BallotProto<'a, C: Consensus, D: Driver>(pub &'a mut SlotProto<'a, C, D>);
+pub struct BallotProto<'a, 'b, C: Consensus, D: Driver>(pub &'a mut SlotProto<'b, C, D>);
 
-impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
-    fn slot_mut(&mut self) -> &mut SlotProto<'a, C, D> {
+impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
+    fn slot_mut(&mut self) -> &mut SlotProto<'b, C, D> {
         self.0
     }
 
-    fn slot(&self) -> &SlotProto<'a, C, D> {
+    fn slot(&self) -> &SlotProto<'b, C, D> {
         self.0
     }
 
@@ -63,7 +63,7 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
 
     // proto
 
-    fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
+    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
         self.ballot_mut()
             .latest_envelopes
@@ -88,8 +88,8 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
         let statement = &env.statement;
         let node_id = &statement.node_id;
 
-        fn check_valid<'a, C: Consensus, D: Driver>(
-            ballot_proto: &mut BallotProto<'a, C, D>,
+        fn check_valid<'a, 'b, C: Consensus, D: Driver>(
+            ballot_proto: &mut BallotProto<'a, 'b, C, D>,
             statement: &proto::SCPStatement,
             ours: bool,
             env: &proto::SCPEnvelope,
@@ -425,20 +425,18 @@ impl<'a, C: Consensus, D: Driver> BallotProto<'a, C, D> {
     }
 
     fn start_timer(&mut self) {
-        let driver = &self.slot().cd.driver;
+        let driver = self.slot().cd.driver;
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
-        driver.start_timer(self.slot().index(), Timer::Ballot, timeout, move || {
-            self.timer_expired(); //XXX: FnMut. How does this work?
-        });
+        driver.start_timer(self.slot().index(), Timer::Ballot, timeout);
     }
 
     fn stop_timer(&mut self) {
-        let driver = &self.slot().cd.driver;
+        let driver = self.slot().cd.driver;
         driver.stop_timer(self.slot().index(), Timer::Ballot);
     }
 
-    fn timer_expired(&mut self) {
+    pub fn timer_expired(&mut self) {
         self.ballot_mut().timer_exp_count += 1;
         self.abandon_ballot(0);
     }

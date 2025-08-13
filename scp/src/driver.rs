@@ -19,8 +19,13 @@ pub trait Driver {
     /// considered invalid.
     fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet>;
 
+    fn send(&self, env: proto::SCPEnvelope);
     fn compute_timeout(&self, counter: proto::SCPCount, is_nomination: bool) -> Duration;
-
-    fn start_timer(&self, slot_index: SlotIndex, timer: Timer, timeout: Duration, cb: impl FnMut());
+    fn start_timer(&self, slot_index: SlotIndex, timer: Timer, timeout: Duration);
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
+}
+
+pub trait DriverCb {
+    fn received(&mut self, env: &proto::SCPEnvelope);
+    fn timer_expired(&mut self, slot_index: SlotIndex, timer: Timer);
 }

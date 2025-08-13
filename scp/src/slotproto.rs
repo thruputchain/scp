@@ -23,7 +23,7 @@ pub struct SlotProto<'a, C: Consensus, D: Driver> {
 }
 
 impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
-    pub fn ballot_proto(&'a mut self) -> BallotProto<'a, C, D> {
+    pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a, C, D> {
         crate::ballotproto::BallotProto(self)
     }
 
@@ -37,6 +37,13 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn ballot_mut(&mut self) -> &mut Ballot {
         &mut self.slot.ballot
+    }
+
+    pub fn timer_expired_cb(&mut self, timer: Timer) {
+        match timer {
+            Timer::Ballot => self.ballot_proto().timer_expired(),
+            Timer::Nomination => panic!("XXX"),
+        }
     }
 
     pub fn get_qset_from_statement(

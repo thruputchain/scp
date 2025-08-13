@@ -9,9 +9,27 @@ pub enum ValidationLevel {
     FullyValid, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
+pub trait Consensus: ConsensusNotify {
+    fn validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
+    fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
+}
+
+pub trait ConsensusCb {
+    fn validated(
+        &mut self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+        result: ValidationLevel,
+    );
+}
+
+pub trait ConsensusNotify {
+    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
+}
+
 /// App defines the calls that SCP makes to the user.
 #[async_trait]
-pub trait Consensus: StellarConsensus {
+pub trait ConsensusAsync: ConsensusNotify {
     /// Prompts the SCP user to nominate a value for the given slot.
     /// Nomination can consume time, so SCP reserves the right to
     /// cancel a nomination request via the given cancellation token.
@@ -48,19 +66,15 @@ pub trait Consensus: StellarConsensus {
     fn externalized(&self, slot_index: SCPSlotIndex, value: SCPValue);
 }
 
-pub trait StellarConsensus {
-    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
-}
-
 /// Send specifies the functionality that SCP requires in order to communicate
 /// with peers, which includes networking and a sense of time.
 #[async_trait]
-pub trait Send {
+pub trait SendAsync {
     async fn send(&self, msg: BytesM);
 }
 
 /// Receive specifies the external events that SCP handles.
-pub trait Receive {
+pub trait Received {
     fn received(&mut self, msg: BytesM);
 }
 

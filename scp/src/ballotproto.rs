@@ -63,7 +63,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     // proto
 
-    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
+    fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
         let node_id = env.statement.node_id.clone();
         self.ballot_mut()
             .latest_envelopes
@@ -78,11 +78,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    pub async fn process_envelope(
-        &mut self,
-        env: &proto::SCPEnvelope,
-        ours: bool,
-    ) -> EnvelopeState {
+    pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert!(env.statement.slot_index == self.slot().index());
 
         let statement = &env.statement;
@@ -118,7 +114,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             return EnvelopeState::Invalid;
         }
 
-        let validation_result = self.validate_values(statement).await;
+        let validation_result = self.validate_values(statement); //XXX: must be async
         match validation_result {
             ValidationLevel::Invalid => {
                 if ours {
@@ -447,7 +443,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let pledges = match typ {
             proto::SCPStatementType::SCP_ST_PREPARE => {
                 let mut prepare = proto::SCPStatementPrepare {
-                    quorum_set_hash: [0u8; 32], // XXX: get from local node
+                    quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
                     ballot: proto::SCPBallot {
                         counter: 0,
                         value: Default::default(),
@@ -487,7 +483,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     n_prepared: self.ballot().prepared.as_ref().unwrap().counter,
                     n_commit: self.ballot().commit.as_ref().unwrap().counter,
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    quorum_set_hash: [0u8; 32], // XXX: get from local node
+                    quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
@@ -497,7 +493,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 let externalize = proto::SCPStatementExternalize {
                     commit: self.ballot().commit.as_ref().unwrap().clone(),
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    commit_quorum_set_hash: [0u8; 32], // XXX: get from local node
+                    commit_quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
@@ -509,13 +505,13 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         };
 
         proto::SCPStatement {
-            node_id: proto::PublicKey::Ed25519 {
-                ed25519: proto::Ed25519PublicKey::new([0u8; 32]),
-            }, // XXX: get from local node
+            node_id: self.slot().local.get_node_id().clone(),
             slot_index: self.slot().index(),
             pledges,
         }
     }
+
+    
 
     fn emit_current_state_statement(&mut self) {
         panic!("XXX")
@@ -529,7 +525,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         panic!("XXX")
     }
 
-    async fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
+    fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }
 

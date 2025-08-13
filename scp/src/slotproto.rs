@@ -24,7 +24,7 @@ pub struct SlotProto<'a, C: Consensus, D: Driver> {
 
 impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a, C, D> {
-        crate::ballotproto::BallotProto(self)
+        BallotProto(self)
     }
 
     pub fn index(&self) -> SlotIndex {

@@ -26,19 +26,6 @@ impl<'a, C: Consensus, D: Driver> Stellar<'a, C, D> {
             slot,
         })
     }
-
-    fn xxx_stellar_to_ballot(&mut self, env: &proto::SCPEnvelope) {
-        self.slot_proto(1)
-            .unwrap()
-            .ballot_proto()
-            .record_envelope(env);
-        self.slot_proto(1)
-            .unwrap()
-            .ballot_proto()
-            .record_envelope(env);
-    }
-
-    // callbacks from driver
 }
 
 impl<'a, C: Consensus, D: Driver> DriverCb for Stellar<'a, C, D> {

@@ -1,3 +1,4 @@
+use crate::ballot::are_ballots_less_and_compatible;
 use crate::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -511,8 +512,6 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    
-
     fn emit_current_state_statement(&mut self) {
         panic!("XXX")
     }
@@ -522,7 +521,47 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn check_invariants(&self) {
-        panic!("XXX")
+        match self.ballot().phase {
+            Phase::Prepare => {}
+            Phase::Confirm | Phase::Externalize => {
+                assert!(self.ballot().current.is_some());
+                assert!(self.ballot().prepared.is_some());
+                assert!(self.ballot().commit.is_some());
+                assert!(self.ballot().high.is_some());
+            }
+            Phase::Num => {
+                panic!("bug");
+            }
+        }
+
+        if let Some(current) = &self.ballot().current {
+            assert!(current.counter != 0);
+        }
+
+        if let (Some(prepared_prime), Some(prepared)) =
+            (&self.ballot().prepared_prime, &self.ballot().prepared)
+        {
+            assert!(are_ballots_less_and_incompatible(prepared_prime, prepared));
+        }
+
+        if let Some(high) = &self.ballot().high {
+            assert!(self.ballot().current.is_some(),);
+            assert!(are_ballots_less_and_compatible(
+                high,
+                self.ballot().current.as_ref().unwrap()
+            ),);
+        }
+
+        if let Some(commit) = &self.ballot().commit {
+            assert!(self.ballot().current.is_some());
+            assert!(self.ballot().high.is_some());
+
+            let high = self.ballot().high.as_ref().unwrap();
+            let current = self.ballot().current.as_ref().unwrap();
+
+            assert!(are_ballots_less_and_compatible(commit, high));
+            assert!(are_ballots_less_and_compatible(high, current));
+        }
     }
 
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {

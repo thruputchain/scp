@@ -1602,6 +1602,54 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    fn process_current_state<F>(&self, f: F, force_self: bool) -> bool
+    where
+        F: Fn(&proto::SCPEnvelope) -> bool,
+    {
+        for (node_id, envelope) in &self.ballot().latest_envelopes {
+            // only return messages for self if the slot is fully validated
+            if force_self
+                || node_id != self.slot().local.get_node_id()
+                || self.slot().is_fully_validated()
+            {
+                if !f(envelope) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn get_latest_message(&self, id: &proto::SCPNodeID) -> Option<&proto::SCPEnvelope> {
+        self.ballot().latest_envelopes.get(id)
+    }
+
+    fn get_externalizing_state(&self) -> Vec<proto::SCPEnvelope> {
+        let mut res = Vec::new();
+
+        if self.ballot().phase == Phase::Externalize {
+            res.reserve(self.ballot().latest_envelopes.len());
+
+            for (node_id, envelope) in &self.ballot().latest_envelopes {
+                if node_id != self.slot().local.get_node_id() {
+                    // good approximation: statements with the value that externalized
+                    // we could filter more using mConfirmedPrepared as well
+                    if are_ballots_compatible(
+                        &Self::get_working_ballot(&envelope.statement),
+                        self.ballot().commit.as_ref().unwrap(),
+                    ) {
+                        res.push(envelope.clone());
+                    }
+                } else if self.slot().is_fully_validated() {
+                    // only return messages for self if the slot is fully validated
+                    res.push(envelope.clone());
+                }
+            }
+        }
+
+        res
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }
@@ -1609,8 +1657,65 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress
-    //XXX: async?
-    fn advance_slot(&mut self, statement: &proto::SCPStatement) {
+    fn advance_slot(&mut self, hint: &proto::SCPStatement) {
+        const MAX_ADVANCE_SLOT_RECURSION: i64 = 100;
+
+        self.ballot_mut().msg_level += 1;
+        trace!(
+            msg_level = self.ballot().msg_level,
+            local_state = ?self.get_local_state(),
+            "ballot proto advance_slot"
+        );
+
+        if self.ballot().msg_level >= MAX_ADVANCE_SLOT_RECURSION {
+            panic!("maximum number of transitions reached in advance_slot");
+        }
+
+        // attempt* methods will queue up messages, causing advance_slot to be
+        // called recursively
+
+        // done in order so that we follow the steps from the white paper in
+        // order allowing the state to be updated properly
+
+        let mut did_work = false;
+
+        did_work = self.attempt_accept_prepared(hint) || did_work;
+
+        did_work = self.attempt_confirm_prepared(hint) || did_work;
+
+        did_work = self.attempt_accept_commit(hint) || did_work;
+
+        did_work = self.attempt_confirm_commit(hint) || did_work;
+
+        // only bump after we're done with everything else
+        if self.ballot().msg_level == 1 {
+            let mut did_bump = false;
+            loop {
+                // attempt_bump may invoke advance_slot recursively
+                did_bump = self.attempt_bump();
+                did_work = did_bump || did_work;
+                if !did_bump {
+                    break;
+                }
+            }
+
+            self.check_heard_from_quorum();
+        }
+
+        trace!(
+            msg_level = self.ballot().msg_level,
+            local_state = ?self.get_local_state(),
+            "ballot proto advance_slot exiting"
+        );
+
+        self.ballot_mut().msg_level -= 1;
+
+        if did_work {
+            self.send_latest_envelope();
+        }
+    }
+
+    fn get_local_state(&self) -> String {
         panic!("XXX")
     }
 }

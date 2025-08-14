@@ -87,7 +87,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         voted: F1,
         accepted: F2,
         envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
-    ) -> bool {
+    ) -> bool
+    where
+        F1: Fn(&proto::SCPStatement) -> bool,
+        F2: Fn(&proto::SCPStatement) -> bool,
+    {
         panic!("XXX");
     }
 

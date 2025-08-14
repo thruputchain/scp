@@ -1029,6 +1029,77 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    fn attempt_accept_prepared(&mut self, hint: &proto::SCPStatement) -> bool {
+        if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
+            return false;
+        }
+
+        let candidates = self.get_prepare_candidates(hint);
+
+        // see if we can accept any of the candidates, starting with the highest
+        let mut sorted_candidates: Vec<_> = candidates.into_iter().collect();
+        sorted_candidates.sort_by(|a, b| compare_ballots(b, a)); // Sort in descending order (reverse)
+
+        for ballot in sorted_candidates {
+            if self.ballot().phase == Phase::Confirm {
+                // only consider the ballot if it may help us increase
+                // p (note: at this point, p ~ c)
+                if !are_ballots_less_and_compatible(
+                    &self.ballot().prepared.as_ref().unwrap(),
+                    &ballot,
+                ) {
+                    continue;
+                }
+                assert!(are_ballots_compatible(
+                    &self.ballot().commit.as_ref().unwrap(),
+                    &ballot
+                ));
+            }
+
+            // if we already prepared this ballot, don't bother checking again
+
+            // if ballot <= p' ballot is neither a candidate for p nor p'
+            if let Some(ref prepared_prime) = self.ballot().prepared_prime {
+                if compare_ballots(&ballot, prepared_prime) != Ordering::Greater {
+                    continue;
+                }
+            }
+
+            if let Some(ref prepared) = self.ballot().prepared {
+                // if ballot is already covered by p, skip
+                if are_ballots_less_and_compatible(&ballot, prepared) {
+                    continue;
+                }
+                // otherwise, there is a chance it increases p'
+            }
+
+            let accepted = self.federated_accept(
+                // checks if any node is voting for this ballot
+                |st: &proto::SCPStatement| -> bool {
+                    match &st.pledges {
+                        proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                            are_ballots_less_and_compatible(&ballot, &prepare.ballot)
+                        }
+                        proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                            are_ballots_compatible(&ballot, &confirm.ballot)
+                        }
+                        proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                            are_ballots_compatible(&ballot, &externalize.commit)
+                        }
+                        _ => panic!("bug"),
+                    }
+                },
+                |st: &proto::SCPStatement| -> bool { Self::has_prepared_ballot(&ballot, st) },
+            );
+
+            if accepted {
+                return self.set_accept_prepared(&ballot);
+            }
+        }
+
+        false
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

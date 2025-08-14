@@ -1352,6 +1352,54 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    fn attempt_bump(&mut self) -> bool {
+        if self.ballot().phase == Phase::Prepare || self.ballot().phase == Phase::Confirm {
+            // First check to see if this condition applies at all. If there
+            // is no v-blocking set ahead of the local node, there's nothing
+            // to do, return early.
+            let local_counter = match &self.ballot().current {
+                Some(current) => current.counter,
+                None => 0,
+            };
+
+            if !has_v_blocking_subset_strictly_ahead_of(
+                self.slot().local,
+                &self.ballot().latest_envelopes,
+                local_counter,
+            ) {
+                return false;
+            }
+
+            // Collect all possible counters we might need to advance to.
+            let mut all_counters = HashSet::new();
+            for envelope in self.ballot().latest_envelopes.values() {
+                let c = statement_ballot_counter(&envelope.statement);
+                if c > local_counter {
+                    all_counters.insert(c);
+                }
+            }
+
+            let mut all_counters_sorted: Vec<proto::SCPCount> = all_counters.into_iter().collect();
+            all_counters_sorted.sort();
+
+            // If we got to here, implicitly there _was_ a v-blocking subset
+            // with counters above the local counter; we just need to find a
+            // minimal n at which that's no longer true. So check them in
+            // order, starting from the smallest.
+            for n in all_counters_sorted {
+                if !has_v_blocking_subset_strictly_ahead_of(
+                    self.slot().local,
+                    &self.ballot().latest_envelopes,
+                    n,
+                ) {
+                    // Move to n.
+                    return self.abandon_ballot(n);
+                }
+            }
+        }
+        false
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

@@ -9,29 +9,37 @@ pub struct Interval {
 }
 
 pub fn compare_ballots(left: &proto::SCPBallot, right: &proto::SCPBallot) -> Ordering {
-    panic!("XXX")
+    match left.counter.cmp(&right.counter) {
+        Ordering::Equal => left.value.cmp(&right.value),
+        other => other,
+    }
 }
 
 pub fn compare_opt_ballots(
     left: &Option<proto::SCPBallot>,
     right: &Option<proto::SCPBallot>,
 ) -> Ordering {
-    panic!("XXX")
+    match (left, right) {
+        (Some(b1), Some(b2)) => compare_ballots(b1, b2),
+        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => Ordering::Less,
+        (None, None) => Ordering::Equal,
+    }
 }
 
 pub fn are_ballots_compatible(left: &proto::SCPBallot, right: &proto::SCPBallot) -> bool {
-    panic!("XXX")
+    left.counter == right.counter
 }
 
 pub fn are_ballots_less_and_incompatible(
     left: &proto::SCPBallot,
     right: &proto::SCPBallot,
 ) -> bool {
-    panic!("XXX")
+    (compare_ballots(left, right) != Ordering::Greater) && !are_ballots_compatible(left, right)
 }
 
 pub fn are_ballots_less_and_compatible(left: &proto::SCPBallot, right: &proto::SCPBallot) -> bool {
-    panic!("XXX")
+    (compare_ballots(left, right) != Ordering::Greater) && are_ballots_compatible(left, right)
 }
 
 pub fn has_v_blocking_subset_strictly_ahead_of(

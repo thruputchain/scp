@@ -1161,6 +1161,44 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    /// constructs the set of counters representing the
+    /// commit ballots compatible with the ballot
+    fn get_commit_boundaries_from_statements(
+        &self,
+        ballot: &proto::SCPBallot,
+    ) -> HashSet<proto::SCPCount> {
+        let mut res = HashSet::new();
+
+        for envelope in self.ballot().latest_envelopes.values() {
+            match &envelope.statement.pledges {
+                proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                    if are_ballots_compatible(ballot, &prepare.ballot) {
+                        if prepare.n_c != 0 {
+                            res.insert(prepare.n_c);
+                            res.insert(prepare.n_h);
+                        }
+                    }
+                }
+                proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                    if are_ballots_compatible(ballot, &confirm.ballot) {
+                        res.insert(confirm.n_commit);
+                        res.insert(confirm.n_h);
+                    }
+                }
+                proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                    if are_ballots_compatible(ballot, &externalize.commit) {
+                        res.insert(externalize.commit.counter);
+                        res.insert(externalize.n_h);
+                        res.insert(u32::MAX);
+                    }
+                }
+                _ => panic!("bug"),
+            }
+        }
+
+        res
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

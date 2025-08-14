@@ -1250,6 +1250,108 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         did_work
     }
 
+    fn attempt_accept_commit(&mut self, hint: &proto::SCPStatement) -> bool {
+        if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
+            return false;
+        }
+
+        // extracts value from hint
+        // note: ballot.counter is only used for logging purpose as we're looking at
+        // possible value to commit
+        let ballot = match &hint.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                if prepare.n_c != 0 {
+                    proto::SCPBallot {
+                        counter: prepare.n_h,
+                        value: prepare.ballot.value.clone(),
+                    }
+                } else {
+                    return false;
+                }
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => proto::SCPBallot {
+                counter: confirm.n_h,
+                value: confirm.ballot.value.clone(),
+            },
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => proto::SCPBallot {
+                counter: externalize.n_h,
+                value: externalize.commit.value.clone(),
+            },
+            _ => panic!("bug"),
+        };
+
+        if self.ballot().phase == Phase::Confirm {
+            if !are_ballots_compatible(&ballot, self.ballot().high.as_ref().unwrap()) {
+                return false;
+            }
+        }
+
+        let pred = |cur: &Interval| -> bool {
+            self.federated_accept(
+                |st: &proto::SCPStatement| -> bool {
+                    match &st.pledges {
+                        proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                            if are_ballots_compatible(&ballot, &prepare.ballot) {
+                                if prepare.n_c != 0 {
+                                    prepare.n_c <= cur.lo && cur.hi <= prepare.n_h
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        }
+                        proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                            if are_ballots_compatible(&ballot, &confirm.ballot) {
+                                confirm.n_commit <= cur.lo
+                            } else {
+                                false
+                            }
+                        }
+                        proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                            if are_ballots_compatible(&ballot, &externalize.commit) {
+                                externalize.commit.counter <= cur.lo
+                            } else {
+                                false
+                            }
+                        }
+                        _ => panic!("bug"),
+                    }
+                },
+                |st: &proto::SCPStatement| -> bool { Self::commit_predicate(&ballot, cur, st) },
+            )
+        };
+
+        // build the boundaries to scan
+        let boundaries = self.get_commit_boundaries_from_statements(&ballot);
+
+        if boundaries.is_empty() {
+            return false;
+        }
+
+        // now, look for the high interval
+        let mut candidate = Interval { lo: 0, hi: 0 };
+        Self::find_extended_interval(&mut candidate, &boundaries, pred);
+
+        if candidate.lo != 0 {
+            if self.ballot().phase != Phase::Confirm
+                || candidate.hi > self.ballot().high.as_ref().unwrap().counter
+            {
+                let c = proto::SCPBallot {
+                    counter: candidate.lo,
+                    value: ballot.value.clone(),
+                };
+                let h = proto::SCPBallot {
+                    counter: candidate.hi,
+                    value: ballot.value.clone(),
+                };
+                return self.set_accept_commit(&c, &h);
+            }
+        }
+
+        false
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

@@ -1125,6 +1125,42 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    /// helper function to find a contiguous range 'candidate' that satisfies the
+    /// predicate. updates 'candidate' (or leave it unchanged)
+    fn find_extended_interval<F>(
+        candidate: &mut Interval,
+        boundaries: &HashSet<proto::SCPCount>,
+        pred: F,
+    ) where
+        F: Fn(&Interval) -> bool,
+    {
+        // collect boundaries into a vector and sort, then iterate from the top
+        let mut sorted_boundaries: Vec<proto::SCPCount> = boundaries.iter().copied().collect();
+        sorted_boundaries.sort();
+
+        for &b in sorted_boundaries.iter().rev() {
+            let cur = if candidate.lo == 0 {
+                // first, find the high bound
+                Interval { lo: b, hi: b }
+            } else if b > candidate.hi {
+                // invalid
+                continue;
+            } else {
+                Interval {
+                    lo: b,
+                    hi: candidate.hi,
+                }
+            };
+
+            if pred(&cur) {
+                *candidate = cur;
+            } else if candidate.lo != 0 {
+                // could not extend further
+                break;
+            }
+        }
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

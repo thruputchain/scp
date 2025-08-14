@@ -1650,8 +1650,25 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
-    fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
-        panic!("XXX")
+    fn validate_values(&self, st: &proto::SCPStatement) -> ValidationLevel {
+        let values = get_statement_values(st);
+
+        if values.is_empty() {
+            // This shouldn't happen
+            return ValidationLevel::Invalid;
+        }
+
+        let mut res = ValidationLevel::FullyValid;
+        for value in values {
+            if res > ValidationLevel::Invalid {
+                let validation_result =
+                    self.consensus()
+                        .validate_value(self.slot().index(), &value, false);
+                res = std::cmp::min(validation_result, res);
+            }
+        }
+
+        res
     }
 
     // attempts to make progress using the latest statement as a hint

@@ -1,23 +1,32 @@
 use crate::*;
 
+#[derive(PartialEq, PartialOrd, Ord, Eq)]
 pub enum ValidationLevel {
-    Invalid,    // definitively invalid
-    MaybeValid, // unable to fully decide at this stage; value is possibly valid
-    FullyValid, // definitively valid at this stage (validate_tentatively or validate_fully)
+    Invalid = 0,    // definitively invalid
+    MaybeValid = 1, // unable to fully decide at this stage; value is possibly valid
+    FullyValid = 2, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
 pub trait Consensus: ConsensusCb + ConsensusNotify {
-    fn validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
-    fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
+    fn validate_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+        nomination: bool,
+    ) -> ValidationLevel;
+
+    // XXX: async
+    // fn validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
+    // fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
 }
 
 pub trait ConsensusCb {
-    fn validated(
-        &mut self,
-        slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
-        result: ValidationLevel,
-    );
+    // fn validated(
+    //     &mut self,
+    //     slot_index: SCPSlotIndex,
+    //     value: &proto::SCPValue,
+    //     result: ValidationLevel,
+    // );
 }
 
 pub trait ConsensusNotify {

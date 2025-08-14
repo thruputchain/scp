@@ -799,8 +799,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     let should_update_prime = match &self.ballot().prepared_prime {
                         None => true,
                         Some(prepared_prime) => {
-                            compare_ballots(prepared_prime, &ballot) == Ordering::Less &&
-                            !are_ballots_compatible(prepared, &ballot)
+                            compare_ballots(prepared_prime, &ballot) == Ordering::Less
+                                && !are_ballots_compatible(prepared, &ballot)
                         }
                     };
 
@@ -819,6 +819,116 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         did_work
+    }
+
+    fn federated_ratify<F>(&self, voted: F) -> bool
+    where
+        F: Fn(&proto::SCPStatement) -> bool,
+    {
+        panic!("XXX")
+    }
+
+    fn set_confirm_prepared(&mut self, new_c: &proto::SCPBallot, new_h: &proto::SCPBallot) -> bool {
+        panic!("XXX")
+    }
+
+    fn attempt_confirm_prepared(&mut self, hint: &proto::SCPStatement) -> bool {
+        if self.ballot().phase != Phase::Prepare {
+            return false;
+        }
+
+        // check if we could accept this ballot as prepared
+        if self.ballot().prepared.is_none() {
+            return false;
+        }
+
+        let candidates = self.get_prepare_candidates(hint);
+
+        // See if we can accept any of the candidates, starting with the highest
+        let mut new_h: Option<proto::SCPBallot> = None;
+        let mut sorted_candidates: Vec<_> = candidates.into_iter().collect();
+        sorted_candidates.sort_by(|a, b| compare_ballots(b, a)); // Sort in descending order
+
+        // find newH
+        let mut iter = sorted_candidates.iter();
+        let mut cur = iter.next();
+        while cur.is_some() {
+            let ballot = cur.unwrap();
+
+            // only consider it if we can potentially raise h
+            if let Some(ref high) = self.ballot().high {
+                if compare_ballots(high, ballot) != Ordering::Less {
+                    break;
+                }
+            }
+
+            let ratified = self.federated_ratify(|st: &proto::SCPStatement| -> bool {
+                Self::has_prepared_ballot(ballot, st)
+            });
+
+            if ratified {
+                new_h = Some(ballot.clone());
+                break;
+            }
+
+            cur = iter.next();
+        }
+
+        if let Some(new_h_ballot) = new_h {
+            let mut new_c: Option<&proto::SCPBallot> = None;
+
+            // now, look for newC (left as None if no update)
+            // step (3) from the paper
+            let current_ballot = self.ballot().current.as_ref();
+
+            let should_find_commit = self.ballot().commit.is_none()
+                && (self
+                    .ballot()
+                    .prepared
+                    .as_ref()
+                    .map(|p| !are_ballots_less_and_incompatible(&new_h_ballot, p))
+                    .unwrap_or(true))
+                && (self
+                    .ballot()
+                    .prepared_prime
+                    .as_ref()
+                    .map(|pp| !are_ballots_less_and_incompatible(&new_h_ballot, pp))
+                    .unwrap_or(true));
+
+            if should_find_commit {
+                // continue where we left off (cur is at newH at this point)
+                while cur.is_some() {
+                    let ballot = cur.unwrap();
+
+                    if let Some(current) = current_ballot {
+                        if compare_ballots(ballot, current) == Ordering::Less {
+                            break;
+                        }
+                    }
+
+                    // c and h must be compatible
+                    if !are_ballots_less_and_compatible(ballot, &new_h_ballot) {
+                        continue;
+                    }
+
+                    let ratified = self.federated_ratify(|st: &proto::SCPStatement| -> bool {
+                        Self::has_prepared_ballot(ballot, st)
+                    });
+
+                    if ratified {
+                        new_c = Some(ballot);
+                    } else {
+                        break;
+                    }
+
+                    cur = iter.next();
+                }
+            }
+
+            return self.set_confirm_prepared(new_c.unwrap(), &new_h_ballot);
+        }
+
+        false
     }
 
     fn check_heard_from_quorum(&mut self) {

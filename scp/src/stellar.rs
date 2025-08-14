@@ -34,7 +34,7 @@ impl<'a, C: Consensus, D: Driver> DriverCb for Stellar<'a, C, D> {
     }
     fn timer_expired(&mut self, slot_index: SlotIndex, timer: Timer) {
         if let Some(sp) = &mut self.slot_proto(slot_index) {
-            sp.timer_expired_cb(timer);
+            sp.timer_expired(timer);
         }
     }
 }

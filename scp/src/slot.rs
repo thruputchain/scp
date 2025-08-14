@@ -1,4 +1,5 @@
 use crate::*;
+use std::collections::HashMap;
 
 pub type SlotIndex = u64;
 
@@ -47,7 +48,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.cd.consensus
     }
 
-    pub fn timer_expired_cb(&mut self, timer: Timer) {
+    pub fn timer_expired(&mut self, timer: Timer) {
         match timer {
             Timer::Ballot => self.ballot_proto().timer_expired(),
             Timer::Nomination => panic!("XXX"),
@@ -78,6 +79,26 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     pub fn is_fully_validated(&self) -> bool {
+        panic!("XXX")
+    }
+
+    pub fn federated_accept<F1, F2>(
+        &self,
+        voted: F1,
+        accepted: F2,
+        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+    ) -> bool {
+        panic!("XXX");
+    }
+
+    pub fn federated_ratify<F>(
+        &self,
+        voted: F,
+        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+    ) -> bool
+    where
+        F: Fn(&proto::SCPStatement) -> bool,
+    {
         panic!("XXX")
     }
 }

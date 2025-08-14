@@ -732,7 +732,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         F1: Fn(&proto::SCPStatement) -> bool,
         F2: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX")
+        self.slot()
+            .federated_accept(voted, accepted, &self.ballot().latest_envelopes)
     }
 
     fn set_accept_prepared(&mut self, ballot: &proto::SCPBallot) -> bool {
@@ -825,7 +826,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     where
         F: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX")
+        self.slot()
+            .federated_ratify(voted, &self.ballot().latest_envelopes)
     }
 
     fn set_confirm_prepared(&mut self, new_c: &proto::SCPBallot, new_h: &proto::SCPBallot) -> bool {

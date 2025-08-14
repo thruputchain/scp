@@ -61,6 +61,14 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.slot_mut().ballot_mut()
     }
 
+    fn driver(&self) -> &D {
+        self.slot().driver()
+    }
+
+    fn consensus(&self) -> &C {
+        self.slot().consensus()
+    }
+
     // proto
 
     fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
@@ -684,6 +692,133 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         } else {
             false
         }
+    }
+
+    fn has_prepared_ballot(ballot: &proto::SCPBallot, st: &proto::SCPStatement) -> bool {
+        match &st.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                let prepared_check = prepare
+                    .prepared
+                    .as_ref()
+                    .map(|p| are_ballots_less_and_compatible(ballot, p))
+                    .unwrap_or(false);
+
+                let prepared_prime_check = prepare
+                    .prepared_prime
+                    .as_ref()
+                    .map(|pp| are_ballots_less_and_compatible(ballot, pp))
+                    .unwrap_or(false);
+
+                prepared_check || prepared_prime_check
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                let prepared = proto::SCPBallot {
+                    counter: confirm.n_prepared,
+                    value: confirm.ballot.value.clone(),
+                };
+                are_ballots_less_and_compatible(ballot, &prepared)
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                are_ballots_compatible(ballot, &externalize.commit)
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                panic!("bug");
+            }
+        }
+    }
+
+    fn federated_accept<F1, F2>(&self, voted: F1, accepted: F2) -> bool
+    where
+        F1: Fn(&proto::SCPStatement) -> bool,
+        F2: Fn(&proto::SCPStatement) -> bool,
+    {
+        panic!("XXX")
+    }
+
+    fn set_accept_prepared(&mut self, ballot: &proto::SCPBallot) -> bool {
+        trace!(
+            slot_index = self.slot().index(),
+            ballot = ?ballot,
+            "BallotProtocol::setAcceptPrepared"
+        );
+
+        // Update our state
+        let mut did_work = self.set_prepared(ballot.clone());
+
+        // Check if we also need to clear 'c'
+        if let (Some(_commit), Some(high)) = (&self.ballot().commit, &self.ballot().high) {
+            let should_clear_commit =
+                if let Some(prepared) = &self.ballot().prepared {
+                    are_ballots_less_and_incompatible(high, prepared)
+                } else {
+                    false
+                } || if let Some(prepared_prime) = &self.ballot().prepared_prime {
+                    are_ballots_less_and_incompatible(high, prepared_prime)
+                } else {
+                    false
+                };
+
+            if should_clear_commit {
+                assert_eq!(self.ballot().phase, Phase::Prepare);
+                self.ballot_mut().commit = None;
+                did_work = true;
+            }
+        }
+
+        if did_work {
+            self.consensus()
+                .accepted_ballot_prepared(self.slot().index(), ballot);
+            self.emit_current_state_statement();
+        }
+
+        did_work
+    }
+
+    fn set_prepared(&mut self, ballot: proto::SCPBallot) -> bool {
+        let mut did_work = false;
+
+        // p and p' are the two highest prepared and incompatible ballots
+        if let Some(ref prepared) = self.ballot().prepared {
+            match compare_ballots(prepared, &ballot) {
+                Ordering::Less => {
+                    // as we're replacing p, we see if we should also replace p'
+                    if !are_ballots_compatible(prepared, &ballot) {
+                        self.ballot_mut().prepared_prime = Some(prepared.clone());
+                    }
+                    self.ballot_mut().prepared = Some(ballot);
+                    did_work = true;
+                }
+                Ordering::Greater => {
+                    // check if we should update only p', this happens
+                    // either p' was NULL
+                    // or p' gets replaced by ballot
+                    //      (p' < ballot and ballot is incompatible with p)
+                    // note, the later check is here out of paranoia as this function is
+                    // not called with a value that would not allow us to make progress
+
+                    let should_update_prime = match &self.ballot().prepared_prime {
+                        None => true,
+                        Some(prepared_prime) => {
+                            compare_ballots(prepared_prime, &ballot) == Ordering::Less &&
+                            !are_ballots_compatible(prepared, &ballot)
+                        }
+                    };
+
+                    if should_update_prime {
+                        self.ballot_mut().prepared_prime = Some(ballot);
+                        did_work = true;
+                    }
+                }
+                Ordering::Equal => {
+                    // Already have this ballot prepared, no work needed
+                }
+            }
+        } else {
+            self.ballot_mut().prepared = Some(ballot);
+            did_work = true;
+        }
+
+        did_work
     }
 
     fn check_heard_from_quorum(&mut self) {

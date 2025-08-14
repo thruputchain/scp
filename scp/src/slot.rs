@@ -39,6 +39,14 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         &mut self.slot.ballot
     }
 
+    pub fn driver(&self) -> &D {
+        self.cd.driver
+    }
+
+    pub fn consensus(&self) -> &C {
+        self.cd.consensus
+    }
+
     pub fn timer_expired_cb(&mut self, timer: Timer) {
         match timer {
             Timer::Ballot => self.ballot_proto().timer_expired(),

@@ -1,5 +1,11 @@
 use std::cmp::Ordering;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Interval {
+    pub lo: proto::SCPCount,
+    pub hi: proto::SCPCount,
+}
+
 pub fn compare_ballots(left: &proto::SCPBallot, right: &proto::SCPBallot) -> Ordering {
     panic!("XXX")
 }
@@ -22,9 +28,6 @@ pub fn are_ballots_less_and_incompatible(
     panic!("XXX")
 }
 
-pub fn are_ballots_less_and_compatible(
-    left: &proto::SCPBallot,
-    right: &proto::SCPBallot,
-) -> bool {
+pub fn are_ballots_less_and_compatible(left: &proto::SCPBallot, right: &proto::SCPBallot) -> bool {
     panic!("XXX")
 }

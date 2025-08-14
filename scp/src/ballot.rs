@@ -1100,6 +1100,31 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    fn commit_predicate(
+        ballot: &proto::SCPBallot,
+        check: &Interval,
+        st: &proto::SCPStatement,
+    ) -> bool {
+        match &st.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { .. } => false,
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                if are_ballots_compatible(ballot, &confirm.ballot) {
+                    confirm.n_commit <= check.lo && check.hi <= confirm.n_h
+                } else {
+                    false
+                }
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                if are_ballots_compatible(ballot, &externalize.commit) {
+                    externalize.commit.counter <= check.lo
+                } else {
+                    false
+                }
+            }
+            _ => panic!("bug"),
+        }
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

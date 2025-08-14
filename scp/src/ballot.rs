@@ -1671,6 +1671,77 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
+    fn get_state(&self, n: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
+        let mut state = QuorumInfoNodeState::Agree;
+
+        if n == self.slot().local.get_node_id() {
+            // always mark myself as AGREE.
+            return state;
+        }
+
+        let envelope_opt = self.ballot().latest_envelopes.get(n);
+
+        if envelope_opt.is_none() {
+            if self.ballot().timer_exp_count >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
+                || self_already_moved_on
+            {
+                state = QuorumInfoNodeState::Missing;
+            } else {
+                // It's too soon to start calling this node MISSING.
+                state = QuorumInfoNodeState::NoInfo;
+            }
+        } else if let Some(last_envelope_emit) = &self.ballot().last_envelope_emit {
+            let envelope = envelope_opt.unwrap();
+            let st = &envelope.statement;
+            let externalized = matches!(
+                st.pledges,
+                proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
+            );
+
+            let confirmed_commit = match &st.pledges {
+                proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                    confirm.ballot.counter == u32::MAX
+                }
+                _ => false,
+            };
+
+            if self.ballot().phase == Phase::Externalize
+                && (!externalized || !confirmed_commit)
+                && self_already_moved_on
+            {
+                // We have already externalized and moved onto the next slot.
+                // However, this node hasn't externalized yet.
+                state = QuorumInfoNodeState::Delayed;
+            }
+
+            let self_accepted_confirm =
+                self.ballot().phase == Phase::Confirm || self.ballot().phase == Phase::Externalize;
+
+            let other_accepted_confirm = matches!(
+                st.pledges,
+                proto::SCPStatement_pledges::SCP_ST_CONFIRM { .. }
+                    | proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
+            );
+
+            let self_st = &last_envelope_emit.statement;
+
+            if self_accepted_confirm
+                && other_accepted_confirm
+                && !are_ballots_compatible(
+                    &Self::get_working_ballot(st),
+                    &Self::get_working_ballot(self_st),
+                )
+            {
+                // n has accepted to commit a different value than mine!
+                // Even if this node has been marked something else,
+                // we will overwrite it since this is bad.
+                state = QuorumInfoNodeState::Disagree;
+            }
+        }
+
+        state
+    }
+
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress

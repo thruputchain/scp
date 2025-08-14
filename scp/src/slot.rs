@@ -3,6 +3,10 @@ use std::collections::HashMap;
 
 pub type SlotIndex = u64;
 
+// The number of times the timer has to expire before we consider the node
+// missing. Used for reporting purposes only.
+pub const NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING: i64 = 2;
+
 pub struct Slot {
     pub slot_index: SlotIndex,
     pub ballot: Ballot,

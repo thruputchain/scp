@@ -9,6 +9,9 @@ pub use driver::*;
 pub mod stellar;
 pub use stellar::*;
 
+pub mod info;
+pub use info::*;
+
 pub mod local;
 pub use local::*;
 

@@ -1515,6 +1515,93 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    fn set_state_from_envelope(&mut self, env: &proto::SCPEnvelope) {
+        // cannot set state after starting ballot protocol
+        assert!(self.ballot().current.is_none());
+
+        self.record_envelope(env);
+
+        self.ballot_mut().last_envelope_gen = Some(env.clone());
+        self.ballot_mut().last_envelope_emit = Some(env.clone());
+
+        match &env.statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                let b = &prepare.ballot;
+                self.bump_to_ballot(b.clone(), true);
+
+                if let Some(prepared) = &prepare.prepared {
+                    self.ballot_mut().prepared = Some(prepared.clone());
+                }
+
+                if let Some(prepared_prime) = &prepare.prepared_prime {
+                    self.ballot_mut().prepared_prime = Some(prepared_prime.clone());
+                }
+
+                if prepare.n_h != 0 {
+                    self.ballot_mut().high = Some(proto::SCPBallot {
+                        counter: prepare.n_h,
+                        value: b.value.clone(),
+                    });
+                }
+
+                if prepare.n_c != 0 {
+                    self.ballot_mut().commit = Some(proto::SCPBallot {
+                        counter: prepare.n_c,
+                        value: b.value.clone(),
+                    });
+                }
+
+                self.ballot_mut().phase = Phase::Prepare;
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                let v = &confirm.ballot.value;
+                self.bump_to_ballot(confirm.ballot.clone(), true);
+
+                self.ballot_mut().prepared = Some(proto::SCPBallot {
+                    counter: confirm.n_prepared,
+                    value: v.clone(),
+                });
+
+                self.ballot_mut().high = Some(proto::SCPBallot {
+                    counter: confirm.n_h,
+                    value: v.clone(),
+                });
+
+                self.ballot_mut().commit = Some(proto::SCPBallot {
+                    counter: confirm.n_commit,
+                    value: v.clone(),
+                });
+
+                self.ballot_mut().phase = Phase::Confirm;
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                let v = &externalize.commit.value;
+                self.bump_to_ballot(
+                    proto::SCPBallot {
+                        counter: u32::MAX,
+                        value: v.clone(),
+                    },
+                    true,
+                );
+
+                self.ballot_mut().prepared = Some(proto::SCPBallot {
+                    counter: u32::MAX,
+                    value: v.clone(),
+                });
+
+                self.ballot_mut().high = Some(proto::SCPBallot {
+                    counter: externalize.n_h,
+                    value: v.clone(),
+                });
+
+                self.ballot_mut().commit = Some(externalize.commit.clone());
+
+                self.ballot_mut().phase = Phase::Externalize;
+            }
+            _ => panic!("bug"),
+        }
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

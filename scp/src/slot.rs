@@ -105,4 +105,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     {
         panic!("XXX")
     }
+
+    pub fn stop_nomination(&mut self) {
+        panic!("XXX")
+    }
 }

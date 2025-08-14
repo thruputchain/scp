@@ -21,6 +21,8 @@ pub trait ConsensusCb {
 }
 
 pub trait ConsensusNotify {
+    fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue);
+    //
     fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);

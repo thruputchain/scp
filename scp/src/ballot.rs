@@ -1400,6 +1400,86 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    fn attempt_confirm_commit(&mut self, hint: &proto::SCPStatement) -> bool {
+        if self.ballot().phase != Phase::Confirm {
+            return false;
+        }
+
+        if self.ballot().high.is_none() || self.ballot().commit.is_none() {
+            return false;
+        }
+
+        // extracts value from hint
+        // note: ballot.counter is only used for logging purpose
+        let ballot = match &hint.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { .. } => {
+                return false;
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => proto::SCPBallot {
+                counter: confirm.n_h,
+                value: confirm.ballot.value.clone(),
+            },
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => proto::SCPBallot {
+                counter: externalize.n_h,
+                value: externalize.commit.value.clone(),
+            },
+            _ => panic!("bug"),
+        };
+
+        if !are_ballots_compatible(&ballot, self.ballot().commit.as_ref().unwrap()) {
+            return false;
+        }
+
+        let boundaries = self.get_commit_boundaries_from_statements(&ballot);
+        let mut candidate = Interval { lo: 0, hi: 0 };
+
+        let pred = |cur: &Interval| -> bool {
+            self.federated_ratify(|st: &proto::SCPStatement| -> bool {
+                Self::commit_predicate(&ballot, cur, st)
+            })
+        };
+
+        Self::find_extended_interval(&mut candidate, &boundaries, pred);
+
+        if candidate.lo != 0 {
+            let c = proto::SCPBallot {
+                counter: candidate.lo,
+                value: ballot.value.clone(),
+            };
+            let h = proto::SCPBallot {
+                counter: candidate.hi,
+                value: ballot.value.clone(),
+            };
+            return self.set_confirm_commit(&c, &h);
+        }
+
+        false
+    }
+
+    fn set_confirm_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
+        trace!(
+            slot_index = self.slot().index(),
+            c = ?c,
+            h = ?h,
+            "ballot proto set_confirm_commit"
+        );
+
+        self.ballot_mut().commit = Some(c.clone());
+        self.ballot_mut().high = Some(h.clone());
+        self.update_current_if_needed(h);
+
+        self.ballot_mut().phase = Phase::Externalize;
+
+        self.emit_current_state_statement();
+
+        self.slot_mut().stop_nomination();
+
+        self.consensus()
+            .value_externalized(self.slot().index(), &c.value);
+
+        true
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

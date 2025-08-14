@@ -60,6 +60,15 @@ pub fn is_newer_statement(older: &proto::SCPStatement, newer: &proto::SCPStateme
     }
 }
 
+pub fn statement_ballot_counter(st: &proto::SCPStatement) -> proto::SCPCount {
+    match &st.pledges {
+        proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => prepare.ballot.counter,
+        proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => confirm.ballot.counter,
+        proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. } => u32::MAX,
+        _ => panic!("bug"),
+    }
+}
+
 // helper function to retrieve b for PREPARE, P for CONFIRM or
 // c for EXTERNALIZE messages
 pub fn get_working_ballot(statement: &proto::SCPStatement) -> &proto::SCPBallot {

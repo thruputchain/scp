@@ -4,6 +4,10 @@ use std::collections::HashMap;
 pub struct Local {}
 
 impl Local {
+    pub fn get_quorum_set(&self) -> &proto::SCPQuorumSet {
+        panic!("XXX")
+    }
+
     pub fn get_quorum_hash(&self) -> &proto::SCPHash {
         panic!("XXX")
     }
@@ -20,7 +24,7 @@ impl Local {
         panic!("XXX")
     }
 
-    pub fn is_vblocking_envs<F>(
+    pub fn is_vblocking_envelopes<F>(
         &self,
         qset: &proto::SCPQuorumSet,
         envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,

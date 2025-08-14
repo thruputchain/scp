@@ -1199,6 +1199,57 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
+    fn set_accept_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
+        trace!(
+            slot_index = self.slot().index(),
+            c = ?c,
+            h = ?h,
+            "ballot proto set_accept_commit"
+        );
+
+        let mut did_work = false;
+
+        // remember h's value
+        self.ballot_mut().value_override = Some(h.value.clone());
+
+        let high_changed = match &self.ballot().high {
+            None => true,
+            Some(current_high) => compare_ballots(current_high, h) != Ordering::Equal,
+        };
+
+        let commit_changed = match &self.ballot().commit {
+            None => true,
+            Some(current_commit) => compare_ballots(current_commit, c) != Ordering::Equal,
+        };
+
+        if high_changed || commit_changed {
+            self.ballot_mut().commit = Some(c.clone());
+            self.ballot_mut().high = Some(h.clone());
+            did_work = true;
+        }
+
+        if self.ballot().phase == Phase::Prepare {
+            self.ballot_mut().phase = Phase::Confirm;
+
+            if let Some(current) = &self.ballot().current {
+                if !are_ballots_less_and_compatible(h, current) {
+                    self.bump_to_ballot(h.clone(), false);
+                }
+            }
+
+            self.ballot_mut().prepared_prime = None;
+            did_work = true;
+        }
+
+        if did_work {
+            self.update_current_if_needed(&self.ballot().high.as_ref().unwrap().clone());
+            self.consensus().accepted_commit(self.slot().index(), h);
+            self.emit_current_state_statement();
+        }
+
+        did_work
+    }
+
     fn validate_values(&self, statement: &proto::SCPStatement) -> ValidationLevel {
         panic!("XXX")
     }

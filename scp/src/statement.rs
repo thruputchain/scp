@@ -68,9 +68,3 @@ pub fn statement_ballot_counter(st: &proto::SCPStatement) -> proto::SCPCount {
         _ => panic!("bug"),
     }
 }
-
-// helper function to retrieve b for PREPARE, P for CONFIRM or
-// c for EXTERNALIZE messages
-pub fn get_working_ballot(statement: &proto::SCPStatement) -> &proto::SCPBallot {
-    panic!("XXX")
-}

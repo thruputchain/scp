@@ -11,7 +11,7 @@ pub struct Ballot {
     prepared_prime: Option<proto::SCPBallot>, // p'
     high: Option<proto::SCPBallot>,           // h
     commit: Option<proto::SCPBallot>,         // c
-    value_override: Option<proto::SCPBallot>, // z
+    value_override: Option<proto::SCPValue>,  // z
     latest_envelopes: HashMap<proto::SCPNodeID, proto::SCPEnvelope>, // M
     phase: Phase,                             // phi
 
@@ -310,7 +310,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         return match self.ballot().phase {
             Phase::Prepare | Phase::Confirm => {
                 let newv = match &self.ballot().value_override {
-                    Some(v) => v.value.clone(),
+                    Some(v) => v.clone(),
                     None => value,
                 };
                 let newb = proto::SCPBallot {
@@ -829,7 +829,55 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn set_confirm_prepared(&mut self, new_c: &proto::SCPBallot, new_h: &proto::SCPBallot) -> bool {
-        panic!("XXX")
+        trace!(
+            slot_index = self.slot().index(),
+            new_h = ?new_h,
+            "ballot proto set_confirm_prepared"
+        );
+
+        let mut did_work = false;
+
+        // remember newH's value
+        self.ballot_mut().value_override = Some(new_h.value.clone());
+
+        // we don't set c/h if we're not on a compatible ballot
+        let should_update = match &self.ballot().current {
+            None => true,
+            Some(current) => are_ballots_compatible(current, new_h),
+        };
+
+        if should_update {
+            if let Some(ref high) = self.ballot().high {
+                if compare_ballots(new_h, high) == Ordering::Greater {
+                    did_work = true;
+                    self.ballot_mut().high = Some(new_h.clone());
+                }
+            } else {
+                did_work = true;
+                self.ballot_mut().high = Some(new_h.clone());
+            }
+
+            if new_c.counter != 0 {
+                assert!(self.ballot().commit.is_none());
+                self.ballot_mut().commit = Some(new_c.clone());
+                did_work = true;
+            }
+
+            if did_work {
+                self.consensus()
+                    .confirmed_ballot_prepared(self.slot().index(), new_h);
+            }
+        }
+
+        // always perform step (8) with the computed value of h
+        let current_updated = self.update_current_if_needed(new_h);
+        did_work = current_updated || did_work;
+
+        if did_work {
+            self.emit_current_state_statement();
+        }
+
+        did_work
     }
 
     fn attempt_confirm_prepared(&mut self, hint: &proto::SCPStatement) -> bool {

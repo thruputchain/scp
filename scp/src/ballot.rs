@@ -451,7 +451,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let pledges = match typ {
             proto::SCPStatementType::SCP_ST_PREPARE => {
                 let mut prepare = proto::SCPStatementPrepare {
-                    quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
+                    quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
                     ballot: proto::SCPBallot {
                         counter: 0,
                         value: Default::default(),
@@ -491,7 +491,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     n_prepared: self.ballot().prepared.as_ref().unwrap().counter,
                     n_commit: self.ballot().commit.as_ref().unwrap().counter,
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
+                    quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
@@ -501,7 +501,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 let externalize = proto::SCPStatementExternalize {
                     commit: self.ballot().commit.as_ref().unwrap().clone(),
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    commit_quorum_set_hash: self.slot().local.get_quorum_hash().clone(),
+                    commit_quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
@@ -532,7 +532,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
                 if should_emit {
                     ballot_mut.last_envelope_emit = Some(last_gen.clone());
-                    driver.send(last_gen.clone());
+                    driver.emit_envelope(last_gen.clone());
                 }
             }
         }
@@ -1740,6 +1740,86 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         state
+    }
+
+    fn get_json_quorum_info(
+        &self,
+        id: &proto::SCPNodeID,
+        summary: bool,
+        full_keys: bool,
+    ) -> serde_json::Value {
+        let mut ret = serde_json::json!({});
+
+        // find the state of the node `id`
+        let mut b = proto::SCPBallot {
+            counter: 0,
+            value: proto::SCPValue::default(),
+        };
+        let mut q_set_hash = proto::SCPHash::default();
+
+        let envelope_opt = self.ballot().latest_envelopes.get(id);
+        if envelope_opt.is_none() {
+            ret["phase"] = serde_json::Value::String("unknown".to_string());
+            if id == self.slot().local.get_node_id() {
+                q_set_hash = *self.slot().local.get_quorum_set_hash();
+            }
+        } else {
+            let envelope = envelope_opt.unwrap();
+            let st = &envelope.statement;
+
+            match &st.pledges {
+                proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                    ret["phase"] = serde_json::Value::String("PREPARE".to_string());
+                    b = prepare.ballot.clone();
+                }
+                proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                    ret["phase"] = serde_json::Value::String("CONFIRM".to_string());
+                    b = confirm.ballot.clone();
+                }
+                proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                    ret["phase"] = serde_json::Value::String("EXTERNALIZE".to_string());
+                    b = externalize.commit.clone();
+                }
+                _ => panic!("bug"),
+            }
+
+            // use the companion set here even for externalize to capture
+            // the view of the quorum set during consensus
+            q_set_hash = Self::get_companion_quorum_set_hash_from_statement(st);
+        }
+
+        let q_set = self.driver().get_qset(&q_set_hash);
+        if q_set.is_none() {
+            ret["phase"] = serde_json::Value::String("expired".to_string());
+            return ret;
+        }
+
+        let q_set = q_set.unwrap();
+        let f = self.slot().local.find_closest_v_blocking_envelopes(
+            &q_set,
+            &self.ballot().latest_envelopes,
+            |st: &proto::SCPStatement| -> bool {
+                are_ballots_compatible(&Self::get_working_ballot(st), &b)
+            },
+            Some(id),
+        );
+
+        ret["fail_at"] = serde_json::Value::Number(serde_json::Number::from(f.len()));
+
+        if !summary {
+            let mut f_ex = serde_json::json!([]);
+            for n in f {
+                f_ex.as_array_mut().unwrap().push(serde_json::Value::String(
+                    self.driver().to_str_key(n, full_keys),
+                ));
+            }
+            ret["fail_with"] = f_ex;
+            ret["value"] = self.slot().local.to_json(&q_set, full_keys);
+        }
+
+        ret["hash"] = serde_json::Value::String(hex_abbrev(&q_set_hash));
+
+        ret
     }
 
     // attempts to make progress using the latest statement as a hint

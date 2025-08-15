@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use thiserror::Error;
+use xdr_common::VecM;
 
 // level = 0 when there is no nesting.
 pub const MAXIMUM_QUORUM_NESTING_LEVEL: u32 = 4;
@@ -99,6 +100,49 @@ pub fn is_qset_sane(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<()
     }
 }
 
+fn normalize_qset_simplify(
+    qset: &mut proto::SCPQuorumSet,
+    id_to_remove: Option<&proto::SCPNodeID>,
+) {
+    // remove the specified node ID if provided
+    if let Some(id_to_remove) = id_to_remove {
+        let validators = &mut qset.validators;
+        let original_len = validators.len();
+        validators.0.retain(|node| node != id_to_remove);
+        let removed_count = original_len - validators.len();
+        qset.threshold = qset.threshold.saturating_sub(removed_count as u32);
+    }
+
+    // process inner sets
+    let mut updated_inner_sets = VecM::<proto::SCPQuorumSet>(Vec::new());
+    for mut inner_set in qset.inner_sets.0.iter_mut() {
+        normalize_qset_simplify(&mut inner_set, id_to_remove);
+
+        // check if this inner set can be merged into validator list
+        // (threshold=1, 1 validator, 0 inner sets)
+        if inner_set.threshold == 1
+            && inner_set.validators.len() == 1
+            && inner_set.inner_sets.len() == 0
+        {
+            qset.validators
+                .0
+                .push(inner_set.validators.iter().next().unwrap().clone());
+        } else {
+            updated_inner_sets.0.push(inner_set.clone());
+        }
+    }
+    qset.inner_sets = updated_inner_sets;
+
+    // simplify quorum set if needed
+    // (threshold=1, no validators, 1 inner set)
+    if qset.threshold == 1 && qset.validators.len() == 0 && qset.inner_sets.len() == 1 {
+        let inner_set = qset.inner_sets.iter().next().unwrap().clone();
+        *qset = inner_set;
+    }
+}
+
 pub fn normalize_qset(qset: &mut proto::SCPQuorumSet, id_to_remove: Option<&proto::SCPNodeID>) {
+    normalize_qset_simplify(qset, id_to_remove);
+    // normalizeQuorumSetReorder(qSet);
     panic!("XXX")
 }

@@ -36,4 +36,5 @@ pub trait ConsensusNotify {
     fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
+    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
 }

@@ -6,6 +6,6 @@ pub enum QSetError {
     XXXError,
 }
 
-pub fn is_qset_sane(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<(), QSetError> {
+pub fn is_quorum_set_sane(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<(), QSetError> {
     panic!("XXX")
 }

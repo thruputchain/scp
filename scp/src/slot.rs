@@ -59,7 +59,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    pub fn get_qset_from_statement(
+    pub fn get_quorum_set_from_statement(
         &self,
         statement: &proto::SCPStatement,
     ) -> Option<proto::SCPQuorumSet> {

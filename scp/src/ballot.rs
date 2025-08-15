@@ -169,9 +169,9 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
-        match &self.slot().get_qset_from_statement(statement) {
+        match &self.slot().get_quorum_set_from_statement(statement) {
             Some(qset) => {
-                if let Result::Err(e) = is_qset_sane(qset, false) {
+                if let Result::Err(e) = is_quorum_set_sane(qset, false) {
                     debug!(err = ?e, "invalid quorum set received");
                     return false;
                 }
@@ -982,7 +982,50 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn check_heard_from_quorum(&mut self) {
-        panic!("XXX")
+        // this method is safe to call regardless of the transitions of the other
+        // nodes on the network:
+        // we guarantee that other nodes can only transition to higher counters
+        // (messages are ignored upstream)
+        // therefore the local node will not flip flop between "seen" and "not seen"
+        // for a given counter on the local node
+        if let Some(current_ballot) = &self.ballot().current.clone() {
+            let is_quorum = Local::is_quorum(
+                self.slot().local.get_quorum_set(),
+                &self.ballot().latest_envelopes,
+                |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+                    self.slot().get_quorum_set_from_statement(st)
+                },
+                |st: &proto::SCPStatement| -> bool {
+                    match &st.pledges {
+                        proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                            current_ballot.counter <= prepare.ballot.counter
+                        }
+                        _ => true,
+                    }
+                },
+            );
+
+            if is_quorum {
+                let old_hq = self.ballot().heard_from_quorum;
+                self.ballot_mut().heard_from_quorum = true;
+
+                if !old_hq {
+                    // if we transition from not heard -> heard, we start the timer
+                    self.consensus()
+                        .ballot_did_hear_from_quorum(self.slot().index(), current_ballot);
+                    if self.ballot().phase != Phase::Externalize {
+                        self.start_timer();
+                    }
+                }
+
+                if self.ballot().phase == Phase::Externalize {
+                    self.stop_timer();
+                }
+            } else {
+                self.ballot_mut().heard_from_quorum = false;
+                self.stop_timer();
+            }
+        }
     }
 
     fn check_invariants(&self) {

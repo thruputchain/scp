@@ -36,6 +36,15 @@ impl Local {
         panic!("XXX")
     }
 
+    pub fn is_quorum(
+        qset: &proto::SCPQuorumSet,
+        envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        qfun: impl Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
+        filter: impl Fn(&proto::SCPStatement) -> bool,
+    ) -> bool {
+        panic!("XXX")
+    }
+
     // computes the distance to the set of v-blocking sets given
     // a set of nodes that agree (but can fail)
     // excluded, if set will be skipped altogether

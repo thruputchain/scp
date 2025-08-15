@@ -1,4 +1,5 @@
 use crate::*;
+use std::fmt::Debug;
 
 #[derive(PartialEq, PartialOrd, Ord, Eq)]
 pub enum ValidationLevel {
@@ -7,7 +8,7 @@ pub enum ValidationLevel {
     FullyValid = 2, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
-pub trait Consensus: ConsensusCb + ConsensusNotify {
+pub trait Consensus: ConsensusCb + ConsensusNotify + Debug {
     fn validate_value(
         &self,
         slot_index: SCPSlotIndex,
@@ -20,7 +21,7 @@ pub trait Consensus: ConsensusCb + ConsensusNotify {
     // fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
 }
 
-pub trait ConsensusCb {
+pub trait ConsensusCb: Debug {
     // fn validated(
     //     &mut self,
     //     slot_index: SCPSlotIndex,
@@ -29,7 +30,7 @@ pub trait ConsensusCb {
     // );
 }
 
-pub trait ConsensusNotify {
+pub trait ConsensusNotify: Debug {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue);
     //
     fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);

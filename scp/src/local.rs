@@ -1,6 +1,7 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug)]
 pub struct Local {}
 
 impl Local {

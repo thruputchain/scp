@@ -2,7 +2,7 @@ use crate::*;
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, instrument, trace};
 
 #[derive(Debug)]
 pub struct BallotState {
@@ -44,6 +44,7 @@ impl BallotState {
     }
 }
 
+#[derive(Debug)]
 pub struct BallotProto<'a, 'b, C: Consensus, D: Driver>(pub &'a mut SlotProto<'b, C, D>);
 
 impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
@@ -88,11 +89,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert!(env.statement.slot_index == self.slot().index());
 
         let statement = &env.statement;
-        let node_id = &statement.node_id;
 
         fn check_valid<'a, 'b, C: Consensus, D: Driver>(
             ballot_proto: &mut BallotProto<'a, 'b, C, D>,
@@ -259,6 +260,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot().get_latest_composite_candidate() {
@@ -295,6 +297,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
         let n = match &self.ballot().current {
             Some(b) => {
@@ -337,6 +340,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
+    #[instrument]
     fn update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
         if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
             return false;
@@ -380,6 +384,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         updated
     }
 
+    #[instrument]
     fn bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
         trace!(
             slot_index = self.slot().index(),
@@ -447,6 +452,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.abandon_ballot(0);
     }
 
+    #[instrument]
     fn create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
         self.check_invariants();
 
@@ -521,6 +527,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn send_latest_envelope(&mut self) {
         // emit current envelope if needed
         if self.ballot().msg_level == 0 && self.slot().is_fully_validated() {
@@ -540,6 +547,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn emit_current_state_statement(&mut self) {
         let statement_type = match self.ballot().phase {
             Phase::Prepare => proto::SCPStatementType::SCP_ST_PREPARE,
@@ -590,6 +598,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn get_prepare_candidates(&self, hint: &proto::SCPStatement) -> HashSet<proto::SCPBallot> {
         let mut hint_ballots = HashSet::new();
 
@@ -729,6 +738,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument(skip(voted, accepted))]
     fn federated_accept<F1, F2>(&self, voted: F1, accepted: F2) -> bool
     where
         F1: Fn(&proto::SCPStatement) -> bool,
@@ -824,6 +834,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         did_work
     }
 
+    #[instrument(skip(voted))]
     fn federated_ratify<F>(&self, voted: F) -> bool
     where
         F: Fn(&proto::SCPStatement) -> bool,
@@ -832,6 +843,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             .federated_ratify(voted, &self.ballot().latest_envelopes)
     }
 
+    #[instrument]
     fn set_confirm_prepared(&mut self, new_c: &proto::SCPBallot, new_h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot().index(),
@@ -983,6 +995,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    #[instrument]
     fn check_heard_from_quorum(&mut self) {
         // this method is safe to call regardless of the transitions of the other
         // nodes on the network:
@@ -1074,6 +1087,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn attempt_accept_prepared(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
             return false;
@@ -1244,6 +1258,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
+    #[instrument]
     fn set_accept_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot().index(),
@@ -1295,6 +1310,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         did_work
     }
 
+    #[instrument]
     fn attempt_accept_commit(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot().phase != Phase::Prepare && self.ballot().phase != Phase::Confirm {
             return false;
@@ -1397,6 +1413,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    #[instrument]
     fn attempt_bump(&mut self) -> bool {
         if self.ballot().phase == Phase::Prepare || self.ballot().phase == Phase::Confirm {
             // First check to see if this condition applies at all. If there
@@ -1445,6 +1462,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    #[instrument]
     fn attempt_confirm_commit(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot().phase != Phase::Confirm {
             return false;
@@ -1501,6 +1519,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
+    #[instrument]
     fn set_confirm_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot().index(),
@@ -1560,6 +1579,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
+    #[instrument]
     fn set_state_from_envelope(&mut self, env: &proto::SCPEnvelope) {
         // cannot set state after starting ballot protocol
         assert!(self.ballot().current.is_none());
@@ -1695,6 +1715,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
+    #[instrument]
     fn validate_values(&self, st: &proto::SCPStatement) -> ValidationLevel {
         let values = get_statement_values(st);
 
@@ -1870,6 +1891,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress
+    #[instrument]
     fn advance_slot(&mut self, hint: &proto::SCPStatement) {
         const MAX_ADVANCE_SLOT_RECURSION: i64 = 100;
 

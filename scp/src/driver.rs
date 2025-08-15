@@ -1,4 +1,5 @@
 use crate::*;
+use std::fmt::Debug;
 use std::time::Duration;
 
 pub enum Timer {
@@ -6,7 +7,7 @@ pub enum Timer {
     Ballot = 1,
 }
 
-pub trait Driver {
+pub trait Driver: Debug {
     /// Retrieves a quorum set from its hash
     ///
     /// All SCP statement (see `SCPNomination` and `SCPStatement`) include

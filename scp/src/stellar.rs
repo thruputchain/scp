@@ -1,6 +1,7 @@
 use crate::*;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct ConsensusDriver<'a, C: Consensus, D: Driver> {
     pub consensus: &'a C,
     pub driver: &'a D,
@@ -12,6 +13,7 @@ impl<'a, C: Consensus, D: Driver> ConsensusDriver<'a, C, D> {
     }
 }
 
+#[derive(Debug)]
 pub struct Stellar<'a, C: Consensus, D: Driver> {
     cd: ConsensusDriver<'a, C, D>,
     local: Local,

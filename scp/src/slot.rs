@@ -7,6 +7,7 @@ pub type SlotIndex = u64;
 // missing. Used for reporting purposes only.
 pub const NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING: i64 = 2;
 
+#[derive(Debug)]
 pub struct Slot {
     pub slot_index: SlotIndex,
     pub ballot: BallotState,
@@ -21,6 +22,7 @@ impl Slot {
     }
 }
 
+#[derive(Debug)]
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
     pub cd: &'a ConsensusDriver<'a, C, D>,
     pub local: &'a mut Local,

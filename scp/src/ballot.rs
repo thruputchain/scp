@@ -459,7 +459,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let pledges = match typ {
             proto::SCPStatementType::SCP_ST_PREPARE => {
                 let mut prepare = proto::SCPStatementPrepare {
-                    quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
+                    quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
                     ballot: proto::SCPBallot {
                         counter: 0,
                         value: Default::default(),
@@ -499,7 +499,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     n_prepared: self.ballot().prepared.as_ref().unwrap().counter,
                     n_commit: self.ballot().commit.as_ref().unwrap().counter,
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
+                    quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
@@ -509,7 +509,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 let externalize = proto::SCPStatementExternalize {
                     commit: self.ballot().commit.as_ref().unwrap().clone(),
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    commit_quorum_set_hash: self.slot().local.get_quorum_set_hash().clone(),
+                    commit_quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
@@ -521,7 +521,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         };
 
         proto::SCPStatement {
-            node_id: self.slot().local.get_node_id().clone(),
+            node_id: self.slot().local_proto().get_node_id().clone(),
             slot_index: self.slot().index(),
             pledges,
         }
@@ -564,7 +564,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // if we generate the same envelope, don't process it again
         // this can occur when updating h in PREPARE phase
         // as statements only keep track of h.n (but h.x could be different)
-        let local_node_id = self.slot().local.get_node_id();
+        let local_proto = self.slot().local_proto();
+        let local_node_id = local_proto.get_node_id();
         let last_env = self.ballot().latest_envelopes.get(local_node_id);
 
         let should_process = match last_env {
@@ -1004,8 +1005,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // therefore the local node will not flip flop between "seen" and "not seen"
         // for a given counter on the local node
         if let Some(current_ballot) = &self.ballot().current.clone() {
-            let is_quorum = Local::is_quorum(
-                self.slot().local.get_quorum_set(),
+            let is_quorum = LocalProto::<C, D>::is_quorum(
+                self.slot().local_proto().get_quorum_set(),
                 &self.ballot().latest_envelopes,
                 |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
                     self.slot().get_quorum_set_from_statement(st)
@@ -1425,7 +1426,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             };
 
             if !has_v_blocking_subset_strictly_ahead_of(
-                self.slot().local,
+                &self.slot().local_proto(),
                 &self.ballot().latest_envelopes,
                 local_counter,
             ) {
@@ -1450,7 +1451,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             // order, starting from the smallest.
             for n in all_counters_sorted {
                 if !has_v_blocking_subset_strictly_ahead_of(
-                    self.slot().local,
+                    &self.slot().local_proto(),
                     &self.ballot().latest_envelopes,
                     n,
                 ) {
@@ -1674,7 +1675,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         for (node_id, envelope) in &self.ballot().latest_envelopes {
             // only return messages for self if the slot is fully validated
             if force_self
-                || node_id != self.slot().local.get_node_id()
+                || node_id != self.slot().local_proto().get_node_id()
                 || self.slot().is_fully_validated()
             {
                 if !f(envelope) {
@@ -1696,7 +1697,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             res.reserve(self.ballot().latest_envelopes.len());
 
             for (node_id, envelope) in &self.ballot().latest_envelopes {
-                if node_id != self.slot().local.get_node_id() {
+                if node_id != self.slot().local_proto().get_node_id() {
                     // good approximation: statements with the value that externalized
                     // we could filter more using mConfirmedPrepared as well
                     if are_ballots_compatible(
@@ -1740,7 +1741,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     fn get_state(&self, n: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
         let mut state = QuorumInfoNodeState::Agree;
 
-        if n == self.slot().local.get_node_id() {
+        if n == self.slot().local_proto().get_node_id() {
             // always mark myself as AGREE.
             return state;
         }
@@ -1826,8 +1827,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let envelope_opt = self.ballot().latest_envelopes.get(id);
         if envelope_opt.is_none() {
             ret["phase"] = serde_json::Value::String("unknown".to_string());
-            if id == self.slot().local.get_node_id() {
-                q_set_hash = *self.slot().local.get_quorum_set_hash();
+            if id == self.slot().local_proto().get_node_id() {
+                q_set_hash = *self.slot().local_proto().get_quorum_set_hash();
             }
         } else {
             let envelope = envelope_opt.unwrap();
@@ -1861,7 +1862,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         let q_set = q_set.unwrap();
-        let f = self.slot().local.find_closest_v_blocking_envelopes(
+        let local_proto = self.slot().local_proto();
+        let f = local_proto.find_closest_v_blocking_envelopes(
             &q_set,
             &self.ballot().latest_envelopes,
             |st: &proto::SCPStatement| -> bool {
@@ -1880,7 +1882,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 ));
             }
             ret["fail_with"] = f_ex;
-            ret["value"] = self.slot().local.to_json(&q_set, full_keys);
+            ret["value"] = self.slot().local_proto().to_json(&q_set, full_keys);
         }
 
         ret["hash"] = serde_json::Value::String(hex_abbrev(&q_set_hash));

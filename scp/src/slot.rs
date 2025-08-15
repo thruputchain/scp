@@ -34,6 +34,20 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         BallotProto(self)
     }
 
+    pub fn local_proto(&self) -> LocalProto<'_, 'a, C, D> {
+        LocalProto {
+            cd: self.cd,
+            local: self.local,
+        }
+    }
+
+    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, 'a, C, D> {
+        LocalProtoMut {
+            cd: self.cd,
+            local: self.local,
+        }
+    }
+
     pub fn index(&self) -> SlotIndex {
         self.slot.slot_index
     }

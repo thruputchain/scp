@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use thiserror::Error;
 use xdr_common::VecM;
@@ -141,8 +142,62 @@ fn normalize_qset_simplify(
     }
 }
 
+fn compare_public_key(l: &proto::PublicKey, r: &proto::PublicKey) -> Ordering {
+    match (l, r) {
+        (
+            proto::PublicKey::Ed25519 { ed25519: l_key },
+            proto::PublicKey::Ed25519 { ed25519: r_key },
+        ) => l_key.as_ref().cmp(r_key.as_ref()),
+    }
+}
+
+fn qset_compare(l: &proto::SCPQuorumSet, r: &proto::SCPQuorumSet) -> Ordering {
+    // Compare by validators first - lexicographically (element by element)
+    for (l_validator, r_validator) in l.validators.0.iter().zip(r.validators.0.iter()) {
+        let validator_cmp = compare_public_key(l_validator, r_validator);
+        if validator_cmp != Ordering::Equal {
+            return validator_cmp;
+        }
+    }
+    
+    // If we've compared all common elements and they're equal, shorter vector is less than
+    let validators_len_cmp = l.validators.0.len().cmp(&r.validators.0.len());
+    if validators_len_cmp != Ordering::Equal {
+        return validators_len_cmp;
+    }
+
+    // Then compare by inner sets (lexicographically, element by element)
+    for (l_inner, r_inner) in l.inner_sets.0.iter().zip(r.inner_sets.0.iter()) {
+        let inner_cmp = qset_compare(l_inner, r_inner);
+        if inner_cmp != Ordering::Equal {
+            return inner_cmp;
+        }
+    }
+    
+    // If we've compared all common elements and they're equal, shorter vector is less than
+    let inner_sets_len_cmp = l.inner_sets.0.len().cmp(&r.inner_sets.0.len());
+    if inner_sets_len_cmp != Ordering::Equal {
+        return inner_sets_len_cmp;
+    }
+
+    // Finally compare by threshold
+    l.threshold.cmp(&r.threshold)
+}
+
+fn normalize_quorum_set_reorder(qset: &mut proto::SCPQuorumSet) {
+    // Sort validators using custom comparison
+    qset.validators.0.sort_by(compare_public_key);
+
+    // Recursively reorder inner sets
+    for inner_set in qset.inner_sets.0.iter_mut() {
+        normalize_quorum_set_reorder(inner_set);
+    }
+
+    // Sort inner sets using custom comparison
+    qset.inner_sets.0.sort_by(qset_compare);
+}
+
 pub fn normalize_qset(qset: &mut proto::SCPQuorumSet, id_to_remove: Option<&proto::SCPNodeID>) {
     normalize_qset_simplify(qset, id_to_remove);
-    // normalizeQuorumSetReorder(qSet);
-    panic!("XXX")
+    normalize_quorum_set_reorder(qset);
 }

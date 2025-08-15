@@ -21,6 +21,9 @@ pub use slot::*;
 pub mod qset;
 pub use qset::*;
 
+#[cfg(test)]
+mod qset_tests;
+
 pub mod ballotutil;
 pub use ballotutil::*;
 

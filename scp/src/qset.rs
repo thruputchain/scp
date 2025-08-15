@@ -60,7 +60,7 @@ impl QuorumSetSanityChecker {
         let inner_sets = &qset.inner_sets;
 
         let tot_entries = validators.len() + inner_sets.len();
-        let v_blocking_size = tot_entries - qset.threshold as usize + 1;
+        let v_blocking_size = tot_entries.saturating_sub(qset.threshold as usize).saturating_add(1);
         self.count += validators.len();
 
         if qset.threshold as usize > tot_entries {
@@ -142,7 +142,7 @@ fn normalize_qset_simplify(
     }
 }
 
-fn compare_public_key(l: &proto::PublicKey, r: &proto::PublicKey) -> Ordering {
+pub fn compare_public_key(l: &proto::PublicKey, r: &proto::PublicKey) -> Ordering {
     match (l, r) {
         (
             proto::PublicKey::Ed25519 { ed25519: l_key },

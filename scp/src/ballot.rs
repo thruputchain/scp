@@ -174,7 +174,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     pub fn is_statement_sane(&self, statement: &proto::SCPStatement, ours: bool) -> bool {
         match &self.slot().get_quorum_set_from_statement(statement) {
             Some(qset) => {
-                if let Result::Err(e) = is_quorum_set_sane(qset, false) {
+                if let Result::Err(e) = is_qset_sane(qset, false) {
                     debug!(err = ?e, "invalid quorum set received");
                     return false;
                 }

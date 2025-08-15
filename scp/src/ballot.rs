@@ -1,9 +1,11 @@
 use crate::*;
+use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, trace};
 
-pub struct Ballot {
+#[derive(Debug)]
+pub struct BallotState {
     heard_from_quorum: bool,
 
     current: Option<proto::SCPBallot>,        // b
@@ -22,9 +24,9 @@ pub struct Ballot {
     last_envelope_emit: Option<proto::SCPEnvelope>, // last envelope emitted by this node
 }
 
-impl Ballot {
+impl BallotState {
     pub fn new() -> Self {
-        Ballot {
+        BallotState {
             heard_from_quorum: false,
             current: None,
             prepared: None,
@@ -53,11 +55,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.0
     }
 
-    fn ballot(&self) -> &Ballot {
+    fn ballot(&self) -> &BallotState {
         self.slot().ballot()
     }
 
-    fn ballot_mut(&mut self) -> &mut Ballot {
+    fn ballot_mut(&mut self) -> &mut BallotState {
         self.slot_mut().ballot_mut()
     }
 
@@ -1927,6 +1929,36 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn get_local_state(&self) -> String {
-        panic!("XXX")
+        let state = LocalState {
+            slot_index: self.slot().index(),
+            ballot: self.ballot(),
+        };
+        format!("{:?}", state)
     }
+
+    fn get_json_info(&self) -> serde_json::Value {
+        json!({
+           "heard": self.ballot().heard_from_quorum,
+           "ballot": self.ballot_to_str(self.ballot().current.as_ref()),
+           "phase": self.ballot().phase.to_string(),
+           "state": self.get_local_state(),
+        })
+    }
+
+    pub fn ballot_to_str(&self, b: Option<&proto::SCPBallot>) -> String {
+        match b {
+            Some(b) => format!(
+                "<{},{}>",
+                b.counter,
+                self.driver().get_value_string(&b.value),
+            ),
+            None => "<,>".to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LocalState<'a> {
+    slot_index: proto::SCPSlotIndex,
+    ballot: &'a BallotState,
 }

@@ -9,14 +9,14 @@ pub const NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING: i64 = 2;
 
 pub struct Slot {
     pub slot_index: SlotIndex,
-    pub ballot: Ballot,
+    pub ballot: BallotState,
 }
 
 impl Slot {
     pub fn new() -> Self {
         Slot {
             slot_index: 0,
-            ballot: Ballot::new(),
+            ballot: BallotState::new(),
         }
     }
 }
@@ -36,11 +36,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.slot.slot_index
     }
 
-    pub fn ballot(&self) -> &Ballot {
+    pub fn ballot(&self) -> &BallotState {
         &self.slot.ballot
     }
 
-    pub fn ballot_mut(&mut self) -> &mut Ballot {
+    pub fn ballot_mut(&mut self) -> &mut BallotState {
         &mut self.slot.ballot
     }
 

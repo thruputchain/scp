@@ -384,7 +384,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         updated
     }
 
-    #[instrument]
+    #[instrument(fields(slot_index=self.slot().index(), ballot_counter=ballot.counter))]
     fn bump_to_ballot(&mut self, ballot: proto::SCPBallot, check: bool) {
         trace!(
             slot_index = self.slot().index(),

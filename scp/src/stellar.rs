@@ -16,7 +16,7 @@ impl<'a, C: Consensus, D: Driver> ConsensusDriver<'a, C, D> {
 #[derive(Debug)]
 pub struct Stellar<'a, C: Consensus, D: Driver> {
     cd: ConsensusDriver<'a, C, D>,
-    local: Local,
+    local: LocalState,
     slot: HashMap<SlotIndex, Slot>,
 }
 

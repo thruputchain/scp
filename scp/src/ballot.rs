@@ -459,7 +459,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let pledges = match typ {
             proto::SCPStatementType::SCP_ST_PREPARE => {
                 let mut prepare = proto::SCPStatementPrepare {
-                    quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
+                    quorum_set_hash: self.slot().local_proto().get_qset_hash().clone(),
                     ballot: proto::SCPBallot {
                         counter: 0,
                         value: Default::default(),
@@ -499,7 +499,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     n_prepared: self.ballot().prepared.as_ref().unwrap().counter,
                     n_commit: self.ballot().commit.as_ref().unwrap().counter,
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
+                    quorum_set_hash: self.slot().local_proto().get_qset_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
@@ -509,7 +509,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 let externalize = proto::SCPStatementExternalize {
                     commit: self.ballot().commit.as_ref().unwrap().clone(),
                     n_h: self.ballot().high.as_ref().unwrap().counter,
-                    commit_quorum_set_hash: self.slot().local_proto().get_quorum_set_hash().clone(),
+                    commit_quorum_set_hash: self.slot().local_proto().get_qset_hash().clone(),
                 };
 
                 proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
@@ -1006,7 +1006,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // for a given counter on the local node
         if let Some(current_ballot) = &self.ballot().current.clone() {
             let is_quorum = LocalProto::<C, D>::is_quorum(
-                self.slot().local_proto().get_quorum_set(),
+                self.slot().local_proto().get_qset(),
                 &self.ballot().latest_envelopes,
                 |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
                     self.slot().get_quorum_set_from_statement(st)
@@ -1828,7 +1828,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         if envelope_opt.is_none() {
             ret["phase"] = serde_json::Value::String("unknown".to_string());
             if id == self.slot().local_proto().get_node_id() {
-                q_set_hash = *self.slot().local_proto().get_quorum_set_hash();
+                q_set_hash = *self.slot().local_proto().get_qset_hash();
             }
         } else {
             let envelope = envelope_opt.unwrap();

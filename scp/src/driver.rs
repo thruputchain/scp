@@ -21,6 +21,7 @@ pub trait Driver: Debug {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
     fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;
     fn get_value_string(&self, value: &proto::SCPValue) -> String;
+    fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash;
 
     fn emit_envelope(&self, env: proto::SCPEnvelope);
     fn compute_timeout(&self, counter: proto::SCPCount, is_nomination: bool) -> Duration;

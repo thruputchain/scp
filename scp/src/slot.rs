@@ -25,7 +25,7 @@ impl Slot {
 #[derive(Debug)]
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
     pub cd: &'a ConsensusDriver<'a, C, D>,
-    pub local: &'a mut Local,
+    pub local: &'a mut LocalState,
     pub slot: &'a mut Slot,
 }
 

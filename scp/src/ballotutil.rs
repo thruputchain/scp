@@ -48,7 +48,7 @@ pub fn has_v_blocking_subset_strictly_ahead_of<'a, 'b, C: Consensus, D: Driver>(
     n: proto::SCPCount,
 ) -> bool {
     LocalProto::<C, D>::is_vblocking_envelopes(
-        local.get_quorum_set(),
+        local.get_qset(),
         envelopes,
         |st: &proto::SCPStatement| -> bool { statement_ballot_counter(st) > n },
     )

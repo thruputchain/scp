@@ -16,7 +16,9 @@ mod tests {
         let hash = Sha256::digest(seed_string.as_bytes());
         let hash_bytes: [u8; 32] = hash.into();
         let ed25519_key = Ed25519PublicKey::from(hash_bytes);
-        PublicKey::Ed25519 { ed25519: ed25519_key }
+        PublicKey::Ed25519 {
+            ed25519: ed25519_key,
+        }
     }
 
     // Helper function to create a singleton quorum set
@@ -41,20 +43,21 @@ mod tests {
     // Helper function that mimics the C++ check function
     fn check_qset(
         qset_check: &SCPQuorumSet,
-        expected: bool,
+        expected_sanity: bool,
         expected_normalized: &SCPQuorumSet,
+        expected_normalized_sanity: bool,
     ) {
         // First, without normalization
         let sanity_result = is_qset_sane(qset_check, false);
-        assert_eq!(expected, sanity_result.is_ok());
+        assert_eq!(expected_sanity, sanity_result.is_ok());
 
         // Secondary test: normalize the set and check again
         let mut normalized_qset = qset_check.clone();
         normalize_qset(&mut normalized_qset, None);
         let normalized_sanity_result = is_qset_sane(&normalized_qset, false);
 
-        assert_eq!(expected, normalized_sanity_result.is_ok());
-        assert_eq!(*expected_normalized, normalized_qset);
+        assert_eq!(expected_normalized_sanity, normalized_sanity_result.is_ok());
+        assert_eq!(expected_normalized, &normalized_qset);
     }
 
     #[test]
@@ -67,22 +70,22 @@ mod tests {
             validators: vecm(vec![]),
             inner_sets: vecm(vec![]),
         };
-        check_qset(&qset_t0, false, &qset_t0);
+        check_qset(&qset_t0, false, &qset_t0, false);
 
         let valid_one_node = make_singleton(keys[0].clone());
 
         // Test: { t: 0, v0 }
         let mut qset_t0_v0 = valid_one_node.clone();
         qset_t0_v0.threshold = 0;
-        check_qset(&qset_t0_v0, false, &qset_t0_v0);
+        check_qset(&qset_t0_v0, false, &qset_t0_v0, false);
 
         // Test: { t: 2, v0 }
         let mut qset_t2_v0 = valid_one_node.clone();
         qset_t2_v0.threshold = 2;
-        check_qset(&qset_t2_v0, false, &qset_t2_v0);
+        check_qset(&qset_t2_v0, false, &qset_t2_v0, false);
 
         // Test: { t: 1, v0 }
-        check_qset(&valid_one_node, true, &valid_one_node);
+        check_qset(&valid_one_node, true, &valid_one_node, true);
 
         // Test: { t: 1, v0, { t: 1, v1 } } -> { t:1, v0, v1 }
         let qset_with_inner = SCPQuorumSet {
@@ -101,7 +104,7 @@ mod tests {
             inner_sets: vecm(vec![]),
         };
 
-        check_qset(&qset_with_inner, true, &expected_merged);
+        check_qset(&qset_with_inner, true, &expected_merged, true);
 
         // Test: { t: 1, v0, { t: 2, v1 }, { t: 1, v2 } } -> { t:1, v0, v2, { t: 2, v1 } }
         let qset_mixed = SCPQuorumSet {
@@ -117,7 +120,7 @@ mod tests {
                     threshold: 1,
                     validators: vecm(vec![keys[2].clone()]),
                     inner_sets: vecm(vec![]),
-                }
+                },
             ]),
         };
 
@@ -131,7 +134,7 @@ mod tests {
             }]),
         };
 
-        check_qset(&qset_mixed, false, &expected_mixed);
+        check_qset(&qset_mixed, false, &expected_mixed, false);
 
         // Test: { t: 1, v0, { t: 1, v1 }, { t: 1, v2, v3 } } -> { t:1, v0, v1, { t: 1, v2, v3 } }
         let valid_multiple_nodes = SCPQuorumSet {
@@ -153,15 +156,21 @@ mod tests {
 
         let valid_multiple_nodes_normalized = SCPQuorumSet {
             threshold: 1,
-            validators: vecm(vec![keys[0].clone(), keys[1].clone()]),
-            inner_sets: vecm(vec![SCPQuorumSet {
-                threshold: 1,
-                validators: vecm(vec![keys[2].clone(), keys[3].clone()]),
-                inner_sets: vecm(vec![]),
-            }]),
+            validators: vecm(vec![
+                keys[0].clone(),
+                keys[1].clone(),
+                keys[2].clone(),
+                keys[3].clone(),
+            ]),
+            inner_sets: vecm(vec![]),
         };
 
-        check_qset(&valid_multiple_nodes, true, &valid_multiple_nodes_normalized);
+        check_qset(
+            &valid_multiple_nodes,
+            true,
+            &valid_multiple_nodes_normalized,
+            true,
+        );
 
         // Test containing set simplification
         // Test: { t: 1, { t: 1, v0, { t: 1, v1 }, { t: 1, v2, v3 } } } -> { t:1, v0, v1, { t: 1, v2, v3 } }
@@ -171,7 +180,12 @@ mod tests {
             inner_sets: vecm(vec![valid_multiple_nodes.clone()]),
         };
 
-        check_qset(&containing_set, true, &valid_multiple_nodes_normalized);
+        check_qset(
+            &containing_set,
+            true,
+            &valid_multiple_nodes_normalized,
+            true,
+        );
     }
 
     #[test]
@@ -179,35 +193,50 @@ mod tests {
         let keys = create_sorted_keys(10);
 
         // Test deep nesting
-        let test_nesting_level = |keys: &[PublicKey], nesting_level: usize, expected: bool| {
-            let mut qsets = Vec::new();
-            for i in 0..=nesting_level {
-                qsets.push(make_singleton(keys[i].clone()));
-            }
-            
-            for i in (0..nesting_level).rev() {
-                qsets[i].inner_sets = vecm(vec![qsets[i + 1].clone()]);
-            }
+        let test_nesting_level =
+            |keys: &[PublicKey],
+             nesting_level: usize,
+             expected_sanity: bool,
+             expected_normalized_sanity: bool| {
+                let mut qsets = Vec::new();
+                for i in 0..=nesting_level {
+                    qsets.push(make_singleton(keys[i].clone()));
+                }
 
-            // Create expected normalized version
-            let mut expected_normalized = qsets[0].clone();
-            let mut qset_ref = &mut expected_normalized;
-            for _i in 0..nesting_level - 1 {
-                qset_ref = &mut qset_ref.inner_sets.0[0];
-            }
-            qset_ref.validators.0.push(keys[nesting_level].clone());
-            qset_ref.inner_sets = vecm(vec![]);
+                for i in (0..nesting_level).rev() {
+                    qsets[i].inner_sets = vecm(vec![qsets[i + 1].clone()]);
+                }
 
-            check_qset(&qsets[0], expected, &expected_normalized);
-        };
+                // Create expected normalized version
+                let mut expected_normalized = proto::SCPQuorumSet {
+                    threshold: 1,
+                    validators: VecM(vec![]),
+                    inner_sets: VecM(vec![]),
+                };
+                for i in 0..=nesting_level {
+                    expected_normalized.validators.0.push(keys[i].clone());
+                }
+
+                check_qset(
+                    &qsets[0],
+                    expected_sanity,
+                    &expected_normalized,
+                    expected_normalized_sanity,
+                );
+            };
 
         // Test maximum nesting level exceeded
         // Test: { t: 1, v0, { t: 1, v1, { .. t: 1, v_{MAXIMUM_QUORUM_NESTING_LEVEL + 1} }..} -> too deep"
-        test_nesting_level(&keys, MAXIMUM_QUORUM_NESTING_LEVEL as usize + 1, false);
+        test_nesting_level(
+            &keys,
+            MAXIMUM_QUORUM_NESTING_LEVEL as usize + 1,
+            false,
+            true,
+        );
 
         // Test maximum nesting level allowed
         // Test: { t: 1, v0, { t: 1, v1, { .. t: 1, v_MAXIMUM_QUORUM_NESTING_LEVEL }..} "
-        test_nesting_level(&keys, MAXIMUM_QUORUM_NESTING_LEVEL as usize, true);
+        test_nesting_level(&keys, MAXIMUM_QUORUM_NESTING_LEVEL as usize, true, true);
     }
 
     #[test]
@@ -220,7 +249,7 @@ mod tests {
             validators: vecm(keys[0..1000].to_vec()),
             inner_sets: vecm(vec![]),
         };
-        check_qset(&qset_1000, true, &qset_1000);
+        check_qset(&qset_1000, true, &qset_1000, true);
 
         // Test: { t: 1, v0..v1000 } -> too big (1001 validators)
         let qset_1001 = SCPQuorumSet {
@@ -228,10 +257,10 @@ mod tests {
             validators: vecm(keys[0..1001].to_vec()),
             inner_sets: vecm(vec![]),
         };
-        check_qset(&qset_1001, false, &qset_1001);
+        check_qset(&qset_1001, false, &qset_1001, false);
 
         // Test: distributed nodes across inner sets -> too big
-        // Test: { t: 1, v0, { t: 1, v1..v100 }, { t: 1, v101..v200} ... { t: 1, v901..v1000} -> too big
+        // Test: { t: 2, v0, { t: 1, v1..v100 }, { t: 1, v101..v200} ... { t: 1, v901..v1000} -> too big
         let mut inner_sets = Vec::new();
         for i in 0..10 {
             let inner_set = SCPQuorumSet {
@@ -243,12 +272,12 @@ mod tests {
         }
 
         let qset_distributed = SCPQuorumSet {
-            threshold: 1,
-            validators: vecm(vec![keys[0].clone()]),
-            inner_sets: vecm(inner_sets),
+            threshold: 2,
+            validators: VecM(vec![keys[0].clone()]),
+            inner_sets: VecM(inner_sets),
         };
 
-        check_qset(&qset_distributed, false, &qset_distributed);
+        check_qset(&qset_distributed, false, &qset_distributed, false);
     }
 
     #[test]
@@ -273,18 +302,15 @@ mod tests {
 
         let expected_normalized = SCPQuorumSet {
             threshold: 1,
-            validators: vecm(vec![keys[0].clone()]),
-            inner_sets: vecm(vec![SCPQuorumSet {
-                threshold: 1,
-                validators: vecm(vec![keys[1].clone()]),
-                inner_sets: vecm(vec![SCPQuorumSet {
-                    threshold: 1,
-                    validators: vecm(vec![keys[2].clone(), keys[3].clone()]),
-                    inner_sets: vecm(vec![]),
-                }]),
-            }]),
+            validators: vecm(vec![
+                keys[0].clone(),
+                keys[1].clone(),
+                keys[2].clone(),
+                keys[3].clone(),
+            ]),
+            inner_sets: vecm(vec![]),
         };
 
-        check_qset(&qset, true, &expected_normalized);
+        check_qset(&qset, true, &expected_normalized, true);
     }
 }

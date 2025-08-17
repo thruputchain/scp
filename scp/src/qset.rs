@@ -60,7 +60,9 @@ impl QuorumSetSanityChecker {
         let inner_sets = &qset.inner_sets;
 
         let tot_entries = validators.len() + inner_sets.len();
-        let v_blocking_size = tot_entries.saturating_sub(qset.threshold as usize).saturating_add(1);
+        let v_blocking_size = tot_entries
+            .saturating_sub(qset.threshold as usize)
+            .saturating_add(1);
         self.count += validators.len();
 
         if qset.threshold as usize > tot_entries {
@@ -115,29 +117,30 @@ fn normalize_qset_simplify(
     }
 
     // process inner sets
-    let mut updated_inner_sets = VecM::<proto::SCPQuorumSet>(Vec::new());
-    for mut inner_set in qset.inner_sets.0.iter_mut() {
-        normalize_qset_simplify(&mut inner_set, id_to_remove);
+    let mut unprocessed = qset.inner_sets.0.clone();
+    qset.inner_sets.0.clear();
 
-        // check if this inner set can be merged into validator list
-        // (threshold=1, 1 validator, 0 inner sets)
-        if inner_set.threshold == 1
-            && inner_set.validators.len() == 1
-            && inner_set.inner_sets.len() == 0
-        {
-            qset.validators
-                .0
-                .push(inner_set.validators.iter().next().unwrap().clone());
+    while unprocessed.len() > 0 {
+        let mut inner_set = unprocessed.pop().unwrap();
+        normalize_qset_simplify(&mut inner_set, id_to_remove);
+        if qset.threshold == 1 && inner_set.threshold == 1 {
+            for inner_inner_set in inner_set.inner_sets.0 {
+                unprocessed.push(inner_inner_set);
+            }
+            for inner_validator in inner_set.validators.0 {
+                if !qset.validators.0.contains(&inner_validator) {
+                    qset.validators.0.push(inner_validator);
+                }
+            }
         } else {
-            updated_inner_sets.0.push(inner_set.clone());
+            qset.inner_sets.0.push(inner_set);
         }
     }
-    qset.inner_sets = updated_inner_sets;
 
     // simplify quorum set if needed
     // (threshold=1, no validators, 1 inner set)
     if qset.threshold == 1 && qset.validators.len() == 0 && qset.inner_sets.len() == 1 {
-        let inner_set = qset.inner_sets.iter().next().unwrap().clone();
+        let inner_set = qset.inner_sets.0.pop().unwrap().clone();
         *qset = inner_set;
     }
 }
@@ -159,7 +162,7 @@ fn qset_compare(l: &proto::SCPQuorumSet, r: &proto::SCPQuorumSet) -> Ordering {
             return validator_cmp;
         }
     }
-    
+
     // If we've compared all common elements and they're equal, shorter vector is less than
     let validators_len_cmp = l.validators.0.len().cmp(&r.validators.0.len());
     if validators_len_cmp != Ordering::Equal {
@@ -173,7 +176,7 @@ fn qset_compare(l: &proto::SCPQuorumSet, r: &proto::SCPQuorumSet) -> Ordering {
             return inner_cmp;
         }
     }
-    
+
     // If we've compared all common elements and they're equal, shorter vector is less than
     let inner_sets_len_cmp = l.inner_sets.0.len().cmp(&r.inner_sets.0.len());
     if inner_sets_len_cmp != Ordering::Equal {

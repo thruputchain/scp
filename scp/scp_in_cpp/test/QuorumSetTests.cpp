@@ -195,7 +195,7 @@ TEST_CASE("sane quorum set", "[scp][quorumset]")
         qSetB->validators.emplace_back(keys[nestingLevel]);
         qSetB->innerSets.clear();
 
-        check(qSets[0], expected, qSelfSet);
+        check(qSets[0], expected,  );
     };
 
     SECTION("{ t: 1, v0, { t: 1, v1, { .. t: 1, "

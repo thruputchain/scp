@@ -103,6 +103,10 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
         &self.local.node_id
     }
 
+    pub fn is_validator(&self) -> bool {
+        self.local.is_validator
+    }
+
     pub fn for_all_nodes<F>(qset: &proto::SCPQuorumSet, mut proc: F) -> bool
     where
         F: FnMut(&proto::SCPNodeID) -> bool,

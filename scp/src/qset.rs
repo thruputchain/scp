@@ -61,8 +61,8 @@ impl QuorumSetSanityChecker {
 
         let tot_entries = validators.len() + inner_sets.len();
         let v_blocking_size = tot_entries
-            .saturating_sub(qset.threshold as usize)
-            .saturating_add(1);
+            .saturating_add(1)
+            .saturating_sub(qset.threshold as usize);
         self.count += validators.len();
 
         if qset.threshold as usize > tot_entries {

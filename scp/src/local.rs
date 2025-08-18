@@ -146,14 +146,50 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
         false
     }
 
-    fn is_quorum_slice(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
+    pub fn is_quorum_slice(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
         Self::is_quorum_slice_internal(qset, node_set)
     }
 
-    pub fn is_vblocking_nodes(qset: &proto::SCPQuorumSet, nodes: &Vec<proto::SCPNodeID>) -> bool {
-        panic!("XXX")
+    fn is_vblocking_internal(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
+        // There is no v-blocking set for 0-threshold
+        if qset.threshold == 0 {
+            return false;
+        }
+
+        // Calculate nodes needed to block: total_entries - threshold + 1
+        let total_entries = qset.validators.len() + qset.inner_sets.len();
+        let mut left_till_block =
+            (total_entries + 1).saturating_sub(qset.threshold as usize) as i32;
+
+        // Check validators
+        for validator in qset.validators.iter() {
+            if node_set.contains(validator) {
+                left_till_block -= 1;
+                if left_till_block <= 0 {
+                    return true;
+                }
+            }
+        }
+
+        // Check inner sets
+        for inner_qset in qset.inner_sets.iter() {
+            if Self::is_vblocking_internal(inner_qset, node_set) {
+                left_till_block -= 1;
+                if left_till_block <= 0 {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
+    pub fn is_vblocking_nodes(qset: &proto::SCPQuorumSet, nodes: &Vec<proto::SCPNodeID>) -> bool {
+        Self::is_vblocking_internal(qset, nodes)
+    }
+
+    /// Check if filtered envelopes form a v-blocking set
+    #[instrument(skip(filter))]
     pub fn is_vblocking_envelopes<F>(
         qset: &proto::SCPQuorumSet,
         envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
@@ -162,16 +198,70 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
     where
         F: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX")
+        // Collect node IDs where the envelope passes the filter
+        let filtered_nodes: Vec<proto::SCPNodeID> = envs
+            .iter()
+            .filter_map(|(node_id, envelope)| {
+                if filter(&envelope.statement) {
+                    Some(node_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Check if the filtered nodes form a v-blocking set
+        Self::is_vblocking_internal(qset, &filtered_nodes)
     }
 
-    pub fn is_quorum(
+    /// Check if filtered envelopes form a quorum
+    pub fn is_quorum<QFun, Filter>(
         qset: &proto::SCPQuorumSet,
         envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
-        qfun: impl Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
-        filter: impl Fn(&proto::SCPStatement) -> bool,
-    ) -> bool {
-        panic!("XXX")
+        qfun: QFun,
+        filter: Filter,
+    ) -> bool
+    where
+        QFun: Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
+        Filter: Fn(&proto::SCPStatement) -> bool,
+    {
+        // Start with nodes that pass the filter
+        let mut p_nodes: Vec<proto::SCPNodeID> = envelopes
+            .iter()
+            .filter_map(|(node_id, envelope)| {
+                if filter(&envelope.statement) {
+                    Some(node_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Iterate until convergence (fixed point)
+        loop {
+            let count = p_nodes.len();
+
+            // Filter nodes that form quorum slices
+            let mut f_nodes = Vec::new();
+            for node_id in &p_nodes {
+                let envelope = envelopes.get(node_id).unwrap();
+                if let Some(node_qset) = qfun(&envelope.statement) {
+                    if Self::is_quorum_slice_internal(&node_qset, &p_nodes) {
+                        f_nodes.push(node_id.clone());
+                    }
+                }
+            }
+
+            p_nodes = f_nodes;
+
+            // Break if no change (fixed point reached)
+            if count == p_nodes.len() {
+                break;
+            }
+        }
+
+        // Check if final set forms a quorum slice for the given qset
+        Self::is_quorum_slice_internal(qset, &p_nodes)
     }
 
     // computes the distance to the set of v-blocking sets given

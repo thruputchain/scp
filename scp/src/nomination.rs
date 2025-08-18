@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, instrument, trace};
+use tracing::{Level, debug, enabled, error, instrument, trace};
 use xdr_common::VecM;
 
 #[derive(Debug)]
@@ -256,13 +256,132 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         for v in nom.votes.iter() {
             processor(v);
         }
-        
+
         // Apply processor to accepted values that are not already in votes
         // NB: "accepted" should be a subset of "votes", so this should mostly no-op
         for a in nom.accepted.iter() {
             if !nom.votes.iter().any(|vote| vote == a) {
                 processor(a);
             }
+        }
+    }
+
+    #[instrument]
+    pub fn update_round_leaders(&mut self) {
+        let mut my_qset = self.slot().local_proto().get_qset().clone();
+        let local_id = self.slot().local_proto().get_node_id().clone();
+
+        // Normalize qset (excludes self)
+        crate::qset::normalize_qset(&mut my_qset, Some(&local_id));
+
+        // Count maximum leader count (includes self)
+        let mut max_leader_count = 1;
+        // note that node IDs here are unique ("sane"), so we can count by
+        // enumeration
+        LocalProto::<C, D>::for_all_nodes(&my_qset, |_| {
+            max_leader_count += 1;
+            true
+        });
+
+        while self.nomination().round_leaders.len() < max_leader_count {
+            // Initialize priority with value derived from self
+            let mut new_round_leaders = HashSet::new();
+
+            new_round_leaders.insert(local_id.clone());
+            let mut top_priority = self.get_node_priority(&local_id, &my_qset);
+
+            // Check all nodes in quorum set for higher priority
+            LocalProto::<C, D>::for_all_nodes(&my_qset, |cur| {
+                let weight = self.get_node_priority(cur, &my_qset);
+                if weight > top_priority {
+                    top_priority = weight;
+                    new_round_leaders.clear();
+                }
+                if weight == top_priority && weight > 0 {
+                    new_round_leaders.insert(cur.clone());
+                }
+                true
+            });
+
+            if top_priority == 0 {
+                // No one had priority, so all nodes would choose themselves
+                // resulting in a timeout. Clear newRoundLeaders, allowing the
+                // algorithm to fast timeout and try again.
+                new_round_leaders.clear();
+            }
+
+            // Expand round_leaders with the newly computed leaders
+            let old_size = self.nomination().round_leaders.len();
+
+            // Insert new leaders into round_leaders
+            for leader in new_round_leaders {
+                self.nomination_mut().round_leaders.insert(leader);
+            }
+
+            let new_size = self.nomination().round_leaders.len();
+
+            if old_size != new_size {
+                if enabled!(Level::DEBUG) {
+                    debug!(
+                        "nomination update_round_leaders: {} -> {}",
+                        old_size, new_size
+                    );
+                    for rl in &self.nomination().round_leaders {
+                        debug!("  leader {}", self.driver().to_short_string(rl));
+                    }
+                }
+                return;
+            } else {
+                self.nomination_mut().round_number += 1;
+                debug!(
+                    "nomination update_round_leaders fast timeout (would no op) -> {}",
+                    self.nomination().round_number
+                );
+            }
+        }
+        debug!("nomination update_round_leaders: nothing to do")
+    }
+
+    #[instrument]
+    fn get_node_priority(&self, node_id: &proto::SCPNodeID, qset: &proto::SCPQuorumSet) -> u64 {
+        let is_local = node_id == self.slot().local_proto().get_node_id();
+        let weight = self.driver().get_node_weight(node_id, qset, is_local);
+
+        // if weight > 0; weight is inclusive here as
+        // 0 <= hash_node <= u64::MAX
+        if weight > 0 && self.hash_node(false, node_id) <= weight {
+            self.hash_node(true, node_id)
+        } else {
+            0
+        }
+    }
+
+    #[instrument]
+    fn hash_node(&self, is_priority: bool, node_id: &proto::SCPNodeID) -> u64 {
+        if let Some(ref previous_value) = self.nomination().previous_value {
+            self.driver().compute_hash_node(
+                self.slot().index(),
+                previous_value,
+                is_priority,
+                self.nomination().round_number,
+                node_id,
+            )
+        } else {
+            panic!("bug")
+        }
+    }
+
+    #[instrument]
+    fn hash_value(&self, value: &proto::SCPValue) -> u64 {
+        if let Some(ref previous_value) = self.nomination().previous_value {
+            self.driver().compute_value_hash(
+                self.slot().index(),
+                previous_value,
+                self.nomination().round_number,
+                value,
+            )
+        } else {
+            panic!("bug")
         }
     }
 }

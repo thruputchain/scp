@@ -8,21 +8,34 @@ pub enum Timer {
 }
 
 pub trait Driver: Debug {
-    /// Retrieves a quorum set from its hash
-    ///
-    /// All SCP statement (see `SCPNomination` and `SCPStatement`) include
-    /// a quorum set hash.
-    /// SCP does not define how quorum sets are exchanged between nodes,
-    /// hence their retrieval is delegated to the user of SCP.
-    /// The return value is not cached by SCP, as quorum sets are transient.
-    ///
-    /// Nonde is a valid return value which cause the statement to be
-    /// considered invalid.
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
+    fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
     fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;
     fn from_str_key(&self, s: &str) -> Result<proto::SCPNodeID, String>; // XXX: get from KeyUtils.cpp
     fn get_value_string(&self, value: &proto::SCPValue) -> String;
     fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash;
+
+    fn get_node_weight(
+        &self,
+        node_id: &proto::SCPNodeID,
+        qset: &proto::SCPQuorumSet,
+        is_local_node: bool,
+    ) -> u64;
+    fn compute_hash_node(
+        &self,
+        slot_index: proto::SCPSlotIndex,
+        prev: &proto::SCPValue,
+        is_priority: bool,
+        round_number: i32,
+        node_id: &proto::SCPNodeID,
+    ) -> u64;
+    fn compute_value_hash(
+        &self,
+        slot_index: proto::SCPSlotIndex,
+        prev: &proto::SCPValue,
+        round_number: i32,
+        value: &proto::SCPValue,
+    ) -> u64;
 
     fn emit_envelope(&self, env: proto::SCPEnvelope);
     fn compute_timeout(&self, counter: proto::SCPCount, is_nomination: bool) -> Duration;

@@ -36,6 +36,9 @@ pub use envelope::*;
 pub mod statement;
 pub use statement::*;
 
+pub mod nomination;
+pub use nomination::*;
+
 pub mod ballot;
 pub use ballot::*;
 

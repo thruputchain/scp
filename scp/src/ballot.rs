@@ -2,6 +2,7 @@ use crate::*;
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::mem::discriminant;
 use tracing::{debug, error, instrument, trace};
 
 #[derive(Debug)]
@@ -82,11 +83,102 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.slot_mut().record_envelope(env);
     }
 
-    pub fn is_newer_statement(&self, node_id: &proto::SCPNodeID, st: &proto::SCPStatement) -> bool {
+    pub fn is_newer_node_statement(
+        &self,
+        node_id: &proto::SCPNodeID,
+        st: &proto::SCPStatement,
+    ) -> bool {
         match self.ballot().latest_envelopes.get(node_id) {
-            Some(old) => is_newer_statement(&old.statement, st),
+            Some(old) => Self::is_newer_statement(&old.statement, st),
             None => true,
         }
+    }
+
+    pub fn is_newer_statement(older: &proto::SCPStatement, newer: &proto::SCPStatement) -> bool {
+        if discriminant(&older.pledges) != discriminant(&newer.pledges) {
+            older.pledges.stmt_type() < newer.pledges.stmt_type()
+        } else if newer.pledges.stmt_type() == proto::SCPStatementType::SCP_ST_EXTERNALIZE as i32 {
+            false
+        } else {
+            match (&older.pledges, &newer.pledges) {
+                // both confirm
+                (
+                    proto::SCPStatement_pledges::SCP_ST_CONFIRM {
+                        confirm: older_confirm,
+                    },
+                    proto::SCPStatement_pledges::SCP_ST_CONFIRM {
+                        confirm: newer_confirm,
+                    },
+                ) => match compare_ballots(&older_confirm.ballot, &newer_confirm.ballot) {
+                    Ordering::Less => true,
+                    Ordering::Equal => {
+                        if older_confirm.n_prepared == newer_confirm.n_prepared {
+                            older_confirm.n_h < newer_confirm.n_h
+                        } else {
+                            older_confirm.n_prepared < newer_confirm.n_prepared
+                        }
+                    }
+                    Ordering::Greater => false,
+                },
+                // both prepare
+                (
+                    proto::SCPStatement_pledges::SCP_ST_PREPARE {
+                        prepare: older_prepare,
+                    },
+                    proto::SCPStatement_pledges::SCP_ST_PREPARE {
+                        prepare: newer_prepare,
+                    },
+                ) => match compare_ballots(&older_prepare.ballot, &newer_prepare.ballot) {
+                    Ordering::Less => true,
+                    Ordering::Equal => {
+                        match compare_opt_ballots(&older_prepare.prepared, &newer_prepare.prepared)
+                        {
+                            Ordering::Less => true,
+                            Ordering::Equal => match compare_opt_ballots(
+                                &older_prepare.prepared_prime,
+                                &newer_prepare.prepared_prime,
+                            ) {
+                                Ordering::Less => true,
+                                Ordering::Equal => older_prepare.n_h < newer_prepare.n_h,
+                                Ordering::Greater => false,
+                            },
+                            Ordering::Greater => false,
+                        }
+                    }
+                    Ordering::Greater => false,
+                },
+                // unreachable
+                _ => panic!(),
+            }
+        }
+    }
+
+    pub fn get_statement_values(st: &proto::SCPStatement) -> HashSet<proto::SCPValue> {
+        let mut values = HashSet::new();
+
+        match &st.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                let b = &prepare.ballot;
+                if b.counter != 0 {
+                    values.insert(prepare.ballot.value.clone());
+                }
+                if let Some(prepared) = &prepare.prepared {
+                    values.insert(prepared.value.clone());
+                }
+                if let Some(prepared_prime) = &prepare.prepared_prime {
+                    values.insert(prepared_prime.value.clone());
+                }
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                values.insert(confirm.ballot.value.clone());
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                values.insert(externalize.commit.value.clone());
+            }
+            _ => panic!("bug"),
+        }
+
+        values
     }
 
     #[instrument]
@@ -107,7 +199,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 }
                 return EnvelopeState::Invalid;
             }
-            if !ballot_proto.is_newer_statement(&statement.node_id, statement) {
+            if !ballot_proto.is_newer_node_statement(&statement.node_id, statement) {
                 if ours {
                     error!(env = ?env, "stale statement from self, skipping")
                 } else {
@@ -580,7 +672,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     match &self.ballot().last_envelope_gen {
                         None => true,
                         Some(last_gen) => {
-                            is_newer_statement(&last_gen.statement, &envelope.statement)
+                            Self::is_newer_statement(&last_gen.statement, &envelope.statement)
                         }
                     }
                 };
@@ -1718,7 +1810,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     #[instrument]
     fn validate_values(&self, st: &proto::SCPStatement) -> ValidationLevel {
-        let values = get_statement_values(st);
+        let values = Self::get_statement_values(st);
 
         if values.is_empty() {
             // This shouldn't happen

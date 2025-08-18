@@ -53,3 +53,12 @@ pub fn has_v_blocking_subset_strictly_ahead_of<'a, 'b, C: Consensus, D: Driver>(
         |st: &proto::SCPStatement| -> bool { statement_ballot_counter(st) > n },
     )
 }
+
+pub fn statement_ballot_counter(st: &proto::SCPStatement) -> proto::SCPCount {
+    match &st.pledges {
+        proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => prepare.ballot.counter,
+        proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => confirm.ballot.counter,
+        proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. } => u32::MAX,
+        _ => panic!("bug"),
+    }
+}

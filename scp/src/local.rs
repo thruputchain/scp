@@ -472,4 +472,9 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
             inner_sets: VecM(inner_sets),
         })
     }
+
+    pub fn to_string(&self, qset: &proto::SCPQuorumSet) -> String {
+        let json = self.to_json(qset, false);
+        serde_json::to_string(&json).unwrap()
+    }
 }

@@ -239,4 +239,30 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             }
         }
     }
+
+    pub fn accept_predicate(v: &proto::SCPValue, st: &proto::SCPStatement) -> bool {
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+            nom.accepted.iter().any(|accepted_val| accepted_val == v)
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_all<F>(nom: &proto::SCPStatementNominate, mut processor: F)
+    where
+        F: FnMut(&proto::SCPValue),
+    {
+        // Apply processor to all votes
+        for v in nom.votes.iter() {
+            processor(v);
+        }
+        
+        // Apply processor to accepted values that are not already in votes
+        // NB: "accepted" should be a subset of "votes", so this should mostly no-op
+        for a in nom.accepted.iter() {
+            if !nom.votes.iter().any(|vote| vote == a) {
+                processor(a);
+            }
+        }
+    }
 }

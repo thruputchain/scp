@@ -1,5 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
+use tracing::{debug, error, instrument, trace};
 use xdr_common::VecM;
 
 #[derive(Debug)]
@@ -162,5 +163,80 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             .latest_nominations
             .insert(node_id.clone(), env.clone());
         self.slot_mut().record_envelope(env);
+    }
+
+    #[instrument]
+    pub fn emit_nomination(&mut self) {
+        // Create SCP statement for nomination
+        let node_id = self.slot().local_proto().get_node_id().clone();
+        let qset_hash = *self.slot().local_proto().get_qset_hash();
+
+        // Create the nomination statement
+        let mut votes = VecM(vec![]);
+        let mut accepted = VecM(vec![]);
+
+        // Copy votes from nomination state
+        for vote in &self.nomination().votes {
+            votes.0.push(vote.clone());
+        }
+
+        // Copy accepted values from nomination state
+        for accept in &self.nomination().accepted {
+            accepted.0.push(accept.clone());
+        }
+
+        // Sort the collections to ensure they're ordered
+        votes.0.sort();
+        accepted.0.sort();
+
+        let nominate = proto::SCPStatementNominate {
+            quorum_set_hash: qset_hash,
+            votes,
+            accepted,
+        };
+
+        let statement = proto::SCPStatement {
+            node_id,
+            slot_index: self.slot().index(),
+            pledges: proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                nominate: nominate.clone(),
+            },
+        };
+
+        // Create envelope
+        let envelope = self.slot().create_envelope(statement.clone());
+
+        // Process the envelope first - this is crucial!
+        match self.slot_mut().process_envelope(&envelope, true) {
+            EnvelopeState::Valid => {
+                // Check if this statement is newer than our last envelope
+                let should_update = match &self.nomination().last_envelope {
+                    None => true,
+                    Some(last_env) => {
+                        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: last_nom } =
+                            &last_env.statement.pledges
+                        {
+                            Self::is_newer_statement(last_nom, &nominate)
+                        } else {
+                            true
+                        }
+                    }
+                };
+
+                if should_update {
+                    self.nomination_mut().last_envelope = Some(envelope.clone());
+
+                    if self.slot().is_fully_validated() {
+                        self.driver().emit_envelope(envelope);
+                    }
+                }
+            }
+            EnvelopeState::Invalid =>
+            // There is a bug in the application if it queued up
+            // a statement for itself that it considers invalid
+            {
+                panic!("moved to a bad state (nomination)")
+            }
+        }
     }
 }

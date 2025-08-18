@@ -96,6 +96,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         panic!("XXX")
     }
 
+    pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
+        panic!("XXX")
+    }
+
     pub fn set_fully_validated(&mut self, validated: bool) {
         panic!("XXX")
     }

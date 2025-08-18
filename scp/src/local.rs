@@ -401,4 +401,75 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
         ret.insert("v".to_string(), serde_json::Value::Array(entries));
         serde_json::Value::Object(ret)
     }
+
+    /// Parse a quorum set from JSON representation
+    pub fn from_json_with(
+        &self,
+        qset_json: &serde_json::Value,
+    ) -> Result<proto::SCPQuorumSet, String> {
+        let from_str_key = |s: &str| self.cd.driver.from_str_key(s);
+        Self::from_json_with_parser(qset_json, &from_str_key)
+    }
+
+    /// Parse a quorum set from JSON representation
+    pub fn from_json_with_parser<F>(
+        qset_json: &serde_json::Value,
+        from_str_key: &F,
+    ) -> Result<proto::SCPQuorumSet, String>
+    where
+        F: Fn(&str) -> Result<proto::SCPNodeID, String>,
+    {
+        if !qset_json.is_object() {
+            return Err("JSON field 'qset' must be an object".to_string());
+        }
+
+        let obj = qset_json.as_object().unwrap();
+
+        // Check for required threshold field
+        let threshold = match obj.get("t") {
+            Some(t) if t.is_number() => match t.as_u64() {
+                Some(val) if val <= u32::MAX as u64 => val as u32,
+                _ => {
+                    return Err(
+                        "JSON field 't' must be a valid unsigned 32-bit integer".to_string()
+                    );
+                }
+            },
+            _ => return Err("JSON field 't' must exist and be an unsigned integer".to_string()),
+        };
+
+        // Check for required validators array field
+        let entries = match obj.get("v") {
+            Some(v) if v.is_array() => v.as_array().unwrap(),
+            _ => return Err("JSON field 'v' must exist and be an array".to_string()),
+        };
+
+        let mut validators = Vec::new();
+        let mut inner_sets = Vec::new();
+
+        for entry in entries {
+            if entry.is_string() {
+                // Parse validator key string
+                let key_str = entry.as_str().unwrap();
+                match from_str_key(key_str) {
+                    Ok(node_id) => validators.push(node_id),
+                    Err(e) => return Err(format!("Invalid validator key in 'v' array: {}", e)),
+                }
+            } else if entry.is_object() {
+                // Recursively parse inner quorum set
+                match Self::from_json_with_parser(entry, from_str_key) {
+                    Ok(inner_qset) => inner_sets.push(inner_qset),
+                    Err(e) => return Err(e),
+                }
+            } else {
+                return Err("Each entry in 'v' must be either a string (validator key) or an object (inner quorum set)".to_string());
+            }
+        }
+
+        Ok(proto::SCPQuorumSet {
+            threshold,
+            validators: VecM(validators),
+            inner_sets: VecM(inner_sets),
+        })
+    }
 }

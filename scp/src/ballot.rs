@@ -1878,7 +1878,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             let mut f_ex = serde_json::json!([]);
             for n in f {
                 f_ex.as_array_mut().unwrap().push(serde_json::Value::String(
-                    self.driver().to_str_key(n, full_keys),
+                    self.driver().to_str_key(&n, full_keys),
                 ));
             }
             ret["fail_with"] = f_ex;

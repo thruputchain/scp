@@ -268,22 +268,98 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
     // a set of nodes that agree (but can fail)
     // excluded, if set will be skipped altogether
     pub fn find_closest_v_blocking_nodes(
-        &self,
         qset: &proto::SCPQuorumSet,
         nodes: &HashSet<proto::SCPNodeID>,
         excluded: Option<&proto::SCPNodeID>,
-    ) -> Vec<&proto::SCPNodeID> {
-        panic!("XXX")
+    ) -> Vec<proto::SCPNodeID> {
+        // Calculate nodes needed to block: total_entries - threshold + 1
+        let total_entries = qset.validators.len() + qset.inner_sets.len();
+        let mut left_till_block = (total_entries + 1).saturating_sub(qset.threshold as usize);
+
+        let mut res = Vec::new();
+
+        // Check validators first
+        for validator in qset.validators.iter() {
+            // Skip excluded node
+            if let Some(ex) = excluded {
+                if validator == ex {
+                    continue;
+                }
+            }
+
+            if !nodes.contains(validator) {
+                // This validator is not in the agreeing set, so it's already blocking
+                left_till_block = left_till_block.saturating_sub(1);
+                if left_till_block == 0 {
+                    // Already blocked
+                    return Vec::new();
+                }
+            } else {
+                res.push(validator.clone());
+            }
+        }
+
+        // Collect results from inner sets, ordered by size
+        let mut res_internals: Vec<Vec<proto::SCPNodeID>> = Vec::new();
+
+        for inner_qset in qset.inner_sets.iter() {
+            let inner_result = Self::find_closest_v_blocking_nodes(inner_qset, nodes, excluded);
+            if inner_result.is_empty() {
+                // This inner set is already blocked
+                left_till_block = left_till_block.saturating_sub(1);
+                if left_till_block == 0 {
+                    return Vec::new();
+                }
+            } else {
+                res_internals.push(inner_result);
+            }
+        }
+
+        // Sort internal results by size (smallest first)
+        res_internals.sort_by_key(|v| v.len());
+
+        // Use top-level validators to get closer
+        if res.len() > left_till_block {
+            res.truncate(left_till_block);
+        }
+        left_till_block = left_till_block.saturating_sub(res.len());
+
+        // Use subsets to get closer, using the smallest ones first
+        for inner_res in res_internals.iter() {
+            if left_till_block == 0 {
+                break;
+            }
+            res.extend_from_slice(inner_res);
+            left_till_block = left_till_block.saturating_sub(1);
+        }
+
+        res
     }
 
-    pub fn find_closest_v_blocking_envelopes(
+    /// Find the closest v-blocking set from filtered envelopes
+    pub fn find_closest_v_blocking_envelopes<F>(
         &self,
         qset: &proto::SCPQuorumSet,
         envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
-        filter: impl Fn(&proto::SCPStatement) -> bool,
+        filter: F,
         excluded: Option<&proto::SCPNodeID>,
-    ) -> Vec<&proto::SCPNodeID> {
-        panic!("XXX")
+    ) -> Vec<proto::SCPNodeID>
+    where
+        F: Fn(&proto::SCPStatement) -> bool,
+    {
+        // Collect nodes that pass the filter into a HashSet
+        let nodes: HashSet<proto::SCPNodeID> = envs
+            .iter()
+            .filter_map(|(node_id, envelope)| {
+                if filter(&envelope.statement) {
+                    Some(node_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Self::find_closest_v_blocking_nodes(qset, &nodes, excluded)
     }
 
     pub fn to_json(&self, qset: &proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {

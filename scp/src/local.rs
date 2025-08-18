@@ -362,7 +362,43 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
         Self::find_closest_v_blocking_nodes(qset, &nodes, excluded)
     }
 
+    /// Convert quorum set to JSON representation
     pub fn to_json(&self, qset: &proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
-        panic!("XXX")
+        Self::to_json_with_formatter(qset, |node_id| {
+            self.cd.driver.to_str_key(node_id, full_keys)
+        })
+    }
+
+    /// Convert quorum set to JSON with custom node formatter
+    pub fn to_json_with_formatter<F>(qset: &proto::SCPQuorumSet, formatter: F) -> serde_json::Value
+    where
+        F: Fn(&proto::SCPNodeID) -> String,
+    {
+        let mut ret = serde_json::Map::new();
+        ret.insert(
+            "t".to_string(),
+            serde_json::Value::Number(qset.threshold.into()),
+        );
+
+        let mut entries = Vec::new();
+
+        // Add validators as strings
+        for validator in qset.validators.iter() {
+            let str_key = formatter(validator);
+            if str_key.is_empty() {
+                // In Rust we'll use a default representation instead of throwing
+                entries.push(serde_json::Value::String(format!("{:?}", validator)));
+            } else {
+                entries.push(serde_json::Value::String(str_key));
+            }
+        }
+
+        // Recursively add inner sets
+        for inner_set in qset.inner_sets.iter() {
+            entries.push(Self::to_json_with_formatter(inner_set, &formatter));
+        }
+
+        ret.insert("v".to_string(), serde_json::Value::Array(entries));
+        serde_json::Value::Object(ret)
     }
 }

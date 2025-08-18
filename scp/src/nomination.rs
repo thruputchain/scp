@@ -155,4 +155,12 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         let values_vec: Vec<_> = values.iter().collect();
         values_vec.windows(2).all(|window| window[0] <= window[1])
     }
+
+    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
+        let node_id = &env.statement.node_id;
+        self.nomination_mut()
+            .latest_nominations
+            .insert(node_id.clone(), env.clone());
+        self.slot_mut().record_envelope(env);
+    }
 }

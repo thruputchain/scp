@@ -1,5 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
+use xdr_common::VecM;
 
 #[derive(Debug)]
 pub struct NominationState {
@@ -60,5 +61,68 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
     fn consensus(&self) -> &C {
         self.slot().consensus()
+    }
+
+    pub fn is_newer_node_statement(
+        &self,
+        node_id: &proto::SCPNodeID,
+        st: &proto::SCPStatementNominate,
+    ) -> bool {
+        match self.nomination().latest_nominations.get(node_id) {
+            None => true,
+            Some(old_envelope) => {
+                if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_st } =
+                    &old_envelope.statement.pledges
+                {
+                    Self::is_newer_statement(old_st, st)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn is_newer_statement(
+        oldst: &proto::SCPStatementNominate,
+        st: &proto::SCPStatementNominate,
+    ) -> bool {
+        let mut grows_votes = false;
+
+        if Self::is_subset(&oldst.votes, &st.votes, &mut grows_votes) {
+            let mut grows_accepted = false;
+            if Self::is_subset(&oldst.accepted, &st.accepted, &mut grows_accepted) {
+                grows_votes || grows_accepted
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    fn is_subset(
+        p: &VecM<proto::SCPValue>,
+        v: &VecM<proto::SCPValue>,
+        not_equal: &mut bool,
+    ) -> bool {
+        if p.len() <= v.len() {
+            let mut p_sorted: Vec<_> = p.iter().cloned().collect();
+            let mut v_sorted: Vec<_> = v.iter().cloned().collect();
+            p_sorted.sort();
+            v_sorted.sort();
+
+            let is_subset = p_sorted
+                .iter()
+                .all(|item| v_sorted.binary_search(item).is_ok());
+            if is_subset {
+                *not_equal = p.len() != v.len();
+            } else {
+                *not_equal = true;
+            }
+            is_subset
+        } else {
+            *not_equal = true;
+            false
+        }
     }
 }

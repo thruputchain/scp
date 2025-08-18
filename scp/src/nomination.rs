@@ -125,4 +125,34 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             false
         }
     }
+
+    pub fn is_sane(&self, st: &proto::SCPStatement) -> bool {
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+            // Check that nomination has at least one vote or accepted value
+            let has_content = !nom.votes.is_empty() || !nom.accepted.is_empty();
+
+            if !has_content {
+                return false;
+            }
+
+            // Check that votes are sorted
+            let votes_sorted = Self::is_sorted(&nom.votes);
+
+            // Check that accepted values are sorted
+            let accepted_sorted = Self::is_sorted(&nom.accepted);
+
+            votes_sorted && accepted_sorted
+        } else {
+            panic!("bug")
+        }
+    }
+
+    fn is_sorted(values: &VecM<proto::SCPValue>) -> bool {
+        if values.len() <= 1 {
+            return true;
+        }
+
+        let values_vec: Vec<_> = values.iter().collect();
+        values_vec.windows(2).all(|window| window[0] <= window[1])
+    }
 }

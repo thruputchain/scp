@@ -26,19 +26,19 @@ pub trait Driver: Debug {
         slot_index: proto::SCPSlotIndex,
         prev: &proto::SCPValue,
         is_priority: bool,
-        round_number: i32,
+        round_number: proto::SCPCount,
         node_id: &proto::SCPNodeID,
     ) -> u64;
     fn compute_value_hash(
         &self,
         slot_index: proto::SCPSlotIndex,
         prev: &proto::SCPValue,
-        round_number: i32,
+        round_number: proto::SCPCount,
         value: &proto::SCPValue,
     ) -> u64;
 
     fn emit_envelope(&self, env: proto::SCPEnvelope);
-    fn compute_timeout(&self, counter: proto::SCPCount, is_nomination: bool) -> Duration;
+    fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration;
     fn start_timer(&self, slot_index: SlotIndex, timer: Timer, timeout: Duration);
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
 }

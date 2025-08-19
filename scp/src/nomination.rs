@@ -5,7 +5,7 @@ use xdr_common::VecM;
 
 #[derive(Debug)]
 pub struct NominationState {
-    round_number: i32,
+    round_number: proto::SCPCount,
     votes: HashSet<proto::SCPValue>,      // X
     accepted: HashSet<proto::SCPValue>,   // Y
     candidates: HashSet<proto::SCPValue>, // Z
@@ -576,4 +576,102 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
         res
     }
+    /*
+    #[instrument]
+    pub fn nominate(
+        &mut self,
+        value: &proto::SCPValue,
+        previous_value: &proto::SCPValue,
+        timed_out: bool,
+    ) -> bool {
+        // No need to continue nominating, as per the whitepaper:
+        // "As soon as `v` has a candidate value, however, it must cease
+        // voting to nominate `x` for any new values `x`"
+        if !self.nomination().candidates.is_empty() {
+            debug!(
+                "nomination skip nomination round {}, already have a candidate",
+                self.nomination().round_number
+            );
+            return false;
+        }
+
+        debug!(
+            "nomination nominate ({}) value: {:?}",
+            self.nomination().round_number,
+            value
+        );
+
+        let mut updated = false;
+
+        if timed_out {
+            self.nomination_mut().timer_exp_count += 1;
+        }
+
+        if timed_out && !self.nomination().nomination_started {
+            debug!("nomination nominate (TIMED OUT)");
+            return false;
+        }
+
+        self.nomination_mut().nomination_started = true;
+        self.nomination_mut().previous_value = Some(previous_value.clone());
+        self.nomination_mut().round_number += 1;
+
+        self.update_round_leaders();
+
+        let timeout = self
+            .driver()
+            .compute_timeout(self.nomination().round_number, true);
+
+        // XXX: check from here
+        // Add a few more values from other leaders
+        for leader in self.nomination().round_leaders.clone().iter() {
+            if let Some(latest_nomination) = self.nomination().latest_nominations.get(leader) {
+                if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
+                    &latest_nomination.statement.pledges
+                {
+                    if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
+                        if self.nomination_mut().votes.insert(new_vote.clone()) {
+                            updated = true;
+                            self.consensus()
+                                .nominating_value(self.slot().index(), &new_vote);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we're leader, add our value if we haven't added any votes yet
+        let local_node_id = self.slot().local_proto().get_node_id().clone();
+        if self.nomination().round_leaders.contains(&local_node_id)
+            && self.nomination().votes.is_empty()
+        {
+            if self.nomination_mut().votes.insert(value.clone()) {
+                updated = true;
+                self.consensus()
+                    .nominating_value(self.slot().index(), value);
+            }
+        }
+
+        // Setup timer for next nomination round
+        let slot_index = self.slot().index();
+        let value_clone = value.clone();
+        let previous_value_clone = previous_value.clone();
+        self.driver().setup_timer(
+            slot_index,
+            Timer::Nomination,
+            timeout,
+            Box::new(move |slot_proto| {
+                self.nominate(&value_clone, &previous_value_clone, true);
+            }),
+        );
+
+        if updated {
+            self.emit_nomination();
+        } else {
+            debug!("nomination nominate (SKIPPED)");
+        }
+
+        updated
+    }
+    */
 }

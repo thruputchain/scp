@@ -566,4 +566,14 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             EnvelopeState::Invalid
         }
     }
+
+    pub fn get_statement_values(&self, st: &proto::SCPStatement) -> Vec<proto::SCPValue> {
+        let mut res = Vec::new();
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+            Self::apply_all(nom, |v| {
+                res.push(v.clone());
+            });
+        }
+        res
+    }
 }

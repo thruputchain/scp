@@ -3,26 +3,26 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
-pub struct ConsensusDriver<'a, C: Consensus, D: Driver> {
-    pub consensus: &'a C,
-    pub driver: &'a D,
+#[derive(Debug, Clone)]
+pub struct ConsensusDriver<C: Consensus, D: Driver> {
+    pub consensus: C,
+    pub driver: D,
 }
 
-impl<'a, C: Consensus, D: Driver> ConsensusDriver<'a, C, D> {
-    pub fn new(consensus: &'a C, driver: &'a D) -> ConsensusDriver<'a, C, D> {
+impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
+    pub fn new(consensus: C, driver: D) -> ConsensusDriver<C, D> {
         return ConsensusDriver { consensus, driver };
     }
 }
 
 #[derive(Debug)]
-pub struct Stellar<'a, C: Consensus, D: Driver> {
-    cd: ConsensusDriver<'a, C, D>,
+pub struct Stellar<C: Consensus, D: Driver> {
+    cd: ConsensusDriver<C, D>,
     local: LocalState,
     slot: HashMap<SlotIndex, Slot>,
 }
 
-impl<'a, C: Consensus, D: Driver> Stellar<'a, C, D> {
+impl<'a, C: Consensus, D: Driver> Stellar<C, D> {
     fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_, C, D>> {
         self.slot.get_mut(&slot_index).map(|slot| SlotProto {
             cd: &self.cd,
@@ -32,7 +32,7 @@ impl<'a, C: Consensus, D: Driver> Stellar<'a, C, D> {
     }
 }
 
-impl<'a, C: Consensus, D: Driver> DriverCb for Stellar<'a, C, D> {
+impl<'a, C: Consensus, D: Driver> DriverCb for Stellar<C, D> {
     fn received(&mut self, env: &proto::SCPEnvelope) {
         panic!("XXX")
     }

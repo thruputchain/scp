@@ -528,14 +528,14 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn start_timer(&mut self) {
-        let driver = self.slot().cd.driver;
+        let driver = &self.slot().cd.driver;
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
         driver.start_timer(self.slot().index(), Timer::Ballot, timeout);
     }
 
     fn stop_timer(&mut self) {
-        let driver = self.slot().cd.driver;
+        let driver = &self.slot().cd.driver;
         driver.stop_timer(self.slot().index(), Timer::Ballot);
     }
 
@@ -623,7 +623,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     fn send_latest_envelope(&mut self) {
         // emit current envelope if needed
         if self.ballot().msg_level == 0 && self.slot().is_fully_validated() {
-            let driver = self.slot().cd.driver;
+            let driver = &self.slot().cd.driver;
             let ballot_mut = self.ballot_mut();
             if let Some(last_gen) = &ballot_mut.last_envelope_gen {
                 let should_emit = match &ballot_mut.last_envelope_emit {

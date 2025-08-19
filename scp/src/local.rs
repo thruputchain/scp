@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, instrument, trace};
+use tracing::instrument;
 use xdr_common::VecM;
 
 #[derive(Debug)]
@@ -61,18 +61,18 @@ impl LocalState {
 }
 
 #[derive(Debug)]
-pub struct LocalProto<'a, 'b, C: Consensus, D: Driver> {
-    pub cd: &'a ConsensusDriver<'b, C, D>,
+pub struct LocalProto<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub local: &'a LocalState,
 }
 
 #[derive(Debug)]
-pub struct LocalProtoMut<'a, 'b, C: Consensus, D: Driver> {
-    pub cd: &'a ConsensusDriver<'b, C, D>,
+pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub local: &'a mut LocalState,
 }
 
-impl<'a, 'b, C: Consensus, D: Driver> LocalProtoMut<'a, 'b, C, D> {
+impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
     #[instrument]
     pub fn update_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         let mut normalized_qset = qset.clone();
@@ -86,7 +86,7 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProtoMut<'a, 'b, C, D> {
     }
 }
 
-impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, 'b, C, D> {
+impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     pub fn get_qset(&self) -> &proto::SCPQuorumSet {
         &self.local.qset
     }

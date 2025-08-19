@@ -42,8 +42,8 @@ pub fn are_ballots_less_and_compatible(left: &proto::SCPBallot, right: &proto::S
     (compare_ballots(left, right) != Ordering::Greater) && are_ballots_compatible(left, right)
 }
 
-pub fn has_v_blocking_subset_strictly_ahead_of<'a, 'b, C: Consensus, D: Driver>(
-    local: &LocalProto<'a, 'b, C, D>,
+pub fn has_v_blocking_subset_strictly_ahead_of<'a, C: Consensus, D: Driver>(
+    local: &LocalProto<'a, C, D>,
     envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
     n: proto::SCPCount,
 ) -> bool {

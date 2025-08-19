@@ -441,4 +441,129 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     fn extract_valid_value(&self, value: &proto::SCPValue) -> Option<proto::SCPValue> {
         panic!("XXX")
     }
+
+    #[instrument]
+    pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope) -> EnvelopeState {
+        let st = &envelope.statement;
+
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+            if !self.is_newer_node_statement(&st.node_id, nom) {
+                return EnvelopeState::Invalid;
+            }
+
+            if !self.is_sane(st) {
+                trace!("nomination proto message didn't pass sanity check");
+                return EnvelopeState::Invalid;
+            }
+
+            self.record_envelope(envelope);
+
+            if self.nomination().nomination_started {
+                // Track if we should emit a new nomination message
+                let mut modified = false;
+                let mut new_candidates = false;
+
+                // Attempt to promote some of the votes to accepted
+                for v in nom.votes.iter() {
+                    if self.nomination().accepted.contains(v) {
+                        // v is already accepted
+                        continue;
+                    }
+
+                    // Check if this value can be accepted via federated accept
+                    let votes_predicate = |st: &proto::SCPStatement| -> bool {
+                        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
+                            &st.pledges
+                        {
+                            nom.votes.iter().any(|vote| vote == v)
+                        } else {
+                            false
+                        }
+                    };
+
+                    let accept_predicate =
+                        |st: &proto::SCPStatement| -> bool { Self::accept_predicate(v, st) };
+
+                    if self.slot().federated_accept(
+                        votes_predicate,
+                        accept_predicate,
+                        &self.nomination().latest_nominations,
+                    ) {
+                        let validation_level = self.validate_value(v);
+                        if validation_level == ValidationLevel::FullyValid {
+                            self.nomination_mut().accepted.insert(v.clone());
+                            self.nomination_mut().votes.insert(v.clone());
+                            modified = true;
+                        } else {
+                            // The value made it pretty far: see if we can vote for a variation
+                            // that we consider valid
+                            if let Some(valid_value) = self.extract_valid_value(v) {
+                                if self.nomination_mut().votes.insert(valid_value) {
+                                    modified = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Attempt to promote accepted values to candidates
+                for a in self.nomination().accepted.clone().iter() {
+                    if self.nomination().candidates.contains(a) {
+                        continue;
+                    }
+
+                    let accept_predicate =
+                        |st: &proto::SCPStatement| -> bool { Self::accept_predicate(a, st) };
+
+                    if self
+                        .slot()
+                        .federated_ratify(accept_predicate, &self.nomination().latest_nominations)
+                    {
+                        self.nomination_mut().candidates.insert(a.clone());
+                        new_candidates = true;
+                        // Stop the timer, as there's no need to continue nominating
+                        self.driver()
+                            .stop_timer(self.slot().index(), Timer::Nomination);
+                    }
+                }
+
+                // Only take round leader votes if we're still looking for candidates
+                if self.nomination().candidates.is_empty()
+                    && self.nomination().round_leaders.contains(&st.node_id)
+                {
+                    if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
+                        if self.nomination_mut().votes.insert(new_vote.clone()) {
+                            modified = true;
+                            self.consensus()
+                                .nominating_value(self.slot().index(), &new_vote);
+                        } else {
+                            panic!("bug")
+                        }
+                    }
+                }
+
+                if modified {
+                    self.emit_nomination();
+                }
+
+                if new_candidates {
+                    // Combine candidates and update state
+                    if let Some(composite) = self
+                        .consensus()
+                        .combine_candidates(self.slot().index(), &self.nomination().candidates)
+                    {
+                        self.nomination_mut().latest_composite_candidate = Some(composite.clone());
+                        self.consensus()
+                            .updated_candidate_value(self.slot().index(), &composite);
+                        self.slot_mut().bump_state(&composite, false);
+                    }
+                }
+            }
+
+            EnvelopeState::Valid
+        } else {
+            // Not a nomination statement
+            EnvelopeState::Invalid
+        }
+    }
 }

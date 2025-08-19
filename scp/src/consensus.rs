@@ -1,4 +1,5 @@
 use crate::*;
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 #[derive(PartialEq, PartialOrd, Ord, Eq)]
@@ -27,6 +28,14 @@ pub trait Consensus: ConsensusCb + ConsensusNotify + Debug {
         value: &proto::SCPValue,
     ) -> Option<proto::SCPValue>;
 
+    // `combineCandidates` computes the composite value based off a list
+    // of candidate values.
+    fn combine_candidates(
+        &self,
+        slot_index: SCPSlotIndex,
+        candidates: &HashSet<proto::SCPValue>,
+    ) -> Option<proto::SCPValue>;
+
     // XXX: async
     // fn validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
     // fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
@@ -49,4 +58,7 @@ pub trait ConsensusNotify: Debug {
     fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
+    // nom
+    fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue);
+    fn updated_candidate_value(&self, slot_index: SlotIndex, value: &proto::SCPValue);
 }

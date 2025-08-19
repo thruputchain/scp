@@ -143,4 +143,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     pub fn stop_nomination(&mut self) {
         panic!("XXX")
     }
+
+    pub fn bump_state(&mut self, value: &proto::SCPValue, force: bool) -> bool {
+        panic!("XXX")
+    }
 }

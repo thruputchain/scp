@@ -384,4 +384,61 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             panic!("bug")
         }
     }
+
+    #[instrument]
+    pub fn get_new_value_from_nomination(
+        &self,
+        nom: &proto::SCPStatementNominate,
+    ) -> Option<proto::SCPValue> {
+        // Pick the highest value we don't have from the nomination
+        // sorted using hash_value.
+        let mut new_vote: Option<proto::SCPValue> = None;
+        let mut new_hash = 0u64;
+        let mut found_valid_value = false;
+
+        let pick_value = |value: &proto::SCPValue,
+                          new_vote: &mut Option<proto::SCPValue>,
+                          new_hash: &mut u64,
+                          found_valid_value: &mut bool| {
+            let value_to_nominate = match self.validate_value(value) {
+                ValidationLevel::FullyValid => Some(value.clone()),
+                _ => self.extract_valid_value(value),
+            };
+
+            if let Some(valid_val) = value_to_nominate {
+                *found_valid_value = true;
+                if !self.nomination().votes.contains(&valid_val) {
+                    let cur_hash = self.hash_value(&valid_val);
+                    if cur_hash >= *new_hash {
+                        *new_hash = cur_hash;
+                        *new_vote = Some(valid_val);
+                    }
+                }
+            }
+        };
+
+        // First look through accepted values
+        for val in nom.accepted.iter() {
+            pick_value(val, &mut new_vote, &mut new_hash, &mut found_valid_value);
+        }
+
+        // Move on to votes if we have not found a valid accepted value
+        if !found_valid_value {
+            for val in nom.votes.iter() {
+                pick_value(val, &mut new_vote, &mut new_hash, &mut found_valid_value);
+            }
+        }
+
+        new_vote
+    }
+
+    #[instrument]
+    fn validate_value(&self, value: &proto::SCPValue) -> ValidationLevel {
+        panic!("XXX")
+    }
+
+    #[instrument]
+    fn extract_valid_value(&self, value: &proto::SCPValue) -> Option<proto::SCPValue> {
+        panic!("XXX")
+    }
 }

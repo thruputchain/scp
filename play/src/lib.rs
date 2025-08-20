@@ -3,36 +3,56 @@ pub mod lifetime;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-struct Slot {
-    x: i64,
-    ballot: Option<Ballot>,
+trait Driver {
+    fn call(&self, cb: Box<dyn FnOnce()>); // without Box?
 }
 
-impl Slot {
-    fn new() -> Rc<RefCell<Slot>> {
-        let slot = Rc::new(RefCell::new(Slot { x: 4, ballot: None }));
-        let ballot = Ballot::new(slot.clone());
-        slot.borrow_mut().ballot = Some(ballot);
-        slot
-    }
-
-    fn mut_fn(&mut self) {}
+struct XDriver {
+    cb: Box<dyn FnOnce()>,
 }
 
-struct Ballot {
-    slot: Rc<RefCell<Slot>>,
+struct State {
+    sub: Substate,
 }
 
-impl Ballot {
-    fn new(slot: Rc<RefCell<Slot>>) -> Ballot {
-        Ballot { slot }
+struct Substate {}
+
+#[derive(Clone)]
+struct Proto {
+    pub driver: Rc<dyn Driver>,
+    pub state: Rc<RefCell<State>>,
+}
+
+struct Subproto<'a> {
+    pub proto: Proto,
+    pub sub: &'a mut Substate,
+}
+
+impl<'a> Subproto<'a> {
+    pub fn g(&mut self) {}
+}
+
+impl Proto {
+    fn test(&mut self) {
+        self.with_sub(|x| x.g());
     }
 
-    fn mut_slot(&self) -> std::cell::RefMut<Slot> {
-        self.slot.borrow_mut()
+    fn with_sub<F, R>(&mut self, p: F) -> R
+    where
+        F: FnOnce(&mut Subproto) -> R,
+    {
+        let mut sp = Subproto {
+            proto: self.clone(),
+            sub: &mut self.state.borrow_mut().sub,
+        };
+        p(&mut sp)
     }
 
-    fn other(&self) {
-        self.mut_slot().mut_fn();
+    fn call_driver(&mut self) {
+        let mut s = self.clone();
+        self.driver.call(Box::new(move || {
+            s.other();
+        }))
     }
+    fn other(&mut self) {}
 }

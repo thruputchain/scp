@@ -728,4 +728,58 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
         ret
     }
+
+    pub fn get_state(&self, node_id: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
+        let mut state = QuorumInfoNodeState::Agree;
+        
+        if node_id == self.slot().local_proto().get_node_id() {
+            // always mark myself as AGREE.
+            return state;
+        }
+
+        let enough_time_has_passed = 
+            i64::from(self.nomination().timer_exp_count) >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
+            || self_already_moved_on;
+
+        match self.nomination().latest_nominations.get(node_id) {
+            None => {
+                if enough_time_has_passed {
+                    state = QuorumInfoNodeState::Missing;
+                } else {
+                    // Not enough time has passed to start calling this node missing.
+                    state = QuorumInfoNodeState::NoInfo;
+                }
+            }
+            Some(other_envelope) => {
+                if enough_time_has_passed {
+                    if let Some(ref last_envelope) = self.nomination().last_envelope {
+                        // Enough time has passed & we have some information on this node.
+                        // We'll examine the information to determine the state of this node.
+                        if let (
+                            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: other_nom },
+                            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom }
+                        ) = (&other_envelope.statement.pledges, &last_envelope.statement.pledges) {
+                            let mut not_equal = false;
+                            let is_subset = Self::is_subset(&other_nom.accepted, &my_nom.accepted, &mut not_equal);
+                            
+                            if is_subset {
+                                if not_equal {
+                                    // If there's some values that I've accepted that
+                                    // they haven't, they are slow.
+                                    state = QuorumInfoNodeState::Delayed;
+                                }
+                                // else remains AGREE
+                            } else {
+                                // If they have accepted a value that I haven't,
+                                // it's likely that I'll never accept it.
+                                state = QuorumInfoNodeState::Disagree;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        state
+    }
 }

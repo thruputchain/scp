@@ -824,4 +824,22 @@ impl<'a, 'b> NominationProto<'a, 'b> {
             panic!("bug")
         }
     }
+
+    pub fn process_current_state<F>(&self, mut f: F, force_self: bool) -> bool
+    where
+        F: FnMut(&proto::SCPEnvelope) -> bool,
+    {
+        for (node_id, envelope) in &self.nomination().latest_nominations {
+            // only return messages for self if the slot is fully validated
+            if force_self 
+                || node_id != self.slot().local_proto().get_node_id()
+                || self.slot().is_fully_validated()
+            {
+                if !f(envelope) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }

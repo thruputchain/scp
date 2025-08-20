@@ -10,13 +10,18 @@ pub struct ConsensusDriver {
 }
 
 #[derive(Debug)]
-pub struct Stellar {
-    cd: ConsensusDriver,
+pub struct StellarState {
     local: LocalState,
     slot: HashMap<SlotIndex, Slot>,
 }
 
-impl Stellar {
+#[derive(Debug)]
+pub struct StellarProto<'a> {
+    cd: ConsensusDriver,
+    state: &'a mut StellarState,
+}
+
+impl<'a> StellarProto<'a> {
     fn driver(&self) -> &dyn Driver {
         self.cd.driver.as_ref()
     }
@@ -26,15 +31,15 @@ impl Stellar {
     }
 
     fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
-        self.slot.get_mut(&slot_index).map(|slot| SlotProto {
+        self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
             cd: &self.cd,
-            local: &mut self.local,
+            local: &mut self.state.local,
             slot,
         })
     }
 }
 
-impl DriverCb for Stellar {
+impl<'a> DriverCb for StellarProto<'a> {
     fn received(&mut self, env: &proto::SCPEnvelope) {
         panic!("XXX")
     }

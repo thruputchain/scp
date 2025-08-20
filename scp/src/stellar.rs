@@ -32,8 +32,8 @@ impl<'a> StellarProto<'a> {
     pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
         self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
             cd: &self.cd,
-            local: &mut self.state.local,
-            slot,
+            local_state: &mut self.state.local,
+            slot_state: slot,
         })
     }
 }

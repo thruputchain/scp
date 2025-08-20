@@ -1,5 +1,6 @@
 use crate::*;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 pub type SlotIndex = u64;
 
@@ -12,6 +13,16 @@ pub struct SlotState {
     pub slot_index: SlotIndex,
     pub nomination: NominationState,
     pub ballot: BallotState,
+    pub statements_history: Vec<HistoricalStatement>,
+    pub fully_validated: bool,
+    pub got_vblocking: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct HistoricalStatement {
+    when: SystemTime,
+    statement: proto::SCPStatement,
+    validated: bool,
 }
 
 impl SlotState {
@@ -20,6 +31,9 @@ impl SlotState {
             slot_index: 0,
             nomination: NominationState::new(),
             ballot: BallotState::new(),
+            statements_history: Vec::new(),
+            fully_validated: false, //XXX
+            got_vblocking: false,
         }
     }
 }
@@ -27,11 +41,16 @@ impl SlotState {
 #[derive(Debug)]
 pub struct SlotProto<'a> {
     pub cd: &'a ConsensusDriver,
-    pub local: &'a mut LocalState,
-    pub slot: &'a mut SlotState,
+    pub local_state: &'a mut LocalState,
+    pub slot_state: &'a mut SlotState,
 }
 
 impl<'a> SlotProto<'a> {
+    //XXX: call this when creating a slot
+    pub fn init(&mut self) {
+        self.slot_state.fully_validated = self.local_proto().is_validator()
+    }
+
     pub fn nomination_proto(&mut self) -> NominationProto<'_, 'a> {
         NominationProto(self)
     }
@@ -43,35 +62,35 @@ impl<'a> SlotProto<'a> {
     pub fn local_proto(&self) -> LocalProto<'_> {
         LocalProto {
             cd: self.cd,
-            local: self.local,
+            local: self.local_state,
         }
     }
 
     pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_> {
         LocalProtoMut {
             cd: self.cd,
-            local: self.local,
+            local: self.local_state,
         }
     }
 
     pub fn index(&self) -> SlotIndex {
-        self.slot.slot_index
+        self.slot_state.slot_index
     }
 
-    pub fn ballot(&self) -> &BallotState {
-        &self.slot.ballot
+    pub fn ballot_state(&self) -> &BallotState {
+        &self.slot_state.ballot
     }
 
-    pub fn ballot_mut(&mut self) -> &mut BallotState {
-        &mut self.slot.ballot
+    pub fn ballot_state_mut(&mut self) -> &mut BallotState {
+        &mut self.slot_state.ballot
     }
 
     pub fn nomination(&self) -> &NominationState {
-        &self.slot.nomination
+        &self.slot_state.nomination
     }
 
     pub fn nomination_mut(&mut self) -> &mut NominationState {
-        &mut self.slot.nomination
+        &mut self.slot_state.nomination
     }
 
     pub fn driver(&self) -> &dyn Driver {

@@ -687,4 +687,45 @@ impl<'a, 'b> NominationProto<'a, 'b> {
             _ => {}
         }
     }
+
+    pub fn stop_nomination(&mut self) {
+        self.nomination_mut().nomination_started = false;
+    }
+
+    pub fn get_leaders(&self) -> HashSet<proto::SCPNodeID> {
+        self.nomination().round_leaders.clone()
+    }
+
+    pub fn get_json_info(&self) -> serde_json::Value {
+        let mut ret = serde_json::json!({});
+        
+        ret["roundnumber"] = serde_json::Value::from(self.nomination().round_number);
+        ret["started"] = serde_json::Value::from(self.nomination().nomination_started);
+
+        let mut votes_array = Vec::new();
+        for vote in &self.nomination().votes {
+            votes_array.push(serde_json::Value::String(
+                self.driver().get_value_string(vote)
+            ));
+        }
+        ret["X"] = serde_json::Value::Array(votes_array);
+
+        let mut accepted_array = Vec::new();
+        for accepted in &self.nomination().accepted {
+            accepted_array.push(serde_json::Value::String(
+                self.driver().get_value_string(accepted)
+            ));
+        }
+        ret["Y"] = serde_json::Value::Array(accepted_array);
+
+        let mut candidates_array = Vec::new();
+        for candidate in &self.nomination().candidates {
+            candidates_array.push(serde_json::Value::String(
+                self.driver().get_value_string(candidate)
+            ));
+        }
+        ret["Z"] = serde_json::Value::Array(candidates_array);
+
+        ret
+    }
 }

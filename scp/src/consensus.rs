@@ -10,11 +10,16 @@ pub enum ValidationLevel {
 }
 
 pub trait Consensus: ConsensusCb + ConsensusNotify + Debug {
-    fn validate_value(
+    fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
-        nomination: bool,
+    ) -> ValidationLevel;
+
+    fn validate_nomination_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
     ) -> ValidationLevel;
 
     fn extract_valid_value(

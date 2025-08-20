@@ -436,12 +436,14 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
     #[instrument]
     fn validate_value(&self, value: &proto::SCPValue) -> ValidationLevel {
-        panic!("XXX")
+        self.consensus()
+            .validate_nomination_value(self.slot().index(), value)
     }
 
     #[instrument]
     fn extract_valid_value(&self, value: &proto::SCPValue) -> Option<proto::SCPValue> {
-        panic!("XXX")
+        self.consensus()
+            .extract_valid_value(self.slot().index(), value)
     }
 
     #[instrument]
@@ -831,7 +833,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
     {
         for (node_id, envelope) in &self.nomination().latest_nominations {
             // only return messages for self if the slot is fully validated
-            if force_self 
+            if force_self
                 || node_id != self.slot().local_proto().get_node_id()
                 || self.slot().is_fully_validated()
             {
@@ -841,5 +843,17 @@ impl<'a, 'b> NominationProto<'a, 'b> {
             }
         }
         true
+    }
+
+    pub fn get_latest_message(&self, node_id: &proto::SCPNodeID) -> Option<&proto::SCPEnvelope> {
+        self.nomination().latest_nominations.get(node_id)
+    }
+
+    pub fn get_latest_composite_candidate(&self) -> Option<&proto::SCPValue> {
+        self.nomination().latest_composite_candidate.as_ref()
+    }
+
+    pub fn get_last_message_send(&self) -> Option<&proto::SCPEnvelope> {
+        self.nomination().last_envelope.as_ref()
     }
 }

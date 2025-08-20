@@ -1835,9 +1835,9 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         let mut res = ValidationLevel::FullyValid;
         for value in values {
             if res > ValidationLevel::Invalid {
-                let validation_result =
-                    self.consensus()
-                        .validate_value(self.slot().index(), &value, false);
+                let validation_result = self
+                    .consensus()
+                    .validate_ballot_value(self.slot().index(), &value);
                 res = std::cmp::min(validation_result, res);
             }
         }

@@ -698,14 +698,14 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
     pub fn get_json_info(&self) -> serde_json::Value {
         let mut ret = serde_json::json!({});
-        
+
         ret["roundnumber"] = serde_json::Value::from(self.nomination().round_number);
         ret["started"] = serde_json::Value::from(self.nomination().nomination_started);
 
         let mut votes_array = Vec::new();
         for vote in &self.nomination().votes {
             votes_array.push(serde_json::Value::String(
-                self.driver().get_value_string(vote)
+                self.driver().get_value_string(vote),
             ));
         }
         ret["X"] = serde_json::Value::Array(votes_array);
@@ -713,7 +713,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         let mut accepted_array = Vec::new();
         for accepted in &self.nomination().accepted {
             accepted_array.push(serde_json::Value::String(
-                self.driver().get_value_string(accepted)
+                self.driver().get_value_string(accepted),
             ));
         }
         ret["Y"] = serde_json::Value::Array(accepted_array);
@@ -721,7 +721,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         let mut candidates_array = Vec::new();
         for candidate in &self.nomination().candidates {
             candidates_array.push(serde_json::Value::String(
-                self.driver().get_value_string(candidate)
+                self.driver().get_value_string(candidate),
             ));
         }
         ret["Z"] = serde_json::Value::Array(candidates_array);
@@ -729,16 +729,20 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         ret
     }
 
-    pub fn get_state(&self, node_id: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
+    pub fn get_state(
+        &self,
+        node_id: &proto::SCPNodeID,
+        self_already_moved_on: bool,
+    ) -> QuorumInfoNodeState {
         let mut state = QuorumInfoNodeState::Agree;
-        
+
         if node_id == self.slot().local_proto().get_node_id() {
             // always mark myself as AGREE.
             return state;
         }
 
-        let enough_time_has_passed = 
-            i64::from(self.nomination().timer_exp_count) >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
+        let enough_time_has_passed = i64::from(self.nomination().timer_exp_count)
+            >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
             || self_already_moved_on;
 
         match self.nomination().latest_nominations.get(node_id) {
@@ -756,12 +760,21 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                         // Enough time has passed & we have some information on this node.
                         // We'll examine the information to determine the state of this node.
                         if let (
-                            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: other_nom },
-                            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom }
-                        ) = (&other_envelope.statement.pledges, &last_envelope.statement.pledges) {
+                            proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                                nominate: other_nom,
+                            },
+                            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom },
+                        ) = (
+                            &other_envelope.statement.pledges,
+                            &last_envelope.statement.pledges,
+                        ) {
                             let mut not_equal = false;
-                            let is_subset = Self::is_subset(&other_nom.accepted, &my_nom.accepted, &mut not_equal);
-                            
+                            let is_subset = Self::is_subset(
+                                &other_nom.accepted,
+                                &my_nom.accepted,
+                                &mut not_equal,
+                            );
+
                             if is_subset {
                                 if not_equal {
                                     // If there's some values that I've accepted that
@@ -779,7 +792,36 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                 }
             }
         }
-        
+
         state
+    }
+
+    pub fn set_state_from_envelope(&mut self, envelope: &proto::SCPEnvelope) {
+        if self.nomination().nomination_started {
+            panic!("cannot set state after nomination is started");
+        }
+
+        self.record_envelope(envelope);
+
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
+            &envelope.statement.pledges
+        {
+            // Add all accepted values from the envelope
+            for accepted_value in nom.accepted.iter() {
+                self.nomination_mut()
+                    .accepted
+                    .insert(accepted_value.clone());
+            }
+
+            // Add all votes from the envelope
+            for vote_value in nom.votes.iter() {
+                self.nomination_mut().votes.insert(vote_value.clone());
+            }
+
+            // Set this as the last envelope
+            self.nomination_mut().last_envelope = Some(envelope.clone());
+        } else {
+            panic!("bug")
+        }
     }
 }

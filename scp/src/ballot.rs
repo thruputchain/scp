@@ -532,7 +532,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
         //
-        let _stellar = self.0.proxy.clone();
+        // let mut _stellar = self.0.proxy.clone();
         let slot_index = self.slot().index();
         driver.start_timer(
             slot_index,
@@ -541,9 +541,9 @@ impl<'a, 'b> BallotProto<'a, 'b> {
             Box::new(|| {}),
             // XXX: this is not compiling
             // Box::new(move || {
-            //     if let Some(slot_proto) = _stellar.slot_proto(slot_index) {
-            //         // let ballot_proto = slot_proto.ballot_proto();
-            //         // ballot_proto.timer_expired();
+            //     if let Some(mut slot_proto) = _stellar.slot_proto(slot_index) {
+            //         let mut ballot_proto = slot_proto.ballot_proto();
+            //         ballot_proto.timer_expired();
             //     }
             // }),
         );

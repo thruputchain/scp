@@ -44,7 +44,7 @@ pub trait Driver: Debug {
         slot_index: SlotIndex,
         timer: Timer,
         timeout: Duration,
-        cb: Box<dyn FnOnce() + Send>,
+        cb: Box<dyn FnOnce()>,
     );
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
 }

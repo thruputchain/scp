@@ -21,7 +21,7 @@ pub struct StellarProto<'a> {
     pub state: &'a mut StellarState,
 }
 
-impl<'a> Clone for StellarProto<'a> {
+impl<'a> Clone for StellarProto<'static> {
     //XXX: ok?
     fn clone(&self) -> Self {
         unsafe {

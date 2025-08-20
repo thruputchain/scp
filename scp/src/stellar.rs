@@ -1,5 +1,4 @@
 use crate::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -12,7 +11,7 @@ pub struct ConsensusDriver {
 #[derive(Debug)]
 pub struct StellarState {
     local: LocalState,
-    slot: HashMap<SlotIndex, Slot>,
+    slot: HashMap<SlotIndex, SlotState>,
 }
 
 #[derive(Debug)]
@@ -21,28 +20,7 @@ pub struct StellarProto<'a> {
     pub state: &'a mut StellarState,
 }
 
-impl<'a> Clone for StellarProto<'static> {
-    //XXX: ok?
-    fn clone(&self) -> Self {
-        unsafe {
-            use std::mem;
-            StellarProto {
-                cd: self.cd.clone(),
-                state: mem::transmute_copy(&self.state),
-            }
-        }
-    }
-}
-
 impl<'a> StellarProto<'a> {
-    //XXX: example returning moved closure that refers to self. ok?
-    fn test_callback(&mut self) -> impl FnOnce() {
-        move || {
-            //XXX: uses the unsafe clone, yes?
-            self.slot_proto(0);
-        }
-    }
-
     fn driver(&self) -> &dyn Driver {
         self.cd.driver.as_ref()
     }
@@ -52,9 +30,7 @@ impl<'a> StellarProto<'a> {
     }
 
     pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
-        let self_clone = unsafe { std::mem::transmute_copy(&self) }; //XXX: ok?
         self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
-            proxy: self_clone,
             cd: &self.cd,
             local: &mut self.state.local,
             slot,
@@ -63,12 +39,22 @@ impl<'a> StellarProto<'a> {
 }
 
 impl<'a> DriverCb for StellarProto<'a> {
-    fn received(&mut self, env: &proto::SCPEnvelope) {
-        panic!("XXX")
+    fn received_envelope(&mut self, env: &proto::SCPEnvelope) {
+        todo!("XXX")
     }
-    fn timer_expired(&mut self, slot_index: SlotIndex, timer: Timer) {
-        if let Some(sp) = &mut self.slot_proto(slot_index) {
-            sp.timer_expired(timer);
+
+    fn driver_calling_back(&mut self, cb: DriverCallback) {
+        match cb {
+            DriverCallback::BallotTimerExpired { slot_index }
+            | DriverCallback::NominationTimerExpired {
+                slot_index,
+                value: _,
+                prev_value: _,
+            } => {
+                if let Some(mut sp) = self.slot_proto(slot_index) {
+                    sp.driver_calling_back(cb);
+                }
+            }
         }
     }
 }

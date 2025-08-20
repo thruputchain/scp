@@ -7,6 +7,17 @@ pub enum Timer {
     Ballot = 1,
 }
 
+pub enum DriverCallback {
+    BallotTimerExpired {
+        slot_index: SlotIndex,
+    },
+    NominationTimerExpired {
+        slot_index: SlotIndex,
+        value: proto::SCPValue,
+        prev_value: proto::SCPValue,
+    },
+}
+
 pub trait Driver: Debug {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
@@ -44,12 +55,13 @@ pub trait Driver: Debug {
         slot_index: SlotIndex,
         timer: Timer,
         timeout: Duration,
-        cb: Box<dyn FnOnce()>,
+        cb: DriverCallback,
     );
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
 }
 
 pub trait DriverCb {
-    fn received(&mut self, env: &proto::SCPEnvelope);
-    fn timer_expired(&mut self, slot_index: SlotIndex, timer: Timer);
+    fn received_envelope(&mut self, env: &proto::SCPEnvelope);
+    //
+    fn driver_calling_back(&mut self, cb: DriverCallback);
 }

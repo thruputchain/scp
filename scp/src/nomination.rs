@@ -578,6 +578,18 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         }
         res
     }
+
+    pub fn driver_calling_back(&mut self, cb: DriverCallback) {
+        match cb {
+            DriverCallback::NominationTimerExpired {
+                slot_index: _,
+                value,
+                prev_value,
+            } => todo!(), //XXX
+            _ => {}
+        }
+    }
+
     /*
     #[instrument]
     pub fn nominate(

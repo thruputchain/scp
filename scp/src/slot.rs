@@ -8,15 +8,15 @@ pub type SlotIndex = u64;
 pub const NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING: i64 = 2;
 
 #[derive(Debug)]
-pub struct Slot {
+pub struct SlotState {
     pub slot_index: SlotIndex,
     pub nomination: NominationState,
     pub ballot: BallotState,
 }
 
-impl Slot {
+impl SlotState {
     pub fn new() -> Self {
-        Slot {
+        SlotState {
             slot_index: 0,
             nomination: NominationState::new(),
             ballot: BallotState::new(),
@@ -26,13 +26,16 @@ impl Slot {
 
 #[derive(Debug)]
 pub struct SlotProto<'a> {
-    pub proxy: &'a StellarProto<'a>,
     pub cd: &'a ConsensusDriver,
     pub local: &'a mut LocalState,
-    pub slot: &'a mut Slot,
+    pub slot: &'a mut SlotState,
 }
 
 impl<'a> SlotProto<'a> {
+    pub fn nomination_proto(&mut self) -> NominationProto<'_, 'a> {
+        NominationProto(self)
+    }
+
     pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a> {
         BallotProto(self)
     }
@@ -79,10 +82,16 @@ impl<'a> SlotProto<'a> {
         self.cd.consensus.as_ref()
     }
 
-    pub fn timer_expired(&mut self, timer: Timer) {
-        match timer {
-            Timer::Ballot => self.ballot_proto().timer_expired(),
-            Timer::Nomination => panic!("XXX"),
+    pub fn driver_calling_back(&mut self, cb: DriverCallback) {
+        match cb {
+            DriverCallback::BallotTimerExpired { slot_index: _ } => {
+                self.ballot_proto().driver_calling_back(cb)
+            }
+            DriverCallback::NominationTimerExpired {
+                slot_index: _,
+                value: _,
+                prev_value: _,
+            } => self.nomination_proto().driver_calling_back(cb),
         }
     }
 

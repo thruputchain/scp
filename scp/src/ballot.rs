@@ -531,27 +531,27 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         let driver = &self.slot().cd.driver;
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
-        //
-        // let mut _stellar = self.0.proxy.clone();
         let slot_index = self.slot().index();
         driver.start_timer(
             slot_index,
             Timer::Ballot,
             timeout,
-            Box::new(|| {}),
-            // XXX: this is not compiling
-            // Box::new(move || {
-            //     if let Some(mut slot_proto) = _stellar.slot_proto(slot_index) {
-            //         let mut ballot_proto = slot_proto.ballot_proto();
-            //         ballot_proto.timer_expired();
-            //     }
-            // }),
+            DriverCallback::BallotTimerExpired {
+                slot_index: slot_index,
+            },
         );
     }
 
     fn stop_timer(&mut self) {
         let driver = &self.slot().cd.driver;
         driver.stop_timer(self.slot().index(), Timer::Ballot);
+    }
+
+    pub fn driver_calling_back(&mut self, cb: DriverCallback) {
+        match cb {
+            DriverCallback::BallotTimerExpired { slot_index: _ } => self.timer_expired(),
+            _ => {}
+        }
     }
 
     pub fn timer_expired(&mut self) {

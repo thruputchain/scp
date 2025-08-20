@@ -39,7 +39,13 @@ pub trait Driver: Debug {
 
     fn emit_envelope(&self, env: proto::SCPEnvelope);
     fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration;
-    fn start_timer(&self, slot_index: SlotIndex, timer: Timer, timeout: Duration);
+    fn start_timer(
+        &self,
+        slot_index: SlotIndex,
+        timer: Timer,
+        timeout: Duration,
+        cb: Box<dyn FnOnce() + Send>,
+    );
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
 }
 

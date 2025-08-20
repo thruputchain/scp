@@ -17,38 +17,20 @@ pub trait Consensus: ConsensusCb + ConsensusNotify + Debug {
         nomination: bool,
     ) -> ValidationLevel;
 
-    /// `extractValidValue` transforms the value, if possible to a different
-    /// value that the local node would agree to (fully validated).
-    /// This is used during nomination when encountering an invalid value (ie
-    /// validateValue did not return `kFullyValidatedValue` for this value).
-    /// returning nullptr means no valid value could be extracted
     fn extract_valid_value(
         &self,
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> Option<proto::SCPValue>;
 
-    // `combineCandidates` computes the composite value based off a list
-    // of candidate values.
     fn combine_candidates(
         &self,
         slot_index: SCPSlotIndex,
         candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue>;
-
-    // XXX: async
-    // fn validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
-    // fn cancel_validate(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue);
 }
 
-pub trait ConsensusCb: Debug {
-    // fn validated(
-    //     &mut self,
-    //     slot_index: SCPSlotIndex,
-    //     value: &proto::SCPValue,
-    //     result: ValidationLevel,
-    // );
-}
+pub trait ConsensusCb: Debug {}
 
 pub trait ConsensusNotify: Debug {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue);

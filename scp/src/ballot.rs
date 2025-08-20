@@ -531,7 +531,22 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         let driver = &self.slot().cd.driver;
         let timeout =
             driver.compute_timeout(self.ballot().current.as_ref().unwrap().counter, false);
-        driver.start_timer(self.slot().index(), Timer::Ballot, timeout);
+        //
+        let _stellar = self.0.proxy.clone();
+        let slot_index = self.slot().index();
+        driver.start_timer(
+            slot_index,
+            Timer::Ballot,
+            timeout,
+            Box::new(|| {}),
+            // XXX: this is not compiling
+            // Box::new(move || {
+            //     if let Some(slot_proto) = _stellar.slot_proto(slot_index) {
+            //         // let ballot_proto = slot_proto.ballot_proto();
+            //         // ballot_proto.timer_expired();
+            //     }
+            // }),
+        );
     }
 
     fn stop_timer(&mut self) {

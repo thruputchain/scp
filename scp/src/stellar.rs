@@ -17,11 +17,32 @@ pub struct StellarState {
 
 #[derive(Debug)]
 pub struct StellarProto<'a> {
-    cd: ConsensusDriver,
-    state: &'a mut StellarState,
+    pub cd: ConsensusDriver,
+    pub state: &'a mut StellarState,
+}
+
+impl<'a> Clone for StellarProto<'a> {
+    //XXX: ok?
+    fn clone(&self) -> Self {
+        unsafe {
+            use std::mem;
+            StellarProto {
+                cd: self.cd.clone(),
+                state: mem::transmute_copy(&self.state),
+            }
+        }
+    }
 }
 
 impl<'a> StellarProto<'a> {
+    //XXX: example returning moved closure that refers to self. ok?
+    fn test_callback(&mut self) -> impl FnOnce() {
+        move || {
+            //XXX: uses the unsafe clone, yes?
+            self.slot_proto(0);
+        }
+    }
+
     fn driver(&self) -> &dyn Driver {
         self.cd.driver.as_ref()
     }
@@ -30,8 +51,10 @@ impl<'a> StellarProto<'a> {
         self.cd.consensus.as_ref()
     }
 
-    fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
+    pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
+        let self_clone = unsafe { std::mem::transmute_copy(&self) }; //XXX: ok?
         self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
+            proxy: self_clone,
             cd: &self.cd,
             local: &mut self.state.local,
             slot,

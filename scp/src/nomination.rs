@@ -579,18 +579,6 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         res
     }
 
-    pub fn driver_calling_back(&mut self, cb: DriverCallback) {
-        match cb {
-            DriverCallback::NominationTimerExpired {
-                slot_index: _,
-                value,
-                prev_value,
-            } => todo!(), //XXX
-            _ => {}
-        }
-    }
-
-    /*
     #[instrument]
     pub fn nominate(
         &mut self,
@@ -636,7 +624,6 @@ impl<'a, 'b> NominationProto<'a, 'b> {
             .driver()
             .compute_timeout(self.nomination().round_number, true);
 
-        // XXX: check from here
         // Add a few more values from other leaders
         for leader in self.nomination().round_leaders.clone().iter() {
             if let Some(latest_nomination) = self.nomination().latest_nominations.get(leader) {
@@ -668,15 +655,15 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
         // Setup timer for next nomination round
         let slot_index = self.slot().index();
-        let value_clone = value.clone();
-        let previous_value_clone = previous_value.clone();
-        self.driver().setup_timer(
+        self.driver().start_timer(
             slot_index,
             Timer::Nomination,
             timeout,
-            Box::new(move |slot_proto| {
-                self.nominate(&value_clone, &previous_value_clone, true);
-            }),
+            DriverCallback::NominationTimerExpired {
+                slot_index: slot_index,
+                value: value.clone(),
+                prev_value: previous_value.clone(),
+            },
         );
 
         if updated {
@@ -687,5 +674,17 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
         updated
     }
-    */
+
+    pub fn driver_calling_back(&mut self, cb: DriverCallback) {
+        match cb {
+            DriverCallback::NominationTimerExpired {
+                slot_index: _,
+                value,
+                prev_value,
+            } => {
+                self.nominate(&value, &prev_value, true);
+            }
+            _ => {}
+        }
+    }
 }

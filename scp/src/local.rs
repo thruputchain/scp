@@ -1,5 +1,7 @@
 use crate::*;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use tracing::instrument;
 use xdr_common::VecM;
 
@@ -61,18 +63,18 @@ impl LocalState {
 }
 
 #[derive(Debug)]
-pub struct LocalProto<'a, C: Consensus, D: Driver> {
-    pub cd: &'a ConsensusDriver<C, D>,
+pub struct LocalProto<'a> {
+    pub cd: &'a ConsensusDriver,
     pub local: &'a LocalState,
 }
 
 #[derive(Debug)]
-pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
-    pub cd: &'a ConsensusDriver<C, D>,
+pub struct LocalProtoMut<'a> {
+    pub cd: &'a ConsensusDriver,
     pub local: &'a mut LocalState,
 }
 
-impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
+impl<'a> LocalProtoMut<'a> {
     #[instrument]
     pub fn update_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         let mut normalized_qset = qset.clone();
@@ -86,7 +88,7 @@ impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
     }
 }
 
-impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
+impl<'a> LocalProto<'a> {
     pub fn get_qset(&self) -> &proto::SCPQuorumSet {
         &self.local.qset
     }
@@ -107,7 +109,10 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         self.local.is_validator
     }
 
-    pub fn for_all_nodes<F>(qset: &proto::SCPQuorumSet, mut proc: F) -> bool
+    pub fn for_all_nodes<F>(
+        qset: &proto::SCPQuorumSet,
+        proc: &mut F,
+    ) -> bool 
     where
         F: FnMut(&proto::SCPNodeID) -> bool,
     {
@@ -118,7 +123,7 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         }
 
         for inner_qset in qset.inner_sets.iter() {
-            if !Self::for_all_nodes(inner_qset, &mut proc) {
+            if !Self::for_all_nodes(inner_qset, proc) {
                 return false;
             }
         }
@@ -368,13 +373,13 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
 
     /// Convert quorum set to JSON representation
     pub fn to_json(&self, qset: &proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
-        Self::to_json_with_formatter(qset, |node_id| {
+        Self::to_json_with_formatter(qset, &|node_id| {
             self.cd.driver.to_str_key(node_id, full_keys)
         })
     }
 
     /// Convert quorum set to JSON with custom node formatter
-    pub fn to_json_with_formatter<F>(qset: &proto::SCPQuorumSet, formatter: F) -> serde_json::Value
+    pub fn to_json_with_formatter<F>(qset: &proto::SCPQuorumSet, formatter: &F) -> serde_json::Value
     where
         F: Fn(&proto::SCPNodeID) -> String,
     {
@@ -399,7 +404,7 @@ impl<'a, 'b, C: Consensus, D: Driver> LocalProto<'a, C, D> {
 
         // Recursively add inner sets
         for inner_set in qset.inner_sets.iter() {
-            entries.push(Self::to_json_with_formatter(inner_set, &formatter));
+            entries.push(Self::to_json_with_formatter(inner_set, formatter));
         }
 
         ret.insert("v".to_string(), serde_json::Value::Array(entries));

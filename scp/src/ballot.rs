@@ -46,14 +46,14 @@ impl BallotState {
 }
 
 #[derive(Debug)]
-pub struct BallotProto<'a, 'b, C: Consensus, D: Driver>(pub &'a mut SlotProto<'b, C, D>);
+pub struct BallotProto<'a, 'b>(pub &'a mut SlotProto<'b>);
 
-impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
-    fn slot_mut(&mut self) -> &mut SlotProto<'b, C, D> {
+impl<'a, 'b> BallotProto<'a, 'b> {
+    fn slot_mut(&mut self) -> &mut SlotProto<'b> {
         self.0
     }
 
-    fn slot(&self) -> &SlotProto<'b, C, D> {
+    fn slot(&self) -> &SlotProto<'b> {
         self.0
     }
 
@@ -65,11 +65,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.slot_mut().ballot_mut()
     }
 
-    fn driver(&self) -> &D {
+    fn driver(&self) -> &dyn Driver {
         self.slot().driver()
     }
 
-    fn consensus(&self) -> &C {
+    fn consensus(&self) -> &dyn Consensus {
         self.slot().consensus()
     }
 
@@ -187,8 +187,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
         let statement = &env.statement;
 
-        fn check_valid<'a, 'b, C: Consensus, D: Driver>(
-            ballot_proto: &mut BallotProto<'a, 'b, C, D>,
+        fn check_valid<'a, 'b>(
+            ballot_proto: &mut BallotProto<'a, 'b>,
             statement: &proto::SCPStatement,
             ours: bool,
             env: &proto::SCPEnvelope,
@@ -1097,7 +1097,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // therefore the local node will not flip flop between "seen" and "not seen"
         // for a given counter on the local node
         if let Some(current_ballot) = &self.ballot().current.clone() {
-            let is_quorum = LocalProto::<C, D>::is_quorum(
+            let is_quorum = LocalProto::is_quorum(
                 self.slot().local_proto().get_qset(),
                 &self.ballot().latest_envelopes,
                 |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {

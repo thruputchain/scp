@@ -9,7 +9,7 @@ pub enum ValidationLevel {
     FullyValid = 2, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
-pub trait Consensus: ConsensusCb + ConsensusNotify + Debug + Clone {
+pub trait Consensus: ConsensusCb + ConsensusNotify + Debug {
     fn validate_value(
         &self,
         slot_index: SCPSlotIndex,

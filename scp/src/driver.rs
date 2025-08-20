@@ -7,7 +7,7 @@ pub enum Timer {
     Ballot = 1,
 }
 
-pub trait Driver: Debug + Clone {
+pub trait Driver: Debug {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
     fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;

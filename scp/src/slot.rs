@@ -25,25 +25,25 @@ impl Slot {
 }
 
 #[derive(Debug)]
-pub struct SlotProto<'a, C: Consensus, D: Driver> {
-    pub cd: &'a ConsensusDriver<C, D>,
+pub struct SlotProto<'a> {
+    pub cd: &'a ConsensusDriver,
     pub local: &'a mut LocalState,
     pub slot: &'a mut Slot,
 }
 
-impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
-    pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a, C, D> {
+impl<'a> SlotProto<'a> {
+    pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a> {
         BallotProto(self)
     }
 
-    pub fn local_proto(&self) -> LocalProto<'_, C, D> {
+    pub fn local_proto(&self) -> LocalProto<'_> {
         LocalProto {
             cd: self.cd,
             local: self.local,
         }
     }
 
-    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, C, D> {
+    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_> {
         LocalProtoMut {
             cd: self.cd,
             local: self.local,
@@ -70,12 +70,12 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         &mut self.slot.nomination
     }
 
-    pub fn driver(&self) -> &D {
-        &self.cd.driver
+    pub fn driver(&self) -> &dyn Driver {
+        self.cd.driver.as_ref()
     }
 
-    pub fn consensus(&self) -> &C {
-        &self.cd.consensus
+    pub fn consensus(&self) -> &dyn Consensus {
+        self.cd.consensus.as_ref()
     }
 
     pub fn timer_expired(&mut self, timer: Timer) {

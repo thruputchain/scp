@@ -272,6 +272,66 @@ impl<'a> StellarProto<'a> {
             serde_json::Value::Object(serde_json::Map::new())
         }
     }
+
+    pub fn is_slot_fully_validated(&mut self, slot_index: SlotIndex) -> bool {
+        if let Some(slot) = self.slot_proto(slot_index) {
+            slot.is_fully_validated()
+        } else {
+            false
+        }
+    }
+
+    pub fn got_vblocking(&mut self, slot_index: SlotIndex) -> bool {
+        if let Some(slot) = self.slot_proto(slot_index) {
+            slot.got_vblocking()
+        } else {
+            false
+        }
+    }
+
+    pub fn get_known_slots_count(&self) -> usize {
+        self.state.known_slots.len()
+    }
+
+    pub fn get_cumulative_statement_count(&mut self) -> usize {
+        let mut count = 0;
+        for slot_index in self.state.known_slots.keys().cloned().collect::<Vec<_>>() {
+            if let Some(slot) = self.slot_proto(slot_index) {
+                count += slot.get_statement_count();
+            }
+        }
+        count
+    }
+
+    pub fn get_latest_messages_send(&mut self, slot_index: SlotIndex) -> Vec<proto::SCPEnvelope> {
+        if let Some(mut slot) = self.slot_proto(slot_index) {
+            slot.get_latest_messages_send()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn set_state_from_envelope(
+        &mut self,
+        slot_index: SlotIndex,
+        envelope: &proto::SCPEnvelope,
+    ) {
+        let mut slot = self.slot_proto_or_create(slot_index);
+        slot.set_state_from_envelope(envelope);
+    }
+
+    pub fn empty(&self) -> bool {
+        self.state.known_slots.is_empty()
+    }
+
+    pub fn process_current_state<F>(&mut self, slot_index: SlotIndex, f: &mut F, force_self: bool)
+    where
+        F: FnMut(&proto::SCPEnvelope) -> bool,
+    {
+        if let Some(mut slot) = self.slot_proto(slot_index) {
+            slot.process_current_state(f, force_self)
+        }
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

@@ -353,7 +353,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     }
 
     #[instrument]
-    fn abandon_ballot(&mut self, n: u32) -> bool {
+    pub fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
             Some(w) => {
@@ -390,7 +390,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     }
 
     #[instrument]
-    fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
+    pub fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
         let n = match &self.ballot_state().current {
             Some(b) => {
                 if !force {
@@ -666,7 +666,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         };
 
         let statement = self.create_statement(statement_type);
-        let envelope = self.slot_proto().create_envelope(statement);
+        let envelope = self.slot_proto_mut().create_envelope(statement);
 
         let can_emit = self.ballot_state().current.is_some();
 

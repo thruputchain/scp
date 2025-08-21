@@ -1,5 +1,5 @@
 use crate::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 pub type SlotIndex = u64;
@@ -192,16 +192,56 @@ impl<'a> SlotProto<'a> {
         result
     }
 
+    pub fn abandon_ballot(&mut self) -> bool {
+        self.ballot_proto().abandon_ballot(0)
+    }
+
+    pub fn bump_state(&mut self, value: &proto::SCPValue, force: bool) -> bool {
+        self.ballot_proto().bump_state(value.clone(), force)
+    }
+
+    pub fn nominate(
+        &mut self,
+        value: &proto::SCPValue,
+        previous_value: &proto::SCPValue,
+        timed_out: bool,
+    ) -> bool {
+        self.nomination_proto()
+            .nominate(value, previous_value, timed_out)
+    }
+
+    pub fn stop_nomination(&mut self) {
+        self.nomination_proto().stop_nomination()
+    }
+
+    pub fn get_nomination_leaders(&mut self) -> HashSet<proto::SCPNodeID> {
+        self.nomination_proto().get_leaders()
+    }
+
     pub fn set_fully_validated(&mut self, validated: bool) {
-        panic!("XXX")
+        self.slot_state.fully_validated = validated;
     }
 
     pub fn get_latest_composite_candidate(&mut self) -> Option<proto::SCPValue> {
         self.nomination_proto().get_latest_composite_candidate()
     }
 
-    pub fn create_envelope(&self, statement: proto::SCPStatement) -> proto::SCPEnvelope {
-        panic!("XXX")
+    pub fn create_envelope(&mut self, statement: proto::SCPStatement) -> proto::SCPEnvelope {
+        use proto::{Ed25519Signature, Signature};
+
+        let mut envelope = proto::SCPEnvelope {
+            statement: statement,
+            signature: Signature::Ed25519 {
+                ed25519: Ed25519Signature::new([0u8; 64]),
+            },
+        };
+
+        envelope.statement.node_id = self.local_proto().get_node_id().clone();
+        envelope.statement.slot_index = self.index();
+
+        self.driver().sign_envelope(&mut envelope);
+
+        envelope
     }
 
     pub fn is_fully_validated(&self) -> bool {
@@ -272,14 +312,6 @@ impl<'a> SlotProto<'a> {
     where
         F: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX")
-    }
-
-    pub fn stop_nomination(&mut self) {
-        panic!("XXX")
-    }
-
-    pub fn bump_state(&mut self, value: &proto::SCPValue, force: bool) -> bool {
         panic!("XXX")
     }
 

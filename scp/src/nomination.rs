@@ -40,28 +40,28 @@ impl NominationState {
 pub struct NominationProto<'a, 'b>(pub &'a mut SlotProto<'b>);
 
 impl<'a, 'b> NominationProto<'a, 'b> {
-    fn slot_mut(&mut self) -> &mut SlotProto<'b> {
+    fn slot_proto_mut(&mut self) -> &mut SlotProto<'b> {
         self.0
     }
 
-    fn slot(&self) -> &SlotProto<'b> {
+    fn slot_proto(&self) -> &SlotProto<'b> {
         self.0
     }
 
     fn nomination(&self) -> &NominationState {
-        self.slot().nomination()
+        self.slot_proto().nomination()
     }
 
     fn nomination_mut(&mut self) -> &mut NominationState {
-        self.slot_mut().nomination_mut()
+        self.slot_proto_mut().nomination_mut()
     }
 
     fn driver(&self) -> &dyn Driver {
-        self.slot().driver()
+        self.slot_proto().driver()
     }
 
     fn consensus(&self) -> &dyn Consensus {
-        self.slot().consensus()
+        self.slot_proto().consensus()
     }
 
     pub fn is_newer_node_statement(
@@ -162,14 +162,14 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         self.nomination_mut()
             .latest_nominations
             .insert(node_id.clone(), env.clone());
-        self.slot_mut().record_statement(&env.statement);
+        self.slot_proto_mut().record_statement(&env.statement);
     }
 
     #[instrument]
     pub fn emit_nomination(&mut self) {
         // Create SCP statement for nomination
-        let node_id = self.slot().local_proto().get_node_id().clone();
-        let qset_hash = *self.slot().local_proto().get_qset_hash();
+        let node_id = self.slot_proto().local_proto().get_node_id().clone();
+        let qset_hash = *self.slot_proto().local_proto().get_qset_hash();
 
         // Create the nomination statement
         let mut votes = VecM(vec![]);
@@ -197,17 +197,17 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
         let statement = proto::SCPStatement {
             node_id,
-            slot_index: self.slot().index(),
+            slot_index: self.slot_proto().index(),
             pledges: proto::SCPStatement_pledges::SCP_ST_NOMINATE {
                 nominate: nominate.clone(),
             },
         };
 
         // Create envelope
-        let envelope = self.slot().create_envelope(statement.clone());
+        let envelope = self.slot_proto_mut().create_envelope(statement.clone());
 
         // Process the envelope first - this is crucial!
-        match self.slot_mut().process_envelope(&envelope, true) {
+        match self.slot_proto_mut().process_envelope(&envelope, true) {
             EnvelopeState::Valid => {
                 // Check if this statement is newer than our last envelope
                 let should_update = match &self.nomination().last_envelope {
@@ -226,7 +226,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                 if should_update {
                     self.nomination_mut().last_envelope = Some(envelope.clone());
 
-                    if self.slot().is_fully_validated() {
+                    if self.slot_proto().is_fully_validated() {
                         self.driver().emit_envelope(envelope);
                     }
                 }
@@ -268,8 +268,8 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
     #[instrument]
     pub fn update_round_leaders(&mut self) {
-        let mut my_qset = self.slot().local_proto().get_qset().clone();
-        let local_id = self.slot().local_proto().get_node_id().clone();
+        let mut my_qset = self.slot_proto().local_proto().get_qset().clone();
+        let local_id = self.slot_proto().local_proto().get_node_id().clone();
 
         // Normalize qset (excludes self)
         crate::qset::normalize_qset(&mut my_qset, Some(&local_id));
@@ -344,7 +344,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
     #[instrument]
     fn get_node_priority(&self, node_id: &proto::SCPNodeID, qset: &proto::SCPQuorumSet) -> u64 {
-        let is_local = node_id == self.slot().local_proto().get_node_id();
+        let is_local = node_id == self.slot_proto().local_proto().get_node_id();
         let weight = self.driver().get_node_weight(node_id, qset, is_local);
 
         // if weight > 0; weight is inclusive here as
@@ -360,7 +360,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
     fn hash_node(&self, is_priority: bool, node_id: &proto::SCPNodeID) -> u64 {
         if let Some(ref previous_value) = self.nomination().previous_value {
             self.driver().compute_hash_node(
-                self.slot().index(),
+                self.slot_proto().index(),
                 previous_value,
                 is_priority,
                 self.nomination().round_number,
@@ -375,7 +375,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
     fn hash_value(&self, value: &proto::SCPValue) -> u64 {
         if let Some(ref previous_value) = self.nomination().previous_value {
             self.driver().compute_value_hash(
-                self.slot().index(),
+                self.slot_proto().index(),
                 previous_value,
                 self.nomination().round_number,
                 value,
@@ -435,13 +435,13 @@ impl<'a, 'b> NominationProto<'a, 'b> {
     #[instrument]
     fn validate_value(&self, value: &proto::SCPValue) -> ValidationLevel {
         self.consensus()
-            .validate_nomination_value(self.slot().index(), value)
+            .validate_nomination_value(self.slot_proto().index(), value)
     }
 
     #[instrument]
     fn extract_valid_value(&self, value: &proto::SCPValue) -> Option<proto::SCPValue> {
         self.consensus()
-            .extract_valid_value(self.slot().index(), value)
+            .extract_valid_value(self.slot_proto().index(), value)
     }
 
     #[instrument]
@@ -486,7 +486,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                     let accept_predicate =
                         |st: &proto::SCPStatement| -> bool { Self::accept_predicate(v, st) };
 
-                    if self.slot().federated_accept(
+                    if self.slot_proto().federated_accept(
                         votes_predicate,
                         accept_predicate,
                         &self.nomination().latest_nominations,
@@ -518,14 +518,14 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                         |st: &proto::SCPStatement| -> bool { Self::accept_predicate(a, st) };
 
                     if self
-                        .slot()
+                        .slot_proto()
                         .federated_ratify(accept_predicate, &self.nomination().latest_nominations)
                     {
                         self.nomination_mut().candidates.insert(a.clone());
                         new_candidates = true;
                         // Stop the timer, as there's no need to continue nominating
                         self.driver()
-                            .stop_timer(self.slot().index(), Timer::Nomination);
+                            .stop_timer(self.slot_proto().index(), Timer::Nomination);
                     }
                 }
 
@@ -537,7 +537,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                         if self.nomination_mut().votes.insert(new_vote.clone()) {
                             modified = true;
                             self.consensus()
-                                .nominating_value(self.slot().index(), &new_vote);
+                                .nominating_value(self.slot_proto().index(), &new_vote);
                         } else {
                             panic!("bug")
                         }
@@ -550,14 +550,14 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
                 if new_candidates {
                     // Combine candidates and update state
-                    if let Some(composite) = self
-                        .consensus()
-                        .combine_candidates(self.slot().index(), &self.nomination().candidates)
-                    {
+                    if let Some(composite) = self.consensus().combine_candidates(
+                        self.slot_proto().index(),
+                        &self.nomination().candidates,
+                    ) {
                         self.nomination_mut().latest_composite_candidate = Some(composite.clone());
                         self.consensus()
-                            .updated_candidate_value(self.slot().index(), &composite);
-                        self.slot_mut().bump_state(&composite, false);
+                            .updated_candidate_value(self.slot_proto().index(), &composite);
+                        self.slot_proto_mut().bump_state(&composite, false);
                     }
                 }
             }
@@ -634,7 +634,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                         if self.nomination_mut().votes.insert(new_vote.clone()) {
                             updated = true;
                             self.consensus()
-                                .nominating_value(self.slot().index(), &new_vote);
+                                .nominating_value(self.slot_proto().index(), &new_vote);
                         }
                     }
                 }
@@ -642,19 +642,19 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         }
 
         // If we're leader, add our value if we haven't added any votes yet
-        let local_node_id = self.slot().local_proto().get_node_id().clone();
+        let local_node_id = self.slot_proto().local_proto().get_node_id().clone();
         if self.nomination().round_leaders.contains(&local_node_id)
             && self.nomination().votes.is_empty()
         {
             if self.nomination_mut().votes.insert(value.clone()) {
                 updated = true;
                 self.consensus()
-                    .nominating_value(self.slot().index(), value);
+                    .nominating_value(self.slot_proto().index(), value);
             }
         }
 
         // Setup timer for next nomination round
-        let slot_index = self.slot().index();
+        let slot_index = self.slot_proto().index();
         self.driver().start_timer(
             slot_index,
             Timer::Nomination,
@@ -736,7 +736,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
     ) -> QuorumInfoNodeState {
         let mut state = QuorumInfoNodeState::Agree;
 
-        if node_id == self.slot().local_proto().get_node_id() {
+        if node_id == self.slot_proto().local_proto().get_node_id() {
             // always mark myself as AGREE.
             return state;
         }
@@ -832,8 +832,8 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         for (node_id, envelope) in &self.nomination().latest_nominations {
             // only return messages for self if the slot is fully validated
             if force_self
-                || node_id != self.slot().local_proto().get_node_id()
-                || self.slot().is_fully_validated()
+                || node_id != self.slot_proto().local_proto().get_node_id()
+                || self.slot_proto().is_fully_validated()
             {
                 if !f(envelope) {
                     return false;

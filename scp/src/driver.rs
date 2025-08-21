@@ -47,6 +47,7 @@ pub trait Driver: Debug {
         round_number: proto::SCPCount,
         value: &proto::SCPValue,
     ) -> u64;
+    fn sign_envelope(&self, env: &mut proto::SCPEnvelope);
 
     fn emit_envelope(&self, env: proto::SCPEnvelope);
     fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration;

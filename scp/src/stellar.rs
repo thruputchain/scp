@@ -133,6 +133,31 @@ impl<'a> StellarProto<'a> {
             self.state.known_slots.remove(&slot_index);
         }
     }
+
+    pub fn get_json_info(&mut self, limit: usize, full_keys: bool) -> serde_json::Value {
+        let mut ret = serde_json::Map::new();
+        
+        // Get slot indices in descending order
+        let mut slot_indices: Vec<SlotIndex> = self.state.known_slots.keys().cloned().collect();
+        slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
+        
+        let mut count = 0;
+        for slot_index in slot_indices {
+            if count >= limit {
+                break;
+            }
+            
+            if let Some(mut slot_proto) = self.slot_proto(slot_index) {
+                ret.insert(
+                    slot_index.to_string(),
+                    slot_proto.get_json_info(full_keys),
+                );
+            }
+            count += 1;
+        }
+        
+        serde_json::Value::Object(ret)
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

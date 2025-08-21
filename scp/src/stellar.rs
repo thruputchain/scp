@@ -83,6 +83,17 @@ impl<'a> StellarProto<'a> {
     pub fn get_highest_known_slot_index(&self) -> SlotIndex {
         self.state.known_slots.keys().max().cloned().unwrap_or(0)
     }
+
+    pub fn nominate(
+        &mut self,
+        slot_index: SlotIndex,
+        value: &proto::SCPValue,
+        prev_value: &proto::SCPValue,
+    ) -> bool {
+        assert!(self.is_validator());
+        self.slot_proto_or_create(slot_index)
+            .nominate(value, prev_value, false)
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

@@ -400,6 +400,18 @@ impl<'a> SlotProto<'a> {
         self.slot_state.got_vblocking
     }
 
+    pub fn get_entire_current_state(&mut self) -> Vec<proto::SCPEnvelope> {
+        let mut res = Vec::new();
+        self.process_current_state(
+            &mut |envelope: &proto::SCPEnvelope| {
+                res.push(envelope.clone());
+                true
+            },
+            true,
+        );
+        res
+    }
+
     pub fn get_latest_messages_send(&mut self) -> Vec<proto::SCPEnvelope> {
         let mut res = Vec::new();
 

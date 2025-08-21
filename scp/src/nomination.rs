@@ -569,7 +569,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         }
     }
 
-    pub fn get_statement_values(&self, st: &proto::SCPStatement) -> Vec<proto::SCPValue> {
+    pub fn get_statement_values(st: &proto::SCPStatement) -> Vec<proto::SCPValue> {
         let mut res = Vec::new();
         if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
             Self::apply_all(nom, |v| {

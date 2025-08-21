@@ -1857,7 +1857,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         res
     }
 
-    fn get_state(&self, n: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
+    pub fn get_state(&self, n: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
         let mut state = QuorumInfoNodeState::Agree;
 
         if n == self.slot_proto().local_proto().get_node_id() {

@@ -133,11 +133,49 @@ impl<'a> SlotProto<'a> {
         }
     }
 
+    pub fn get_statement_values(statement: &proto::SCPStatement) -> Vec<proto::SCPValue> {
+        match &statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                NominationProto::get_statement_values(&statement)
+            }
+            _ => {
+                let vals = BallotProto::get_statement_values(statement);
+                vals.into_iter().collect()
+            }
+        }
+    }
+
     pub fn get_quorum_set_from_statement(
         &self,
         statement: &proto::SCPStatement,
     ) -> Option<proto::SCPQuorumSet> {
-        panic!("XXX")
+        match &statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. } => {
+                Some(self.local_proto().get_singleton_qset(&statement.node_id))
+            }
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                self.driver().get_qset(&prepare.quorum_set_hash).cloned()
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                self.driver().get_qset(&confirm.quorum_set_hash).cloned()
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+                self.driver().get_qset(&nominate.quorum_set_hash).cloned()
+            }
+        }
+    }
+
+    pub fn get_state(
+        &mut self,
+        node: &proto::SCPNodeID,
+        self_already_moved_on: bool,
+    ) -> QuorumInfoNodeState {
+        let ballot_state = self.ballot_proto().get_state(node, self_already_moved_on);
+        if ballot_state != QuorumInfoNodeState::NoInfo {
+            return ballot_state;
+        }
+        self.nomination_proto()
+            .get_state(node, self_already_moved_on)
     }
 
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {

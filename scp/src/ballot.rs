@@ -1928,7 +1928,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         state
     }
 
-    fn get_json_quorum_info(
+    pub fn get_json_quorum_info(
         &self,
         id: &proto::SCPNodeID,
         summary: bool,

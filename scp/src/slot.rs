@@ -329,11 +329,26 @@ impl<'a> SlotProto<'a> {
         })
     }
 
+    pub fn get_json_quorum_info(
+        &mut self,
+        id: &proto::SCPNodeID,
+        summary: bool,
+        full_keys: bool,
+    ) -> serde_json::Value {
+        let mut ret = self.ballot_proto().get_json_quorum_info(id, summary, full_keys);
+        
+        if self.local_proto().is_validator() {
+            ret["validated"] = serde_json::Value::Bool(self.is_fully_validated());
+        }
+        
+        ret
+    }
+
     pub fn federated_accept<F1, F2>(
         &self,
-        voted: F1,
-        accepted: F2,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        _voted: F1,
+        _accepted: F2,
+        _envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
     ) -> bool
     where
         F1: Fn(&proto::SCPStatement) -> bool,
@@ -344,8 +359,8 @@ impl<'a> SlotProto<'a> {
 
     pub fn federated_ratify<F>(
         &self,
-        voted: F,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        _voted: F,
+        _envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
     ) -> bool
     where
         F: Fn(&proto::SCPStatement) -> bool,

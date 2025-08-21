@@ -8,6 +8,16 @@ pub struct ConsensusDriver {
     pub driver: Rc<dyn Driver>,
 }
 
+impl ConsensusDriver {
+    pub fn envelope_to_str(&self, env: &proto::SCPEnvelope, full_keys: bool) -> String {
+        self.statement_to_str(&env.statement, full_keys)
+    }
+
+    pub fn statement_to_str(&self, st: &proto::SCPStatement, full_keys: bool) -> String {
+        todo!("XXX")
+    }
+}
+
 #[derive(Debug)]
 pub struct StellarState {
     local: LocalState,

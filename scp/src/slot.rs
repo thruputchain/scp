@@ -1,5 +1,5 @@
 use crate::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::SystemTime;
 
 pub type SlotIndex = u64;
@@ -20,9 +20,9 @@ pub struct SlotState {
 
 #[derive(Debug, Clone)]
 pub struct HistoricalStatement {
-    when: SystemTime,
-    statement: proto::SCPStatement,
-    validated: bool,
+    pub when: SystemTime,
+    pub statement: proto::SCPStatement,
+    pub validated: bool,
 }
 
 impl SlotState {
@@ -114,6 +114,25 @@ impl<'a> SlotProto<'a> {
         }
     }
 
+    pub fn get_companion_quorum_set_hash_from_statement(
+        statement: &proto::SCPStatement,
+    ) -> proto::SCPHash {
+        match &statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                prepare.quorum_set_hash.clone()
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                confirm.quorum_set_hash.clone()
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                externalize.commit_quorum_set_hash.clone()
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+                nominate.quorum_set_hash.clone()
+            }
+        }
+    }
+
     pub fn get_quorum_set_from_statement(
         &self,
         statement: &proto::SCPStatement,
@@ -122,7 +141,55 @@ impl<'a> SlotProto<'a> {
     }
 
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
-        panic!("XXX")
+        assert_eq!(envelope.statement.slot_index, self.index());
+
+        tracing::trace!(
+            envelope = ?envelope,
+            slot_index = self.index(),
+            "slot proto process_envelope"
+        );
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            match &envelope.statement.pledges {
+                proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                    self.nomination_proto().process_envelope(envelope)
+                }
+                _ => self.ballot_proto().process_envelope(envelope, ours),
+            }
+        }));
+
+        let result = match result {
+            Ok(envelope_state) => envelope_state,
+            Err(panic_payload) => {
+                let local_node_id = self.local_proto().get_node_id().clone();
+                tracing::error!(
+                    local_node_id = ?local_node_id,
+                    "SCP context"
+                );
+                let json_info = self.get_json_info(false);
+                tracing::error!(
+                    json_info = %serde_json::to_string_pretty(&json_info).unwrap_or_else(|_| "failed to serialize".to_string()),
+                    "slot JSON info"
+                );
+                tracing::error!(
+                    slot_index = self.index(),
+                    envelope = ?envelope,
+                    "exception processing SCP messages"
+                );
+                tracing::error!("REPORT_INTERNAL_BUG");
+
+                std::panic::resume_unwind(panic_payload);
+            }
+        };
+
+        let had_previous_message = self
+            .get_latest_message(&envelope.statement.node_id)
+            .is_some();
+        if !had_previous_message && result == EnvelopeState::Valid {
+            self.maybe_set_got_vblocking();
+        }
+
+        result
     }
 
     pub fn set_fully_validated(&mut self, validated: bool) {
@@ -138,7 +205,50 @@ impl<'a> SlotProto<'a> {
     }
 
     pub fn is_fully_validated(&self) -> bool {
-        panic!("XXX")
+        self.slot_state.fully_validated
+    }
+
+    pub fn get_json_info(&mut self, full_keys: bool) -> serde_json::Value {
+        use serde_json::{Value, json};
+
+        let mut statements = Vec::new();
+        let mut qsets_used: HashMap<proto::SCPHash, proto::SCPQuorumSet> = HashMap::new();
+
+        for item in self.slot_state.statements_history.iter() {
+            let mut statement_array = Vec::new();
+
+            if let Ok(duration) = item.when.duration_since(std::time::UNIX_EPOCH) {
+                statement_array.push(Value::Number(serde_json::Number::from(duration.as_secs())));
+            } else {
+                statement_array.push(Value::Number(serde_json::Number::from(0u64)));
+            }
+
+            statement_array.push(Value::String(
+                self.cd.statement_to_str(&item.statement, full_keys),
+            ));
+            statement_array.push(Value::Bool(item.validated));
+
+            let qset_hash = Self::get_companion_quorum_set_hash_from_statement(&item.statement);
+            if let Some(qset) = self.driver().get_qset(&qset_hash) {
+                qsets_used.insert(qset_hash, qset.clone());
+            }
+
+            statements.push(Value::Array(statement_array));
+        }
+
+        let mut quorum_sets_obj = serde_json::Map::new();
+        for (hash, qset) in qsets_used {
+            let hash_abbrev = hex_abbrev(&hash);
+            quorum_sets_obj.insert(hash_abbrev, self.local_proto().to_json(&qset, full_keys));
+        }
+
+        json!({
+            "statements": statements,
+            "quorum_sets": quorum_sets_obj,
+            "validated": self.slot_state.fully_validated,
+            "nomination_proto": self.nomination_proto().get_json_info(),
+            "ballot_proto": self.ballot_proto().get_json_info()
+        })
     }
 
     pub fn federated_accept<F1, F2>(

@@ -109,10 +109,7 @@ impl<'a> LocalProto<'a> {
         self.local.is_validator
     }
 
-    pub fn for_all_nodes<F>(
-        qset: &proto::SCPQuorumSet,
-        proc: &mut F,
-    ) -> bool 
+    pub fn for_all_nodes<F>(qset: &proto::SCPQuorumSet, proc: &mut F) -> bool
     where
         F: FnMut(&proto::SCPNodeID) -> bool,
     {
@@ -371,14 +368,12 @@ impl<'a> LocalProto<'a> {
         Self::find_closest_v_blocking_nodes(qset, &nodes, excluded)
     }
 
-    /// Convert quorum set to JSON representation
     pub fn to_json(&self, qset: &proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
         Self::to_json_with_formatter(qset, &|node_id| {
             self.cd.driver.to_str_key(node_id, full_keys)
         })
     }
 
-    /// Convert quorum set to JSON with custom node formatter
     pub fn to_json_with_formatter<F>(qset: &proto::SCPQuorumSet, formatter: &F) -> serde_json::Value
     where
         F: Fn(&proto::SCPNodeID) -> String,

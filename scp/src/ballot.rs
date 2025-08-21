@@ -2079,7 +2079,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         format!("{:?}", state)
     }
 
-    fn get_json_info(&self) -> serde_json::Value {
+    pub fn get_json_info(&self) -> serde_json::Value {
         json!({
            "heard": self.ballot_state().heard_from_quorum,
            "ballot": self.ballot_to_str(self.ballot_state().current.as_ref()),

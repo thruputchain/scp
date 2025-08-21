@@ -31,20 +31,16 @@ pub struct StellarProto<'a> {
 }
 
 impl<'a> StellarProto<'a> {
-    fn driver(&self) -> &dyn Driver {
-        self.cd.driver.as_ref()
-    }
-
-    fn consensus(&self) -> &dyn Consensus {
-        self.cd.consensus.as_ref()
-    }
-
     pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
         self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
             cd: &self.cd,
             local_state: &mut self.state.local,
             slot_state: slot,
         })
+    }
+
+    pub fn get_highest_known_slot_index(&self) -> SlotIndex {
+        self.state.slot.keys().max().cloned().unwrap_or(0)
     }
 }
 

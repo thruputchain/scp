@@ -45,6 +45,26 @@ pub struct StellarProto<'a> {
 }
 
 impl<'a> StellarProto<'a> {
+    pub fn local_proto(&self) -> LocalProto<'_> {
+        LocalProto {
+            cd: &self.cd,
+            local: &self.state.local,
+        }
+    }
+
+    pub fn slot_proto_or_create(&mut self, slot_index: SlotIndex) -> SlotProto<'_> {
+        let is_validator = self.is_validator();
+        let known_slots = &mut self.state.known_slots;
+        if !known_slots.contains_key(&slot_index) {
+            known_slots.insert(slot_index, SlotState::new(is_validator));
+        };
+        SlotProto {
+            cd: &self.cd,
+            local_state: &mut self.state.local,
+            slot_state: known_slots.get_mut(&slot_index).unwrap(),
+        }
+    }
+
     pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
         self.state
             .known_slots
@@ -56,6 +76,10 @@ impl<'a> StellarProto<'a> {
             })
     }
 
+    pub fn is_validator(&self) -> bool {
+        self.local_proto().is_validator()
+    }
+
     pub fn get_highest_known_slot_index(&self) -> SlotIndex {
         self.state.known_slots.keys().max().cloned().unwrap_or(0)
     }
@@ -63,7 +87,9 @@ impl<'a> StellarProto<'a> {
 
 impl<'a> DriverCb for StellarProto<'a> {
     fn received_envelope(&mut self, env: &proto::SCPEnvelope) {
-        todo!("XXX")
+        let slot_index = env.statement.slot_index;
+        self.slot_proto_or_create(slot_index)
+            .process_envelope(env, false);
     }
 
     fn driver_calling_back(&mut self, cb: DriverCallback) {

@@ -849,7 +849,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     }
 
     #[instrument(skip(voted, accepted))]
-    fn federated_accept<F1, F2>(&self, voted: F1, accepted: F2) -> bool
+    fn federated_accept<F1, F2>(&self, voted: &F1, accepted: &F2) -> bool
     where
         F1: Fn(&proto::SCPStatement) -> bool,
         F2: Fn(&proto::SCPStatement) -> bool,
@@ -1249,7 +1249,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
 
             let accepted = self.federated_accept(
                 // checks if any node is voting for this ballot
-                |st: &proto::SCPStatement| -> bool {
+                &|st: &proto::SCPStatement| -> bool {
                     match &st.pledges {
                         proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                             are_ballots_less_and_compatible(&ballot, &prepare.ballot)
@@ -1263,7 +1263,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
                         _ => panic!("bug"),
                     }
                 },
-                |st: &proto::SCPStatement| -> bool { Self::has_prepared_ballot(&ballot, st) },
+                &|st: &proto::SCPStatement| -> bool { Self::has_prepared_ballot(&ballot, st) },
             );
 
             if accepted {
@@ -1467,7 +1467,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
 
         let pred = |cur: &Interval| -> bool {
             self.federated_accept(
-                |st: &proto::SCPStatement| -> bool {
+                &|st: &proto::SCPStatement| -> bool {
                     match &st.pledges {
                         proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                             if are_ballots_compatible(&ballot, &prepare.ballot) {
@@ -1497,7 +1497,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
                         _ => panic!("bug"),
                     }
                 },
-                |st: &proto::SCPStatement| -> bool { Self::commit_predicate(&ballot, cur, st) },
+                &|st: &proto::SCPStatement| -> bool { Self::commit_predicate(&ballot, cur, st) },
             )
         };
 
@@ -1857,7 +1857,11 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         res
     }
 
-    pub fn get_state(&self, n: &proto::SCPNodeID, self_already_moved_on: bool) -> QuorumInfoNodeState {
+    pub fn get_state(
+        &self,
+        n: &proto::SCPNodeID,
+        self_already_moved_on: bool,
+    ) -> QuorumInfoNodeState {
         let mut state = QuorumInfoNodeState::Agree;
 
         if n == self.slot_proto().local_proto().get_node_id() {

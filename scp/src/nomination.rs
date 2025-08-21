@@ -487,8 +487,8 @@ impl<'a, 'b> NominationProto<'a, 'b> {
                         |st: &proto::SCPStatement| -> bool { Self::accept_predicate(v, st) };
 
                     if self.slot_proto().federated_accept(
-                        votes_predicate,
-                        accept_predicate,
+                        &votes_predicate,
+                        &accept_predicate,
                         &self.nomination().latest_nominations,
                     ) {
                         let validation_level = self.validate_value(v);

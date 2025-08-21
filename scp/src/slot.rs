@@ -335,26 +335,43 @@ impl<'a> SlotProto<'a> {
         summary: bool,
         full_keys: bool,
     ) -> serde_json::Value {
-        let mut ret = self.ballot_proto().get_json_quorum_info(id, summary, full_keys);
-        
+        let mut ret = self
+            .ballot_proto()
+            .get_json_quorum_info(id, summary, full_keys);
+
         if self.local_proto().is_validator() {
             ret["validated"] = serde_json::Value::Bool(self.is_fully_validated());
         }
-        
+
         ret
     }
 
     pub fn federated_accept<F1, F2>(
         &self,
-        _voted: F1,
-        _accepted: F2,
-        _envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        voted: &F1,
+        accepted: &F2,
+        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
     ) -> bool
     where
         F1: Fn(&proto::SCPStatement) -> bool,
         F2: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX");
+        let local_proto = self.local_proto();
+        let qset = local_proto.get_qset();
+
+        // Checks if the nodes that claimed to accept the statement form a v-blocking set
+        if LocalProto::is_vblocking_envelopes(qset, envs, accepted) {
+            return true;
+        }
+
+        // Checks if the set of nodes that accepted or voted for it form a quorum
+        let ratify_filter = |st: &proto::SCPStatement| -> bool { accepted(st) || voted(st) };
+
+        let qset_getter = |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+            self.get_quorum_set_from_statement(st)
+        };
+
+        LocalProto::is_quorum(qset, envs, qset_getter, ratify_filter)
     }
 
     pub fn federated_ratify<F>(

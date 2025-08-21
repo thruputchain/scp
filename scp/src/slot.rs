@@ -371,18 +371,25 @@ impl<'a> SlotProto<'a> {
             self.get_quorum_set_from_statement(st)
         };
 
-        LocalProto::is_quorum(qset, envs, qset_getter, ratify_filter)
+        LocalProto::is_quorum(qset, envs, &qset_getter, &ratify_filter)
     }
 
     pub fn federated_ratify<F>(
         &self,
-        _voted: F,
-        _envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        voted: &F,
+        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
     ) -> bool
     where
         F: Fn(&proto::SCPStatement) -> bool,
     {
-        panic!("XXX")
+        let local_proto = self.local_proto();
+        let qset = local_proto.get_qset();
+
+        let qset_getter = |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+            self.get_quorum_set_from_statement(st)
+        };
+
+        LocalProto::is_quorum(qset, envs, &qset_getter, voted)
     }
 
     pub fn get_statement_count(&self) -> usize {

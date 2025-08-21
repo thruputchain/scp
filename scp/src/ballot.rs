@@ -952,7 +952,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         F: Fn(&proto::SCPStatement) -> bool,
     {
         self.slot_proto()
-            .federated_ratify(voted, &self.ballot_state().latest_envelopes)
+            .federated_ratify(&voted, &self.ballot_state().latest_envelopes)
     }
 
     #[instrument]
@@ -1119,10 +1119,10 @@ impl<'a, 'b> BallotProto<'a, 'b> {
             let is_quorum = LocalProto::is_quorum(
                 self.slot_proto().local_proto().get_qset(),
                 &self.ballot_state().latest_envelopes,
-                |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+                &|st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
                     self.slot_proto().get_quorum_set_from_statement(st)
                 },
-                |st: &proto::SCPStatement| -> bool {
+                &|st: &proto::SCPStatement| -> bool {
                     match &st.pledges {
                         proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                             current_ballot.counter <= prepare.ballot.counter

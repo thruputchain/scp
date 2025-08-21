@@ -224,8 +224,8 @@ impl<'a> LocalProto<'a> {
     pub fn is_quorum<QFun, Filter>(
         qset: &proto::SCPQuorumSet,
         envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
-        qfun: QFun,
-        filter: Filter,
+        qfun: &QFun,
+        filter: &Filter,
     ) -> bool
     where
         QFun: Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,

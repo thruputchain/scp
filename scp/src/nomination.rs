@@ -519,7 +519,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
 
                     if self
                         .slot_proto()
-                        .federated_ratify(accept_predicate, &self.nomination().latest_nominations)
+                        .federated_ratify(&accept_predicate, &self.nomination().latest_nominations)
                     {
                         self.nomination_mut().candidates.insert(a.clone());
                         new_candidates = true;

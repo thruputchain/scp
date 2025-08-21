@@ -52,6 +52,13 @@ impl<'a> StellarProto<'a> {
         }
     }
 
+    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_> {
+        LocalProtoMut {
+            cd: &self.cd,
+            local: &mut self.state.local,
+        }
+    }
+
     pub fn slot_proto_or_create(&mut self, slot_index: SlotIndex) -> SlotProto<'_> {
         let is_validator = self.is_validator();
         let known_slots = &mut self.state.known_slots;
@@ -93,6 +100,38 @@ impl<'a> StellarProto<'a> {
         assert!(self.is_validator());
         self.slot_proto_or_create(slot_index)
             .nominate(value, prev_value, false)
+    }
+
+    pub fn stop_nomination(&mut self, slot_index: SlotIndex) {
+        if let Some(mut slot_proto) = self.slot_proto(slot_index) {
+            slot_proto.stop_nomination();
+        }
+    }
+
+    pub fn update_local_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
+        self.local_proto_mut().update_quorum_set(qset);
+    }
+
+    pub fn get_local_quorum_set(&self) -> proto::SCPQuorumSet {
+        self.local_proto().get_qset().clone()
+    }
+
+    pub fn get_local_node_id(&self) -> proto::SCPNodeID {
+        self.local_proto().get_node_id().clone()
+    }
+
+    pub fn purge_slots(&mut self, max_slot_index: SlotIndex, slot_to_keep: SlotIndex) {
+        let mut slots_to_remove = Vec::new();
+        
+        for (&slot_index, _) in self.state.known_slots.iter() {
+            if slot_index < max_slot_index && slot_index != slot_to_keep {
+                slots_to_remove.push(slot_index);
+            }
+        }
+        
+        for slot_index in slots_to_remove {
+            self.state.known_slots.remove(&slot_index);
+        }
     }
 }
 

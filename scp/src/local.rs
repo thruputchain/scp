@@ -16,12 +16,6 @@ pub struct LocalState {
 }
 
 impl LocalState {
-    /// Constructor equivalent to C++ LocalNode::LocalNode
-    /// Parameters:
-    /// - node_id: The node ID for this local node
-    /// - is_validator: Whether this node is a validator
-    /// - qset: The quorum set for this node
-    /// Note: SCPDriver parameter is ignored as requested
     pub fn new(
         node_id: proto::SCPNodeID,
         is_validator: bool,

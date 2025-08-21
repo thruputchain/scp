@@ -26,13 +26,13 @@ pub struct HistoricalStatement {
 }
 
 impl SlotState {
-    pub fn new() -> Self {
+    pub fn new(is_validator: bool) -> Self {
         SlotState {
             slot_index: 0,
             nomination: NominationState::new(),
             ballot: BallotState::new(),
             statements_history: Vec::new(),
-            fully_validated: false, //XXX
+            fully_validated: is_validator,
             got_vblocking: false,
         }
     }
@@ -46,11 +46,6 @@ pub struct SlotProto<'a> {
 }
 
 impl<'a> SlotProto<'a> {
-    //XXX: call this when creating a slot
-    pub fn init(&mut self) {
-        self.slot_state.fully_validated = self.local_proto().is_validator()
-    }
-
     pub fn nomination_proto(&mut self) -> NominationProto<'_, 'a> {
         NominationProto(self)
     }

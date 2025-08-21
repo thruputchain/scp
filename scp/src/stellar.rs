@@ -21,7 +21,21 @@ impl ConsensusDriver {
 #[derive(Debug)]
 pub struct StellarState {
     local: LocalState,
-    slot: HashMap<SlotIndex, SlotState>,
+    known_slots: HashMap<SlotIndex, SlotState>,
+}
+
+impl StellarState {
+    pub fn new(
+        node_id: proto::SCPNodeID,
+        is_validator: bool,
+        qset: proto::SCPQuorumSet,
+        get_hash_of: impl Fn(&[u8]) -> proto::SCPHash,
+    ) -> StellarState {
+        StellarState {
+            local: LocalState::new(node_id, is_validator, qset, get_hash_of),
+            known_slots: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -32,15 +46,18 @@ pub struct StellarProto<'a> {
 
 impl<'a> StellarProto<'a> {
     pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
-        self.state.slot.get_mut(&slot_index).map(|slot| SlotProto {
-            cd: &self.cd,
-            local_state: &mut self.state.local,
-            slot_state: slot,
-        })
+        self.state
+            .known_slots
+            .get_mut(&slot_index)
+            .map(|slot| SlotProto {
+                cd: &self.cd,
+                local_state: &mut self.state.local,
+                slot_state: slot,
+            })
     }
 
     pub fn get_highest_known_slot_index(&self) -> SlotIndex {
-        self.state.slot.keys().max().cloned().unwrap_or(0)
+        self.state.known_slots.keys().max().cloned().unwrap_or(0)
     }
 }
 

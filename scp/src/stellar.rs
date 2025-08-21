@@ -122,13 +122,13 @@ impl<'a> StellarProto<'a> {
 
     pub fn purge_slots(&mut self, max_slot_index: SlotIndex, slot_to_keep: SlotIndex) {
         let mut slots_to_remove = Vec::new();
-        
+
         for (&slot_index, _) in self.state.known_slots.iter() {
             if slot_index < max_slot_index && slot_index != slot_to_keep {
                 slots_to_remove.push(slot_index);
             }
         }
-        
+
         for slot_index in slots_to_remove {
             self.state.known_slots.remove(&slot_index);
         }
@@ -136,27 +136,51 @@ impl<'a> StellarProto<'a> {
 
     pub fn get_json_info(&mut self, limit: usize, full_keys: bool) -> serde_json::Value {
         let mut ret = serde_json::Map::new();
-        
+
         // Get slot indices in descending order
         let mut slot_indices: Vec<SlotIndex> = self.state.known_slots.keys().cloned().collect();
         slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
-        
+
         let mut count = 0;
         for slot_index in slot_indices {
             if count >= limit {
                 break;
             }
-            
+
             if let Some(mut slot_proto) = self.slot_proto(slot_index) {
-                ret.insert(
-                    slot_index.to_string(),
-                    slot_proto.get_json_info(full_keys),
-                );
+                ret.insert(slot_index.to_string(), slot_proto.get_json_info(full_keys));
             }
             count += 1;
         }
-        
+
         serde_json::Value::Object(ret)
+    }
+
+    pub fn get_state(
+        &mut self,
+        node: &proto::SCPNodeID,
+        slot_index: SlotIndex,
+    ) -> QuorumInfoNodeState {
+        const NUM_SLOTS_TO_CHECK_FOR_REPORTING: i32 = 2;
+
+        for k in 0..NUM_SLOTS_TO_CHECK_FOR_REPORTING {
+            if slot_index <= k as SlotIndex {
+                break;
+            }
+
+            let check_slot_index = slot_index - k as SlotIndex;
+            if let Some(mut slot) = self.slot_proto(check_slot_index) {
+                let self_already_moved_on = k > 0;
+                let state = slot.get_state(node, self_already_moved_on);
+                if state != QuorumInfoNodeState::NoInfo {
+                    return state;
+                }
+            }
+        }
+
+        // We have no messages from this node in N slots.
+        // At this point, we'll consider this node MISSING.
+        QuorumInfoNodeState::Missing
     }
 }
 

@@ -374,6 +374,49 @@ impl<'a> StellarProto<'a> {
             }
         }
     }
+
+    pub fn get_latest_message(&mut self, id: &proto::SCPNodeID) -> Option<proto::SCPEnvelope> {
+        // Iterate through slots in reverse order (highest to lowest)
+        let mut slot_indices: Vec<SlotIndex> = self.state.known_slots.keys().cloned().collect();
+        slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
+
+        for slot_index in slot_indices {
+            if let Some(mut slot) = self.slot_proto(slot_index) {
+                if let Some(envelope) = slot.get_latest_message(id) {
+                    return Some(envelope);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn is_newer_nomination_or_ballot_st(
+        &mut self,
+        old_st: &proto::SCPStatement,
+        new_st: &proto::SCPStatement,
+    ) -> bool {
+        if old_st.slot_index != new_st.slot_index || old_st.node_id != new_st.node_id {
+            return false;
+        }
+
+        if let Some(mut slot) = self.slot_proto(old_st.slot_index) {
+            SlotProto::is_newer_nomination_or_ballot_st(old_st, new_st)
+        } else {
+            false
+        }
+    }
+
+    pub fn get_externalizing_state(&mut self, slot_index: SlotIndex) -> Vec<proto::SCPEnvelope> {
+        if let Some(mut slot) = self.slot_proto(slot_index) {
+            slot.get_externalizing_state()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn get_value_string(&self, value: &proto::SCPValue) -> String {
+        self.cd.driver.get_value_string(value)
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

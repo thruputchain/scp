@@ -274,4 +274,37 @@ impl<'a> SlotProto<'a> {
         self.nomination_proto().process_current_state(f, force_self)
             && self.ballot_proto().process_current_state(f, force_self)
     }
+
+    pub fn is_newer_nomination_or_ballot_st(
+        old_st: &proto::SCPStatement,
+        new_st: &proto::SCPStatement,
+    ) -> bool {
+        let old_nomination = matches!(
+            old_st.pledges,
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
+        );
+        let new_nomination = matches!(
+            new_st.pledges,
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
+        );
+
+        if old_nomination != new_nomination {
+            return false;
+        }
+
+        // Handle each type appropriately
+        if old_nomination {
+            if let (
+                proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_nom },
+                proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: new_nom },
+            ) = (&old_st.pledges, &new_st.pledges)
+            {
+                NominationProto::is_newer_statement(old_nom, new_nom)
+            } else {
+                panic!("bug")
+            }
+        } else {
+            BallotProto::is_newer_statement(old_st, new_st)
+        }
+    }
 }

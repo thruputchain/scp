@@ -83,7 +83,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         }
     }
 
-    fn is_newer_statement(
+    pub fn is_newer_statement(
         oldst: &proto::SCPStatementNominate,
         st: &proto::SCPStatementNominate,
     ) -> bool {

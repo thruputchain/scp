@@ -332,6 +332,48 @@ impl<'a> StellarProto<'a> {
             slot.process_current_state(f, force_self)
         }
     }
+
+    pub fn process_slots_ascending_from<F>(&self, starting_slot: SlotIndex, f: &mut F)
+    where
+        F: FnMut(SlotIndex) -> bool,
+    {
+        // Get slot indices in ascending order starting from starting_slot
+        let mut slot_indices: Vec<SlotIndex> = self
+            .state
+            .known_slots
+            .keys()
+            .filter(|&&slot_index| slot_index >= starting_slot)
+            .cloned()
+            .collect();
+        slot_indices.sort();
+
+        for slot_index in slot_indices {
+            if !f(slot_index) {
+                break;
+            }
+        }
+    }
+
+    pub fn process_slots_descending_from<F>(&self, starting_slot: SlotIndex, f: &mut F)
+    where
+        F: FnMut(SlotIndex) -> bool,
+    {
+        // Get slot indices in descending order up to and including starting_slot
+        let mut slot_indices: Vec<SlotIndex> = self
+            .state
+            .known_slots
+            .keys()
+            .filter(|&&slot_index| slot_index <= starting_slot)
+            .cloned()
+            .collect();
+        slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
+
+        for slot_index in slot_indices {
+            if !f(slot_index) {
+                break;
+            }
+        }
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

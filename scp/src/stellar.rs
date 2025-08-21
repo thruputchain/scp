@@ -9,12 +9,82 @@ pub struct ConsensusDriver {
 }
 
 impl ConsensusDriver {
+    pub fn ballot_to_str(&self, b: &proto::SCPBallot) -> String {
+        format!("<{},{}>", b.counter, self.driver.get_value_string(&b.value),)
+    }
+
+    pub fn opt_ballot_to_str(&self, b: Option<&proto::SCPBallot>) -> String {
+        match b {
+            Some(b) => self.ballot_to_str(b),
+            None => "<,>".to_string(),
+        }
+    }
+
     pub fn envelope_to_str(&self, env: &proto::SCPEnvelope, full_keys: bool) -> String {
         self.statement_to_str(&env.statement, full_keys)
     }
 
     pub fn statement_to_str(&self, st: &proto::SCPStatement, full_keys: bool) -> String {
-        todo!("XXX")
+        let qset_hash = SlotProto::get_companion_quorum_set_hash_from_statement(st);
+        let node_id = self.driver.to_str_key(&st.node_id, full_keys);
+
+        let mut result = format!("{{ENV@{} |  i: {}", node_id, st.slot_index);
+
+        match &st.pledges {
+            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                result.push_str(&format!(
+                    " | PREPARE | D: {} | b: {} | p: {} | p': {} | c.n: {} | h.n: {}",
+                    hex_abbrev(&qset_hash),
+                    self.ballot_to_str(&prepare.ballot),
+                    self.opt_ballot_to_str(prepare.prepared.as_ref()),
+                    self.opt_ballot_to_str(prepare.prepared_prime.as_ref()),
+                    prepare.n_c,
+                    prepare.n_h
+                ));
+            }
+            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                result.push_str(&format!(
+                    " | CONFIRM | D: {} | b: {} | p.n: {} | c.n: {} | h.n: {}",
+                    hex_abbrev(&qset_hash),
+                    self.ballot_to_str(&confirm.ballot),
+                    confirm.n_prepared,
+                    confirm.n_commit,
+                    confirm.n_h
+                ));
+            }
+            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                result.push_str(&format!(
+                    " | EXTERNALIZE | c: {} | h.n: {} | (lastD): {}",
+                    self.ballot_to_str(&externalize.commit),
+                    externalize.n_h,
+                    hex_abbrev(&qset_hash)
+                ));
+            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+                result.push_str(&format!(" | NOMINATE | D: {} | X: {{", hex_abbrev(&qset_hash)));
+                
+                for (i, vote) in nominate.votes.iter().enumerate() {
+                    if i > 0 {
+                        result.push_str(" ,");
+                    }
+                    result.push_str(&format!("'{}'", self.driver.get_value_string(vote)));
+                }
+                
+                result.push_str("} | Y: {");
+                
+                for (i, accepted) in nominate.accepted.iter().enumerate() {
+                    if i > 0 {
+                        result.push_str(" ,");
+                    }
+                    result.push_str(&format!("'{}'", self.driver.get_value_string(accepted)));
+                }
+                
+                result.push_str("}");
+            }
+        }
+
+        result.push_str(" }");
+        result
     }
 }
 
@@ -399,7 +469,7 @@ impl<'a> StellarProto<'a> {
             return false;
         }
 
-        if let Some(mut slot) = self.slot_proto(old_st.slot_index) {
+        if let Some(_slot) = self.slot_proto(old_st.slot_index) {
             SlotProto::is_newer_nomination_or_ballot_st(old_st, new_st)
         } else {
             false

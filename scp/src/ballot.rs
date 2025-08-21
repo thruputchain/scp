@@ -2086,21 +2086,10 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     pub fn get_json_info(&self) -> serde_json::Value {
         json!({
            "heard": self.ballot_state().heard_from_quorum,
-           "ballot": self.ballot_to_str(self.ballot_state().current.as_ref()),
+           "ballot": self.0.cd.opt_ballot_to_str(self.ballot_state().current.as_ref()),
            "phase": self.ballot_state().phase.to_string(),
            "state": self.get_local_state(),
         })
-    }
-
-    pub fn ballot_to_str(&self, b: Option<&proto::SCPBallot>) -> String {
-        match b {
-            Some(b) => format!(
-                "<{},{}>",
-                b.counter,
-                self.driver().get_value_string(&b.value),
-            ),
-            None => "<,>".to_string(),
-        }
     }
 
     pub fn get_last_message_send(&self) -> Option<proto::SCPEnvelope> {

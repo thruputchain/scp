@@ -215,15 +215,6 @@ impl<'a> SlotProto<'a> {
         None
     }
 
-    fn has_message_from_node(&mut self, node_id: &proto::SCPNodeID) -> bool {
-        // Check if either protocol has a message from this node
-        self.ballot_proto().get_latest_message(node_id).is_some()
-            || self
-                .nomination_proto()
-                .get_latest_message(node_id)
-                .is_some()
-    }
-
     pub fn maybe_set_got_vblocking(&mut self) {
         if self.slot_state.got_vblocking {
             // Already set
@@ -274,5 +265,13 @@ impl<'a> SlotProto<'a> {
                 statement.node_id
             );
         }
+    }
+
+    pub fn process_current_state<F>(&mut self, f: &mut F, force_self: bool) -> bool
+    where
+        F: FnMut(&proto::SCPEnvelope) -> bool,
+    {
+        self.nomination_proto().process_current_state(f, force_self)
+            && self.ballot_proto().process_current_state(f, force_self)
     }
 }

@@ -1787,9 +1787,9 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         }
     }
 
-    fn process_current_state<F>(&self, f: F, force_self: bool) -> bool
+    pub fn process_current_state<F>(&self, f: &mut F, force_self: bool) -> bool
     where
-        F: Fn(&proto::SCPEnvelope) -> bool,
+        F: FnMut(&proto::SCPEnvelope) -> bool,
     {
         for (node_id, envelope) in &self.ballot_state().latest_envelopes {
             // only return messages for self if the slot is fully validated

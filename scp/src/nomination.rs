@@ -825,7 +825,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         }
     }
 
-    pub fn process_current_state<F>(&self, mut f: F, force_self: bool) -> bool
+    pub fn process_current_state<F>(&self, f: &mut F, force_self: bool) -> bool
     where
         F: FnMut(&proto::SCPEnvelope) -> bool,
     {

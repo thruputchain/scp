@@ -121,10 +121,6 @@ impl<'a> SlotProto<'a> {
         panic!("XXX")
     }
 
-    pub fn record_envelope(&mut self, env: &proto::SCPEnvelope) {
-        panic!("XXX")
-    }
-
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         panic!("XXX")
     }
@@ -306,5 +302,29 @@ impl<'a> SlotProto<'a> {
         } else {
             BallotProto::is_newer_statement(old_st, new_st)
         }
+    }
+
+    pub fn get_externalizing_state(&mut self) -> Vec<proto::SCPEnvelope> {
+        self.ballot_proto().get_externalizing_state()
+    }
+
+    pub fn record_statement(&mut self, st: &proto::SCPStatement) {
+        let historical_statement = HistoricalStatement {
+            when: std::time::SystemTime::now(), //XXX:diff
+            statement: st.clone(),
+            validated: self.slot_state.fully_validated,
+        };
+
+        self.slot_state
+            .statements_history
+            .push(historical_statement);
+
+        // Log the statement (similar to C++ version)
+        tracing::debug!(
+            statement = ?st,
+            validated = self.slot_state.fully_validated,
+            slot_index = self.slot_state.slot_index,
+            "new statement recorded"
+        );
     }
 }

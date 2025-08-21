@@ -162,7 +162,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         self.nomination_mut()
             .latest_nominations
             .insert(node_id.clone(), env.clone());
-        self.slot_mut().record_envelope(env);
+        self.slot_mut().record_statement(&env.statement);
     }
 
     #[instrument]

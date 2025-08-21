@@ -80,7 +80,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         self.ballot_state_mut()
             .latest_envelopes
             .insert(node_id, env.clone());
-        self.slot_proto_mut().record_envelope(env);
+        self.slot_proto_mut().record_statement(&env.statement);
     }
 
     pub fn is_newer_node_statement(
@@ -1809,7 +1809,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         self.ballot_state().latest_envelopes.get(id).cloned()
     }
 
-    fn get_externalizing_state(&self) -> Vec<proto::SCPEnvelope> {
+    pub fn get_externalizing_state(&self) -> Vec<proto::SCPEnvelope> {
         let mut res = Vec::new();
 
         if self.ballot_state().phase == Phase::Externalize {

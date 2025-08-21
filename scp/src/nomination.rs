@@ -849,11 +849,11 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         self.nomination().latest_nominations.get(node_id)
     }
 
-    pub fn get_latest_composite_candidate(&self) -> Option<&proto::SCPValue> {
-        self.nomination().latest_composite_candidate.as_ref()
+    pub fn get_latest_composite_candidate(&self) -> Option<proto::SCPValue> {
+        self.nomination().latest_composite_candidate.clone()
     }
 
-    pub fn get_last_message_send(&self) -> Option<&proto::SCPEnvelope> {
-        self.nomination().last_envelope.as_ref()
+    pub fn get_last_message_send(&self) -> Option<proto::SCPEnvelope> {
+        self.nomination().last_envelope.clone()
     }
 }

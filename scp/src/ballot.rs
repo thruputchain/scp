@@ -355,7 +355,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     #[instrument]
     fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
-        let v = match self.slot_proto().get_latest_composite_candidate() {
+        let v = match self.slot_proto_mut().get_latest_composite_candidate() {
             Some(w) => {
                 if w.is_empty() {
                     match &self.ballot_state().current {

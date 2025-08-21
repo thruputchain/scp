@@ -133,8 +133,8 @@ impl<'a> SlotProto<'a> {
         panic!("XXX")
     }
 
-    pub fn get_latest_composite_candidate(&self) -> Option<&proto::SCPValue> {
-        panic!("XXX")
+    pub fn get_latest_composite_candidate(&mut self) -> Option<proto::SCPValue> {
+        self.nomination_proto().get_latest_composite_candidate()
     }
 
     pub fn create_envelope(&self, statement: proto::SCPStatement) -> proto::SCPEnvelope {

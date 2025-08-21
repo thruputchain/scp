@@ -182,6 +182,96 @@ impl<'a> StellarProto<'a> {
         // At this point, we'll consider this node MISSING.
         QuorumInfoNodeState::Missing
     }
+
+    pub fn get_json_quorum_info(
+        &mut self,
+        id: &proto::SCPNodeID,
+        summary: bool,
+        full_keys: bool,
+        index: SlotIndex,
+    ) -> serde_json::Value {
+        if self.state.known_slots.is_empty() {
+            return serde_json::Value::Object(serde_json::Map::new());
+        }
+
+        let index = if index == 0 {
+            self.get_highest_known_slot_index()
+        } else {
+            index
+        };
+
+        if let Some(mut slot) = self.slot_proto(index) {
+            let mut ret = slot.get_json_quorum_info(id, summary, full_keys);
+            let qset = self.local_proto().get_qset().clone();
+
+            if summary {
+                let mut n_disagree = 0;
+                let mut n_missing = 0;
+                let mut n_delayed = 0;
+                let mut n_agree = 0;
+
+                // Categorize each node's state
+                LocalProto::for_all_nodes(&qset, &mut |node| {
+                    let state = self.get_state(node, index);
+                    match state {
+                        QuorumInfoNodeState::Disagree => n_disagree += 1,
+                        QuorumInfoNodeState::Delayed => n_delayed += 1,
+                        QuorumInfoNodeState::Missing => n_missing += 1,
+                        QuorumInfoNodeState::Agree => n_agree += 1,
+                        QuorumInfoNodeState::NoInfo => {
+                            tracing::error!("get_state should never return NoInfo");
+                            return false;
+                        }
+                    }
+                    true
+                });
+
+                ret["disagree"] = serde_json::Value::Number(n_disagree.into());
+                ret["missing"] = serde_json::Value::Number(n_missing.into());
+                ret["delayed"] = serde_json::Value::Number(n_delayed.into());
+                ret["agree"] = serde_json::Value::Number(n_agree.into());
+            } else {
+                let mut disagree = Vec::new();
+                let mut missing = Vec::new();
+                let mut delayed = Vec::new();
+                let mut agree = Vec::new();
+
+                // Categorize each node's state
+                LocalProto::for_all_nodes(&qset, &mut |node| {
+                    let state = self.get_state(node, index);
+                    let key = self.cd.driver.to_str_key(node, full_keys);
+
+                    match state {
+                        QuorumInfoNodeState::Disagree => {
+                            disagree.push(serde_json::Value::String(key))
+                        }
+                        QuorumInfoNodeState::Delayed => {
+                            delayed.push(serde_json::Value::String(key))
+                        }
+                        QuorumInfoNodeState::Missing => {
+                            missing.push(serde_json::Value::String(key))
+                        }
+                        QuorumInfoNodeState::Agree => agree.push(serde_json::Value::String(key)),
+                        QuorumInfoNodeState::NoInfo => {
+                            tracing::error!("get_state should never return NoInfo");
+                            return false;
+                        }
+                    }
+                    true
+                });
+
+                ret["disagree"] = serde_json::Value::Array(disagree);
+                ret["missing"] = serde_json::Value::Array(missing);
+                ret["delayed"] = serde_json::Value::Array(delayed);
+                ret["agree"] = serde_json::Value::Array(agree);
+            }
+
+            ret["ledger"] = serde_json::Value::Number(index.into());
+            ret
+        } else {
+            serde_json::Value::Object(serde_json::Map::new())
+        }
+    }
 }
 
 impl<'a> DriverCb for StellarProto<'a> {

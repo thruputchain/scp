@@ -2098,6 +2098,10 @@ impl<'a, 'b> BallotProto<'a, 'b> {
             None => "<,>".to_string(),
         }
     }
+
+    pub fn get_last_message_send(&self) -> Option<proto::SCPEnvelope> {
+        self.ballot_state().last_envelope_emit.clone()
+    }
 }
 
 #[derive(Debug)]

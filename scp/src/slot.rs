@@ -176,4 +176,30 @@ impl<'a> SlotProto<'a> {
     pub fn bump_state(&mut self, value: &proto::SCPValue, force: bool) -> bool {
         panic!("XXX")
     }
+
+    pub fn get_statement_count(&self) -> usize {
+        self.slot_state.statements_history.len()
+    }
+
+    pub fn got_vblocking(&self) -> bool {
+        self.slot_state.got_vblocking
+    }
+
+    pub fn get_latest_messages_send(&mut self) -> Vec<proto::SCPEnvelope> {
+        let mut res = Vec::new();
+        
+        if self.slot_state.fully_validated {
+            // Get nomination protocol's last message
+            if let Some(nomination_envelope) = self.nomination_proto().get_last_message_send() {
+                res.push(nomination_envelope);
+            }
+            
+            // Get ballot protocol's last message
+            if let Some(ballot_envelope) = self.ballot_proto().get_last_message_send() {
+                res.push(ballot_envelope);
+            }
+        }
+        
+        res
+    }
 }

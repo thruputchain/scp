@@ -1,5 +1,5 @@
 use crate::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 pub type SlotIndex = u64;
@@ -187,19 +187,92 @@ impl<'a> SlotProto<'a> {
 
     pub fn get_latest_messages_send(&mut self) -> Vec<proto::SCPEnvelope> {
         let mut res = Vec::new();
-        
+
         if self.slot_state.fully_validated {
             // Get nomination protocol's last message
             if let Some(nomination_envelope) = self.nomination_proto().get_last_message_send() {
                 res.push(nomination_envelope);
             }
-            
+
             // Get ballot protocol's last message
             if let Some(ballot_envelope) = self.ballot_proto().get_last_message_send() {
                 res.push(ballot_envelope);
             }
         }
-        
+
         res
+    }
+
+    pub fn get_latest_message(&mut self, node_id: &proto::SCPNodeID) -> Option<proto::SCPEnvelope> {
+        // Check ballot protocol first
+        if let Some(envelope) = self.ballot_proto().get_latest_message(node_id) {
+            return Some(envelope);
+        }
+        // Fall back to nomination protocol
+        if let Some(envelope) = self.nomination_proto().get_latest_message(node_id) {
+            return Some(envelope);
+        }
+        None
+    }
+
+    fn has_message_from_node(&mut self, node_id: &proto::SCPNodeID) -> bool {
+        // Check if either protocol has a message from this node
+        self.ballot_proto().get_latest_message(node_id).is_some()
+            || self
+                .nomination_proto()
+                .get_latest_message(node_id)
+                .is_some()
+    }
+
+    pub fn maybe_set_got_vblocking(&mut self) {
+        if self.slot_state.got_vblocking {
+            // Already set
+            return;
+        }
+
+        let qset = self.local_proto().get_qset().clone();
+        let mut nodes = Vec::new();
+
+        LocalProto::for_all_nodes(&qset, &mut |node_id| {
+            if self.get_latest_message(node_id).is_some() {
+                nodes.push(node_id.clone());
+            }
+            true
+        });
+
+        self.slot_state.got_vblocking = LocalProto::is_vblocking_nodes(&qset, &nodes);
+
+        if self.slot_state.got_vblocking {
+            tracing::trace!("got v-blocking for slot {}", self.index());
+        }
+    }
+
+    pub fn set_state_from_envelope(&mut self, envelope: &proto::SCPEnvelope) {
+        let statement = &envelope.statement;
+        let local_node_id = self.local_proto().get_node_id().clone();
+
+        if statement.node_id == local_node_id && statement.slot_index == self.index() {
+            let had_previous_message = self.get_latest_message(&statement.node_id).is_some();
+
+            match &statement.pledges {
+                proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                    self.nomination_proto().set_state_from_envelope(envelope);
+                }
+                _ => {
+                    self.ballot_proto().set_state_from_envelope(envelope);
+                }
+            }
+
+            if !had_previous_message {
+                self.maybe_set_got_vblocking();
+            }
+        } else {
+            tracing::trace!(
+                env = ?envelope,
+                "slot proto set_state_from_envelope: invalid envelope for slot {} from node {:?}",
+                self.slot_state.slot_index,
+                statement.node_id
+            );
+        }
     }
 }

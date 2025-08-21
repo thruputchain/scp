@@ -1700,7 +1700,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     }
 
     #[instrument]
-    fn set_state_from_envelope(&mut self, env: &proto::SCPEnvelope) {
+    pub fn set_state_from_envelope(&mut self, env: &proto::SCPEnvelope) {
         // cannot set state after starting ballot protocol
         assert!(self.ballot_state().current.is_none());
 
@@ -1805,8 +1805,8 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         true
     }
 
-    fn get_latest_message(&self, id: &proto::SCPNodeID) -> Option<&proto::SCPEnvelope> {
-        self.ballot_state().latest_envelopes.get(id)
+    pub fn get_latest_message(&self, id: &proto::SCPNodeID) -> Option<proto::SCPEnvelope> {
+        self.ballot_state().latest_envelopes.get(id).cloned()
     }
 
     fn get_externalizing_state(&self) -> Vec<proto::SCPEnvelope> {

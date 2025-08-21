@@ -843,8 +843,8 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         true
     }
 
-    pub fn get_latest_message(&self, node_id: &proto::SCPNodeID) -> Option<&proto::SCPEnvelope> {
-        self.nomination().latest_nominations.get(node_id)
+    pub fn get_latest_message(&self, node_id: &proto::SCPNodeID) -> Option<proto::SCPEnvelope> {
+        self.nomination().latest_nominations.get(node_id).cloned()
     }
 
     pub fn get_latest_composite_candidate(&self) -> Option<proto::SCPValue> {

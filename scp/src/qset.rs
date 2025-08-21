@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use thiserror::Error;
-use xdr_common::VecM;
 
 // level = 0 when there is no nesting.
 pub const MAXIMUM_QUORUM_NESTING_LEVEL: u32 = 4;

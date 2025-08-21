@@ -2049,6 +2049,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
 
         // only bump after we're done with everything else
         if self.ballot_state().msg_level == 1 {
+            #[allow(unused_assignments)]
             let mut did_bump = false;
             loop {
                 // attempt_bump may invoke advance_slot recursively
@@ -2076,7 +2077,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
     }
 
     fn get_local_state(&self) -> String {
-        let state = LocalState {
+        let state = BallotLocalState {
             slot_index: self.slot_proto().index(),
             ballot: self.ballot_state(),
         };
@@ -2098,7 +2099,8 @@ impl<'a, 'b> BallotProto<'a, 'b> {
 }
 
 #[derive(Debug)]
-struct LocalState<'a> {
-    slot_index: proto::SCPSlotIndex,
-    ballot: &'a BallotState,
+#[allow(dead_code)]
+struct BallotLocalState<'a> {
+    pub slot_index: proto::SCPSlotIndex,
+    pub ballot: &'a BallotState,
 }

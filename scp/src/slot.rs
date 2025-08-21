@@ -493,8 +493,9 @@ impl<'a> SlotProto<'a> {
     where
         F: FnMut(&proto::SCPEnvelope) -> bool,
     {
-        self.nomination_proto().process_current_state(f, force_self)
-            && self.ballot_proto().process_current_state(f, force_self);
+        if self.nomination_proto().process_current_state(f, force_self) {
+            self.ballot_proto().process_current_state(f, force_self);
+        }
     }
 
     pub fn is_newer_nomination_or_ballot_st(

@@ -1,5 +1,3 @@
-use crate::*;
-
 #[derive(PartialEq, PartialOrd, Ord, Eq)]
 pub enum QuorumInfoNodeState {
     NoInfo = 0,

@@ -1,7 +1,5 @@
 use crate::*;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 use tracing::instrument;
 use xdr_common::VecM;
 
@@ -11,7 +9,9 @@ pub struct LocalState {
     is_validator: bool,
     qset: proto::SCPQuorumSet,
     qset_hash: proto::SCPHash,
+    #[allow(dead_code)]
     single_qset: Option<proto::SCPQuorumSet>,
+    #[allow(dead_code)]
     single_qset_hash: Option<proto::SCPHash>,
 }
 

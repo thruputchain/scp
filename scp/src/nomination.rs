@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
-use tracing::{Level, debug, enabled, error, instrument, trace};
+use tracing::{Level, debug, enabled, instrument, trace};
 use xdr_common::VecM;
 
 #[derive(Debug)]

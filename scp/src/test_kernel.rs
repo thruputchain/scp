@@ -139,7 +139,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash {
-        todo!("XXX")
+        hash_bytes(opaque)
     }
 
     fn get_node_weight(
@@ -153,23 +153,27 @@ impl Driver for Rc<RefCell<TestDriver>> {
 
     fn compute_hash_node(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
+        _slot_index: proto::SCPSlotIndex,
+        _prev: &proto::SCPValue,
         is_priority: bool,
-        round_number: proto::SCPCount,
+        _round_number: proto::SCPCount,
         node_id: &proto::SCPNodeID,
     ) -> u64 {
-        todo!("XXX")
+        if is_priority {
+            (self.borrow().priority_lookup)(node_id)
+        } else {
+            0
+        }
     }
 
     fn compute_value_hash(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
-        round_number: proto::SCPCount,
+        _slot_index: proto::SCPSlotIndex,
+        _prev: &proto::SCPValue,
+        _round_number: proto::SCPCount,
         value: &proto::SCPValue,
     ) -> u64 {
-        todo!("XXX")
+        (self.borrow().hash_value_calculator)(value)
     }
 
     fn sign_envelope(&self, _: &mut proto::SCPEnvelope) {}

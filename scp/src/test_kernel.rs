@@ -50,6 +50,7 @@ impl TestKernel {
     }
 }
 
+#[derive(Clone)]
 pub struct TimerData {
     pub absolute_timeout: Duration,
     pub callback: DriverCallback,
@@ -73,7 +74,7 @@ pub struct TestDriver {
     pub heard_from_quorums: HashMap<SlotIndex, Vec<proto::SCPBallot>>,
 
     // Timer management
-    pub timers: HashMap<i32, TimerData>,
+    pub timers: HashMap<Timer, TimerData>,
     pub current_timer_offset: Duration,
 
     // Test-specific fields
@@ -108,6 +109,10 @@ impl TestDriver {
     pub fn set_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         self.quorum_sets
             .insert(proto::hash_xdr_scp(qset).unwrap(), qset.clone());
+    }
+
+    pub fn get_ballot_timer(&self) -> Option<TimerData> {
+        self.timers.get(&Timer::Ballot).cloned()
     }
 }
 
@@ -188,16 +193,24 @@ impl Driver for Rc<RefCell<TestDriver>> {
 
     fn start_timer(
         &self,
-        slot_index: SlotIndex,
+        _slot_index: SlotIndex,
         timer: Timer,
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        todo!("XXX")
+        let mut driver = self.borrow_mut();
+        let current_timer_offset = driver.current_timer_offset;
+        driver.timers.insert(
+            timer,
+            TimerData {
+                absolute_timeout: current_timer_offset + timeout,
+                callback: cb,
+            },
+        );
     }
 
-    fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        todo!("XXX")
+    fn stop_timer(&self, _slot_index: SlotIndex, timer: Timer) {
+        self.borrow_mut().timers.remove(&timer);
     }
 }
 

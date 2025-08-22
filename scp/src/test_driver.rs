@@ -4,35 +4,49 @@ use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::Duration;
 
+pub struct TestKernel {
+    kernel: StellarKernel<Rc<TestDriver>, Rc<TestDriver>>,
+}
+
+impl TestKernel {
+    pub fn new(
+        node_id: proto::SCPNodeID,
+        is_validator: bool,
+        qset: proto::SCPQuorumSet,
+    ) -> TestKernel {
+        let driver = Rc::new(TestDriver::default());
+        TestKernel {
+            kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
+        }
+    }
+}
+
 pub struct TimerData {
     pub absolute_timeout: Duration,
-    pub callback: Box<dyn Fn()>,
+    pub callback: DriverCallback,
 }
 
 pub struct TestDriver {
-    // Core SCP instance - will be initialized later
-    pub scp: Option<Rc<dyn std::any::Any>>, // Placeholder for SCP instance
-    
     // Timeout configuration
     pub initial_ballot_timeout_ms: u32,
     pub increment_ballot_timeout_ms: u32,
     pub initial_nomination_timeout_ms: u32,
     pub increment_nomination_timeout_ms: u32,
-    
+
     // Callback functions
     pub priority_lookup: Option<Box<dyn Fn(&proto::SCPNodeID) -> u64>>,
     pub hash_value_calculator: Option<Box<dyn Fn(&proto::SCPValue) -> u64>>,
-    
+
     // State storage
     pub quorum_sets: HashMap<proto::SCPHash, Rc<proto::SCPQuorumSet>>,
     pub envelopes: Vec<proto::SCPEnvelope>,
-    pub externalized_values: HashMap<u64, proto::SCPValue>,
-    pub heard_from_quorums: HashMap<u64, Vec<proto::SCPBallot>>,
-    
+    pub externalized_values: HashMap<SlotIndex, proto::SCPValue>,
+    pub heard_from_quorums: HashMap<SlotIndex, Vec<proto::SCPBallot>>,
+
     // Timer management
     pub timers: HashMap<i32, TimerData>,
     pub current_timer_offset: Duration,
-    
+
     // Test-specific fields
     pub expected_candidates: HashSet<proto::SCPValue>,
     pub composite_value: Option<proto::SCPValue>,
@@ -41,7 +55,6 @@ pub struct TestDriver {
 impl Default for TestDriver {
     fn default() -> Self {
         Self {
-            scp: None,
             initial_ballot_timeout_ms: 1000,
             increment_ballot_timeout_ms: 1000,
             initial_nomination_timeout_ms: 1000,
@@ -145,5 +158,75 @@ impl Driver for Rc<TestDriver> {
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
         todo!("XXX")
+    }
+}
+
+impl Consensus for Rc<TestDriver> {
+    fn validate_ballot_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+    ) -> ValidationLevel {
+        todo!()
+    }
+
+    fn validate_nomination_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+    ) -> ValidationLevel {
+        todo!()
+    }
+
+    fn extract_valid_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+    ) -> Option<proto::SCPValue> {
+        todo!()
+    }
+
+    fn combine_candidates(
+        &self,
+        slot_index: SCPSlotIndex,
+        candidates: &HashSet<proto::SCPValue>,
+    ) -> Option<proto::SCPValue> {
+        todo!()
+    }
+}
+
+impl ConsensusCb for Rc<TestDriver> {}
+
+impl ConsensusNotify for Rc<TestDriver> {
+    fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        todo!()
+    }
+
+    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        todo!()
+    }
+
+    fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        todo!()
+    }
+
+    fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        todo!()
+    }
+
+    fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        todo!()
+    }
+
+    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        todo!()
+    }
+
+    fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        todo!()
+    }
+
+    fn updated_candidate_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        todo!()
     }
 }

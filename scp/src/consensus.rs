@@ -35,17 +35,15 @@ pub trait Consensus: ConsensusCb + ConsensusNotify + Clone + Debug {
     ) -> Option<proto::SCPValue>;
 }
 
-pub trait ConsensusCb: Debug {}
+pub trait ConsensusCb {}
 
-pub trait ConsensusNotify: Debug {
+pub trait ConsensusNotify {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue);
-    //
     fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
     fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot);
-    // nom
     fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue);
     fn updated_candidate_value(&self, slot_index: SlotIndex, value: &proto::SCPValue);
 }

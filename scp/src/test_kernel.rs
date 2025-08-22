@@ -114,6 +114,24 @@ impl TestDriver {
     pub fn get_ballot_timer(&self) -> Option<TimerData> {
         self.timers.get(&Timer::Ballot).cloned()
     }
+
+    pub fn bump_timer_offset(&mut self) -> Duration {
+        // increase by more than the maximum timeout
+        self.current_timer_offset += Duration::from_secs(60 * 60 * 5); // 5 hours
+        self.current_timer_offset
+    }
+
+    pub fn has_ballot_timer(&self) -> bool {
+        self.get_ballot_timer().is_some()
+    }
+
+    pub fn has_ballot_timer_upcoming(&self) -> bool {
+        if let Some(x) = self.get_ballot_timer() {
+            self.current_timer_offset < x.absolute_timeout
+        } else {
+            panic!("bug")
+        }
+    }
 }
 
 impl Debug for TestDriver {

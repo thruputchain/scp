@@ -179,7 +179,9 @@ impl<'a> SlotProto<'a> {
         tracing::trace!(
             envelope = ?envelope,
             slot_index = self.index(),
-            "slot proto process_envelope"
+            "slot proto process_envelope,   i: {}, e: {}",
+            self.index(),
+            self.cd.envelope_to_str(envelope, false),
         );
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -197,19 +199,24 @@ impl<'a> SlotProto<'a> {
                 let local_node_id = self.local_proto().get_node_id().clone();
                 tracing::error!(
                     local_node_id = ?local_node_id,
-                    "SCP context"
+                    "SCP context {}",
+                    self.driver().to_short_string(&local_node_id),
                 );
                 let json_info = self.get_json_info(false);
                 tracing::error!(
-                    json_info = %serde_json::to_string_pretty(&json_info).unwrap_or_else(|_| "failed to serialize".to_string()),
-                    "slot JSON info"
+                    json_info = ?json_info,
+                    "slot JSON info: {}",
+                    serde_json::to_string_pretty(&json_info)
+                        .unwrap_or_else(|_| "failed to serialize".to_string()),
                 );
                 tracing::error!(
                     slot_index = self.index(),
                     envelope = ?envelope,
-                    "exception processing SCP messages"
+                    "exception processing SCP messages,   i: {}, e: {}",
+                    self.index(),
+                    self.cd.envelope_to_str(envelope, false),
                 );
-                tracing::error!("REPORT_INTERNAL_BUG");
+                tracing::error!("INTERNAL BUG");
 
                 std::panic::resume_unwind(panic_payload);
             }
@@ -482,9 +489,10 @@ impl<'a> SlotProto<'a> {
         } else {
             tracing::trace!(
                 env = ?envelope,
-                "slot proto set_state_from_envelope: invalid envelope for slot {} from node {:?}",
+                "slot proto set_state_from_envelope: invalid envelope for slot {} from node {:?}   e: {}",
                 self.slot_state.slot_index,
-                statement.node_id
+                statement.node_id,
+                self.cd.envelope_to_str(envelope, false)
             );
         }
     }
@@ -551,7 +559,10 @@ impl<'a> SlotProto<'a> {
             statement = ?st,
             validated = self.slot_state.fully_validated,
             slot_index = self.slot_state.slot_index,
-            "new statement recorded"
+            "new statement recorded, i: {} st: {} validated: {}",
+            self.slot_state.slot_index,
+            self.cd.statement_to_str(st, false),
+            self.slot_state.fully_validated,
         );
     }
 }

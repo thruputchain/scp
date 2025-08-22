@@ -195,13 +195,13 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         ) -> EnvelopeState {
             if ballot_proto.is_statement_sane(statement, ours) {
                 if ours {
-                    error!(env = ?env, "not sane statement from self, skipping");
+                    error!(env = ?env, "not sane statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false));
                 }
                 return EnvelopeState::Invalid;
             }
             if !ballot_proto.is_newer_node_statement(&statement.node_id, statement) {
                 if ours {
-                    error!(env = ?env, "stale statement from self, skipping")
+                    error!(env = ?env, "stale statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false))
                 } else {
                     trace!(
                         slot_index = ballot_proto.slot_proto().index(),
@@ -221,7 +221,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         match validation_result {
             ValidationLevel::Invalid => {
                 if ours {
-                    error!(env = ?env, "invalid value from self, skipping")
+                    error!(env = ?env, "invalid value from self, skipping   e: {}", self.0.cd.envelope_to_str(env, false))
                 } else {
                     trace!(slot_index = self.slot_proto().index(), "invalid value")
                 }
@@ -257,7 +257,7 @@ impl<'a, 'b> BallotProto<'a, 'b> {
         }
 
         if ours {
-            error!(env = ?env, "externalize statement with invalid value from self, skipping");
+            error!(env = ?env, "externalize statement with invalid value from self, skipping   e: {}", self.0.cd.envelope_to_str(env, false));
         }
 
         return EnvelopeState::Invalid;

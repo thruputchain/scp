@@ -18,7 +18,7 @@ pub enum DriverCallback {
     },
 }
 
-pub trait Driver: Debug {
+pub trait Driver: Clone + Debug {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
     fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;
@@ -63,6 +63,5 @@ pub trait Driver: Debug {
 
 pub trait DriverCb {
     fn received_envelope(&mut self, env: &proto::SCPEnvelope);
-    //
     fn driver_calling_back(&mut self, cb: DriverCallback);
 }

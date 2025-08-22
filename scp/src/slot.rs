@@ -39,29 +39,29 @@ impl SlotState {
 }
 
 #[derive(Debug)]
-pub struct SlotProto<'a> {
-    pub cd: &'a ConsensusDriver,
+pub struct SlotProto<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub local_state: &'a mut LocalState,
     pub slot_state: &'a mut SlotState,
 }
 
-impl<'a> SlotProto<'a> {
-    pub fn nomination_proto(&mut self) -> NominationProto<'_, 'a> {
+impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
+    pub fn nomination_proto(&mut self) -> NominationProto<'_, 'a, C, D> {
         NominationProto(self)
     }
 
-    pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a> {
+    pub fn ballot_proto(&mut self) -> BallotProto<'_, 'a, C, D> {
         BallotProto(self)
     }
 
-    pub fn local_proto(&self) -> LocalProto<'_> {
+    pub fn local_proto(&self) -> LocalProto<'_, C, D> {
         LocalProto {
             cd: self.cd,
             local: self.local_state,
         }
     }
 
-    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_> {
+    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, C, D> {
         LocalProtoMut {
             cd: self.cd,
             local: self.local_state,
@@ -88,12 +88,12 @@ impl<'a> SlotProto<'a> {
         &mut self.slot_state.nomination
     }
 
-    pub fn driver(&self) -> &dyn Driver {
-        self.cd.driver.as_ref()
+    pub fn driver(&self) -> &D {
+        &self.cd.driver
     }
 
-    pub fn consensus(&self) -> &dyn Consensus {
-        self.cd.consensus.as_ref()
+    pub fn consensus(&self) -> &C {
+        &self.cd.consensus
     }
 
     pub fn driver_calling_back(&mut self, cb: DriverCallback) {
@@ -131,10 +131,10 @@ impl<'a> SlotProto<'a> {
     pub fn get_statement_values(statement: &proto::SCPStatement) -> Vec<proto::SCPValue> {
         match &statement.pledges {
             proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
-                NominationProto::get_statement_values(&statement)
+                NominationProto::<C, D>::get_statement_values(&statement)
             }
             _ => {
-                let vals = BallotProto::get_statement_values(statement);
+                let vals = BallotProto::<C, D>::get_statement_values(statement);
                 vals.into_iter().collect()
             }
         }
@@ -362,7 +362,7 @@ impl<'a> SlotProto<'a> {
         let qset = local_proto.get_qset();
 
         // Checks if the nodes that claimed to accept the statement form a v-blocking set
-        if LocalProto::is_vblocking_envelopes(qset, envs, accepted) {
+        if LocalProto::<C, D>::is_vblocking_envelopes(qset, envs, accepted) {
             return true;
         }
 
@@ -373,7 +373,7 @@ impl<'a> SlotProto<'a> {
             self.get_quorum_set_from_statement(st)
         };
 
-        LocalProto::is_quorum(qset, envs, &qset_getter, &ratify_filter)
+        LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, &ratify_filter)
     }
 
     pub fn federated_ratify<F>(
@@ -391,7 +391,7 @@ impl<'a> SlotProto<'a> {
             self.get_quorum_set_from_statement(st)
         };
 
-        LocalProto::is_quorum(qset, envs, &qset_getter, voted)
+        LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, voted)
     }
 
     pub fn get_statement_count(&self) -> usize {
@@ -453,14 +453,14 @@ impl<'a> SlotProto<'a> {
         let qset = self.local_proto().get_qset().clone();
         let mut nodes = Vec::new();
 
-        LocalProto::for_all_nodes(&qset, &mut |node_id| {
+        LocalProto::<C, D>::for_all_nodes(&qset, &mut |node_id| {
             if self.get_latest_message(node_id).is_some() {
                 nodes.push(node_id.clone());
             }
             true
         });
 
-        self.slot_state.got_vblocking = LocalProto::is_vblocking_nodes(&qset, &nodes);
+        self.slot_state.got_vblocking = LocalProto::<C, D>::is_vblocking_nodes(&qset, &nodes);
 
         if self.slot_state.got_vblocking {
             tracing::trace!("got v-blocking for slot {}", self.index());
@@ -530,12 +530,12 @@ impl<'a> SlotProto<'a> {
                 proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: new_nom },
             ) = (&old_st.pledges, &new_st.pledges)
             {
-                NominationProto::is_newer_statement(old_nom, new_nom)
+                NominationProto::<C, D>::is_newer_statement(old_nom, new_nom)
             } else {
                 panic!("bug")
             }
         } else {
-            BallotProto::is_newer_statement(old_st, new_st)
+            BallotProto::<C, D>::is_newer_statement(old_st, new_st)
         }
     }
 

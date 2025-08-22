@@ -1,14 +1,13 @@
 use crate::*;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
-pub struct ConsensusDriver {
-    pub consensus: Rc<dyn Consensus>,
-    pub driver: Rc<dyn Driver>,
+pub struct ConsensusDriver<C: Consensus, D: Driver> {
+    pub consensus: C,
+    pub driver: D,
 }
 
-impl ConsensusDriver {
+impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
     pub fn ballot_to_str(&self, b: &proto::SCPBallot) -> String {
         format!("<{},{}>", b.counter, self.driver.get_value_string(&b.value),)
     }
@@ -25,7 +24,7 @@ impl ConsensusDriver {
     }
 
     pub fn statement_to_str(&self, st: &proto::SCPStatement, full_keys: bool) -> String {
-        let qset_hash = SlotProto::get_companion_quorum_set_hash_from_statement(st);
+        let qset_hash = SlotProto::<C, D>::get_companion_quorum_set_hash_from_statement(st);
         let node_id = self.driver.to_str_key(&st.node_id, full_keys);
 
         let mut result = format!("{{ENV@{} |  i: {}", node_id, st.slot_index);
@@ -61,24 +60,27 @@ impl ConsensusDriver {
                 ));
             }
             proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
-                result.push_str(&format!(" | NOMINATE | D: {} | X: {{", hex_abbrev(&qset_hash)));
-                
+                result.push_str(&format!(
+                    " | NOMINATE | D: {} | X: {{",
+                    hex_abbrev(&qset_hash)
+                ));
+
                 for (i, vote) in nominate.votes.iter().enumerate() {
                     if i > 0 {
                         result.push_str(" ,");
                     }
                     result.push_str(&format!("'{}'", self.driver.get_value_string(vote)));
                 }
-                
+
                 result.push_str("} | Y: {");
-                
+
                 for (i, accepted) in nominate.accepted.iter().enumerate() {
                     if i > 0 {
                         result.push_str(" ,");
                     }
                     result.push_str(&format!("'{}'", self.driver.get_value_string(accepted)));
                 }
-                
+
                 result.push_str("}");
             }
         }
@@ -109,27 +111,27 @@ impl StellarState {
 }
 
 #[derive(Debug)]
-pub struct StellarProto<'a> {
-    pub cd: ConsensusDriver,
+pub struct StellarProto<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub state: &'a mut StellarState,
 }
 
-impl<'a> StellarProto<'a> {
-    pub fn local_proto(&self) -> LocalProto<'_> {
+impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
+    pub fn local_proto(&self) -> LocalProto<'_, C, D> {
         LocalProto {
             cd: &self.cd,
             local: &self.state.local,
         }
     }
 
-    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_> {
+    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, C, D> {
         LocalProtoMut {
             cd: &self.cd,
             local: &mut self.state.local,
         }
     }
 
-    pub fn slot_proto_or_create(&mut self, slot_index: SlotIndex) -> SlotProto<'_> {
+    pub fn slot_proto_or_create(&mut self, slot_index: SlotIndex) -> SlotProto<'_, C, D> {
         let is_validator = self.is_validator();
         let known_slots = &mut self.state.known_slots;
         if !known_slots.contains_key(&slot_index) {
@@ -142,7 +144,7 @@ impl<'a> StellarProto<'a> {
         }
     }
 
-    pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_>> {
+    pub fn slot_proto(&mut self, slot_index: SlotIndex) -> Option<SlotProto<'_, C, D>> {
         self.state
             .known_slots
             .get_mut(&slot_index)
@@ -281,7 +283,7 @@ impl<'a> StellarProto<'a> {
                 let mut n_agree = 0;
 
                 // Categorize each node's state
-                LocalProto::for_all_nodes(&qset, &mut |node| {
+                LocalProto::<C, D>::for_all_nodes(&qset, &mut |node| {
                     let state = self.get_state(node, index);
                     match state {
                         QuorumInfoNodeState::Disagree => n_disagree += 1,
@@ -307,7 +309,7 @@ impl<'a> StellarProto<'a> {
                 let mut agree = Vec::new();
 
                 // Categorize each node's state
-                LocalProto::for_all_nodes(&qset, &mut |node| {
+                LocalProto::<C, D>::for_all_nodes(&qset, &mut |node| {
                     let state = self.get_state(node, index);
                     let key = self.cd.driver.to_str_key(node, full_keys);
 
@@ -470,7 +472,7 @@ impl<'a> StellarProto<'a> {
         }
 
         if let Some(_slot) = self.slot_proto(old_st.slot_index) {
-            SlotProto::is_newer_nomination_or_ballot_st(old_st, new_st)
+            SlotProto::<C, D>::is_newer_nomination_or_ballot_st(old_st, new_st)
         } else {
             false
         }
@@ -489,7 +491,7 @@ impl<'a> StellarProto<'a> {
     }
 }
 
-impl<'a> DriverCb for StellarProto<'a> {
+impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
     fn received_envelope(&mut self, env: &proto::SCPEnvelope) {
         let slot_index = env.statement.slot_index;
         self.slot_proto_or_create(slot_index)

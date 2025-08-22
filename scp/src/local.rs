@@ -57,18 +57,18 @@ impl LocalState {
 }
 
 #[derive(Debug)]
-pub struct LocalProto<'a> {
-    pub cd: &'a ConsensusDriver,
+pub struct LocalProto<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub local: &'a LocalState,
 }
 
 #[derive(Debug)]
-pub struct LocalProtoMut<'a> {
-    pub cd: &'a ConsensusDriver,
+pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
+    pub cd: &'a ConsensusDriver<C, D>,
     pub local: &'a mut LocalState,
 }
 
-impl<'a> LocalProtoMut<'a> {
+impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
     #[instrument]
     pub fn update_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         let mut normalized_qset = qset.clone();
@@ -82,7 +82,7 @@ impl<'a> LocalProtoMut<'a> {
     }
 }
 
-impl<'a> LocalProto<'a> {
+impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     pub fn get_qset(&self) -> &proto::SCPQuorumSet {
         &self.local.qset
     }

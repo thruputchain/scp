@@ -37,14 +37,14 @@ impl NominationState {
 }
 
 #[derive(Debug)]
-pub struct NominationProto<'a, 'b>(pub &'a mut SlotProto<'b>);
+pub struct NominationProto<'a, 'b, C: Consensus, D: Driver>(pub &'a mut SlotProto<'b, C, D>);
 
-impl<'a, 'b> NominationProto<'a, 'b> {
-    fn slot_proto_mut(&mut self) -> &mut SlotProto<'b> {
+impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
+    fn slot_proto_mut(&mut self) -> &mut SlotProto<'b, C, D> {
         self.0
     }
 
-    fn slot_proto(&self) -> &SlotProto<'b> {
+    fn slot_proto(&self) -> &SlotProto<'b, C, D> {
         self.0
     }
 
@@ -56,11 +56,11 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         self.slot_proto_mut().nomination_mut()
     }
 
-    fn driver(&self) -> &dyn Driver {
+    fn driver(&self) -> &D {
         self.slot_proto().driver()
     }
 
-    fn consensus(&self) -> &dyn Consensus {
+    fn consensus(&self) -> &C {
         self.slot_proto().consensus()
     }
 
@@ -278,7 +278,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
         let mut max_leader_count = 1;
         // note that node IDs here are unique ("sane"), so we can count by
         // enumeration
-        LocalProto::for_all_nodes(&my_qset, &mut |_| {
+        LocalProto::<C, D>::for_all_nodes(&my_qset, &mut |_| {
             max_leader_count += 1;
             true
         });
@@ -291,7 +291,7 @@ impl<'a, 'b> NominationProto<'a, 'b> {
             let mut top_priority = self.get_node_priority(&local_id, &my_qset);
 
             // Check all nodes in quorum set for higher priority
-            LocalProto::for_all_nodes(&my_qset, &mut |cur| {
+            LocalProto::<C, D>::for_all_nodes(&my_qset, &mut |cur| {
                 let weight = self.get_node_priority(cur, &my_qset);
                 if weight > top_priority {
                     top_priority = weight;

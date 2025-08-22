@@ -11,3 +11,10 @@ where
     let h: [u8; 32] = Sha256::digest(bytes.as_slice()).into();
     Ok(proto::SHA256Hash::from(h))
 }
+
+pub fn hash_xdr_scp<T>(v: &T) -> writer::Result<proto::SCPHash>
+where
+    T: WriteXDR + ?Sized,
+{
+    Ok(hash_xdr(v)?.into_inner())
+}

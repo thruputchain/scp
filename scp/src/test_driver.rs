@@ -1,11 +1,15 @@
 use crate::*;
+use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::Duration;
 
+type TestDriverHandle = Rc<RefCell<TestDriver>>;
+
 pub struct TestKernel {
-    kernel: StellarKernel<Rc<TestDriver>, Rc<TestDriver>>,
+    kernel: StellarKernel<TestDriverHandle, TestDriverHandle>,
 }
 
 impl TestKernel {
@@ -14,7 +18,11 @@ impl TestKernel {
         is_validator: bool,
         qset: proto::SCPQuorumSet,
     ) -> TestKernel {
-        let driver = Rc::new(TestDriver::default());
+        let node_id_clone = node_id.clone();
+        let driver = Rc::new(RefCell::new(TestDriver::new(
+            Box::new(move |q: &proto::SCPNodeID| if q == &node_id_clone { 1000 } else { 1 }),
+            Box::new(|_: &proto::SCPValue| 0),
+        )));
         TestKernel {
             kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
         }
@@ -34,11 +42,11 @@ pub struct TestDriver {
     pub increment_nomination_timeout_ms: u32,
 
     // Callback functions
-    pub priority_lookup: Option<Box<dyn Fn(&proto::SCPNodeID) -> u64>>,
-    pub hash_value_calculator: Option<Box<dyn Fn(&proto::SCPValue) -> u64>>,
+    pub priority_lookup: Box<dyn Fn(&proto::SCPNodeID) -> u64>,
+    pub hash_value_calculator: Box<dyn Fn(&proto::SCPValue) -> u64>,
 
     // State storage
-    pub quorum_sets: HashMap<proto::SCPHash, Rc<proto::SCPQuorumSet>>,
+    pub quorum_sets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
     pub envelopes: Vec<proto::SCPEnvelope>,
     pub externalized_values: HashMap<SlotIndex, proto::SCPValue>,
     pub heard_from_quorums: HashMap<SlotIndex, Vec<proto::SCPBallot>>,
@@ -52,15 +60,19 @@ pub struct TestDriver {
     pub composite_value: Option<proto::SCPValue>,
 }
 
-impl Default for TestDriver {
-    fn default() -> Self {
+impl TestDriver {
+    pub fn new<P, Q>(priority_lookup: Box<P>, hash_value_calculator: Box<Q>) -> Self
+    where
+        P: Fn(&proto::SCPNodeID) -> u64 + 'static,
+        Q: Fn(&proto::SCPValue) -> u64 + 'static,
+    {
         Self {
             initial_ballot_timeout_ms: 1000,
             increment_ballot_timeout_ms: 1000,
             initial_nomination_timeout_ms: 1000,
             increment_nomination_timeout_ms: 1000,
-            priority_lookup: None,
-            hash_value_calculator: None,
+            priority_lookup: priority_lookup,
+            hash_value_calculator: hash_value_calculator,
             quorum_sets: HashMap::new(),
             envelopes: Vec::new(),
             externalized_values: HashMap::new(),
@@ -71,6 +83,11 @@ impl Default for TestDriver {
             composite_value: None,
         }
     }
+
+    pub fn set_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
+        self.quorum_sets
+            .insert(proto::hash_xdr_scp(qset).unwrap(), qset.clone());
+    }
 }
 
 impl Debug for TestDriver {
@@ -79,7 +96,7 @@ impl Debug for TestDriver {
     }
 }
 
-impl Driver for Rc<TestDriver> {
+impl Driver for Rc<RefCell<TestDriver>> {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet> {
         todo!("XXX")
     }
@@ -161,7 +178,7 @@ impl Driver for Rc<TestDriver> {
     }
 }
 
-impl Consensus for Rc<TestDriver> {
+impl Consensus for Rc<RefCell<TestDriver>> {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
@@ -195,9 +212,9 @@ impl Consensus for Rc<TestDriver> {
     }
 }
 
-impl ConsensusCb for Rc<TestDriver> {}
+impl ConsensusCb for Rc<RefCell<TestDriver>> {}
 
-impl ConsensusNotify for Rc<TestDriver> {
+impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
         todo!()
     }

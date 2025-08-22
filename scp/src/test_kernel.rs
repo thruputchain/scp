@@ -23,6 +23,7 @@ impl TestKernel {
             Box::new(move |q: &proto::SCPNodeID| if q == &node_id_clone { 1000 } else { 1 }),
             Box::new(|_: &proto::SCPValue| 0),
         )));
+        driver.borrow_mut().set_quorum_set(&qset);
         TestKernel {
             kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
         }
@@ -151,9 +152,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
         todo!("XXX")
     }
 
-    fn sign_envelope(&self, env: &mut proto::SCPEnvelope) {
-        todo!("XXX")
-    }
+    fn sign_envelope(&self, _: &mut proto::SCPEnvelope) {}
 
     fn emit_envelope(&self, env: proto::SCPEnvelope) {
         todo!("XXX")
@@ -179,20 +178,12 @@ impl Driver for Rc<RefCell<TestDriver>> {
 }
 
 impl Consensus for Rc<RefCell<TestDriver>> {
-    fn validate_ballot_value(
-        &self,
-        slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
-    ) -> ValidationLevel {
-        todo!()
+    fn validate_ballot_value(&self, _: SCPSlotIndex, _: &proto::SCPValue) -> ValidationLevel {
+        ValidationLevel::FullyValid
     }
 
-    fn validate_nomination_value(
-        &self,
-        slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
-    ) -> ValidationLevel {
-        todo!()
+    fn validate_nomination_value(&self, _: SCPSlotIndex, _: &proto::SCPValue) -> ValidationLevel {
+        ValidationLevel::FullyValid
     }
 
     fn extract_valid_value(

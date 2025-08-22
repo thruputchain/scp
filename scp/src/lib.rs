@@ -45,5 +45,5 @@ pub use ballot::*;
 pub mod util;
 pub use util::*;
 
-pub mod test_driver;
-pub use test_driver::*;
+pub mod test_kernel;
+pub use test_kernel::*;

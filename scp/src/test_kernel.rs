@@ -216,10 +216,27 @@ impl Consensus for Rc<RefCell<TestDriver>> {
 
     fn combine_candidates(
         &self,
-        slot_index: SCPSlotIndex,
+        _slot_index: SCPSlotIndex,
         candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue> {
-        todo!()
+        let driver = self.borrow();
+
+        assert_eq!(
+            candidates.len(),
+            driver.expected_candidates.len(),
+            "candidates size mismatch"
+        );
+
+        for (candidate, expected) in candidates.iter().zip(driver.expected_candidates.iter()) {
+            assert_eq!(candidate, expected, "candidate value mismatch");
+        }
+
+        assert!(
+            driver.composite_value.is_some(),
+            "composite value must not be empty"
+        );
+
+        driver.composite_value.clone()
     }
 }
 

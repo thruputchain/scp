@@ -149,13 +149,13 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
                 Some(self.local_proto().get_singleton_qset(&statement.node_id))
             }
             proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                self.driver().get_qset(&prepare.quorum_set_hash).cloned()
+                self.driver().get_qset(&prepare.quorum_set_hash)
             }
             proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                self.driver().get_qset(&confirm.quorum_set_hash).cloned()
+                self.driver().get_qset(&confirm.quorum_set_hash)
             }
             proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
-                self.driver().get_qset(&nominate.quorum_set_hash).cloned()
+                self.driver().get_qset(&nominate.quorum_set_hash)
             }
         }
     }

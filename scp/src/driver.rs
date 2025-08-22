@@ -19,7 +19,7 @@ pub enum DriverCallback {
 }
 
 pub trait Driver: Clone + Debug {
-    fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet>;
+    fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
     fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;
     fn from_str_key(&self, s: &str) -> Result<proto::SCPNodeID, String>; // XXX: get from KeyUtils.cpp

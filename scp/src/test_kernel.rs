@@ -28,6 +28,26 @@ impl TestKernel {
             kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
         }
     }
+
+    /// used to test BallotProtocol and bypass nomination
+    pub fn bump_state(&mut self, slot_index: SlotIndex, v: &proto::SCPValue) -> bool {
+        self.kernel
+            .proto()
+            .slot_proto_or_create(slot_index)
+            .bump_state(v, true)
+    }
+
+    pub fn nominate(
+        &mut self,
+        slot_index: SlotIndex,
+        value: &proto::SCPValue,
+        timed_out: bool,
+    ) -> bool {
+        self.kernel
+            .proto()
+            .slot_proto_or_create(slot_index)
+            .nominate(value, value, timed_out)
+    }
 }
 
 pub struct TimerData {
@@ -98,8 +118,8 @@ impl Debug for TestDriver {
 }
 
 impl Driver for Rc<RefCell<TestDriver>> {
-    fn get_qset(&self, h: &proto::SCPHash) -> Option<&proto::SCPQuorumSet> {
-        todo!("XXX")
+    fn get_qset(&self, qset_hash: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+        self.borrow().quorum_sets.get(qset_hash).cloned()
     }
 
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String {
@@ -155,7 +175,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
     fn sign_envelope(&self, _: &mut proto::SCPEnvelope) {}
 
     fn emit_envelope(&self, env: proto::SCPEnvelope) {
-        todo!("XXX")
+        self.borrow_mut().envelopes.push(env);
     }
 
     fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration {
@@ -207,7 +227,11 @@ impl ConsensusCb for Rc<RefCell<TestDriver>> {}
 
 impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
-        todo!()
+        let x = self
+            .borrow_mut()
+            .externalized_values
+            .insert(slot_index, value.clone());
+        assert!(x.is_none(), "value already externalized")
     }
 
     fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
@@ -227,7 +251,11 @@ impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     }
 
     fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
-        todo!()
+        self.borrow_mut()
+            .heard_from_quorums
+            .entry(slot_index)
+            .or_insert_with(Vec::new)
+            .push(ballot.clone());
     }
 
     fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {

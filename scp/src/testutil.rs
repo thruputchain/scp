@@ -225,3 +225,41 @@ pub fn verify_nominate(
               "Statement mismatch: expected {:?}, actual {:?}", 
               expected.statement, actual.statement);
 }
+
+pub struct TestValues {
+    pub x_value: proto::SCPValue,
+    pub y_value: proto::SCPValue,
+    pub z_value: proto::SCPValue,
+    pub zz_value: proto::SCPValue,
+    pub k_value: proto::SCPValue,
+}
+
+pub fn setup_values() -> TestValues {
+    use sha2::{Sha256, Digest};
+    use xdr_common::BytesM;
+    
+    let mut hasher = Sha256::new();
+    hasher.update(format!("SEED_VALUE_DATA_{}", rand::random::<u64>()));
+    let base_seed = format!("{:x}", hasher.finalize_reset());
+    
+    let mut values = Vec::new();
+    for i in 0..4 {
+        hasher.update(format!("{}/{}", base_seed, i));
+        let hash = hasher.finalize_reset();
+        values.push(BytesM(hash.to_vec()));
+    }
+    
+    values.sort();
+    
+    hasher.update(&base_seed);
+    let k_hash = hasher.finalize();
+    let k_value = BytesM(k_hash.to_vec());
+    
+    TestValues {
+        x_value: values[0].clone(),
+        y_value: values[1].clone(),
+        z_value: values[2].clone(),
+        zz_value: values[3].clone(),
+        k_value,
+    }
+}

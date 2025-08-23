@@ -122,3 +122,106 @@ pub fn make_nominate(
     make_envelope(secret_key, slot_index, statement, public_key)
 }
 
+
+// Verification functions - compare actual envelope with expected envelope
+pub fn verify_prepare(
+    actual: &proto::SCPEnvelope,
+    secret_key: &proto::SecretKey,
+    qset_hash: proto::SCPHash,
+    slot_index: proto::SCPSlotIndex,
+    ballot: proto::SCPBallot,
+    prepared: Option<proto::SCPBallot>,
+    n_c: proto::SCPCount,
+    n_h: proto::SCPCount,
+    prepared_prime: Option<proto::SCPBallot>,
+    public_key: proto::PublicKey,
+) {
+    let expected = make_prepare(
+        secret_key,
+        qset_hash,
+        slot_index,
+        ballot,
+        prepared,
+        n_c,
+        n_h,
+        prepared_prime,
+        public_key,
+    ).expect("Failed to create expected envelope");
+    
+    assert_eq!(expected.statement, actual.statement, 
+              "Statement mismatch: expected {:?}, actual {:?}", 
+              expected.statement, actual.statement);
+}
+
+pub fn verify_confirm(
+    actual: &proto::SCPEnvelope,
+    secret_key: &proto::SecretKey,
+    qset_hash: proto::SCPHash,
+    slot_index: proto::SCPSlotIndex,
+    prepare_counter: proto::SCPCount,
+    ballot: proto::SCPBallot,
+    n_c: proto::SCPCount,
+    n_h: proto::SCPCount,
+    public_key: proto::PublicKey,
+) {
+    let expected = make_confirm(
+        secret_key,
+        qset_hash,
+        slot_index,
+        prepare_counter,
+        ballot,
+        n_c,
+        n_h,
+        public_key,
+    ).expect("Failed to create expected envelope");
+    
+    assert_eq!(expected.statement, actual.statement, 
+              "Statement mismatch: expected {:?}, actual {:?}", 
+              expected.statement, actual.statement);
+}
+
+pub fn verify_externalize(
+    actual: &proto::SCPEnvelope,
+    secret_key: &proto::SecretKey,
+    qset_hash: proto::SCPHash,
+    slot_index: proto::SCPSlotIndex,
+    commit_ballot: proto::SCPBallot,
+    n_h: proto::SCPCount,
+    public_key: proto::PublicKey,
+) {
+    let expected = make_externalize(
+        secret_key,
+        qset_hash,
+        slot_index,
+        commit_ballot,
+        n_h,
+        public_key,
+    ).expect("Failed to create expected envelope");
+    
+    assert_eq!(expected.statement, actual.statement, 
+              "Statement mismatch: expected {:?}, actual {:?}", 
+              expected.statement, actual.statement);
+}
+
+pub fn verify_nominate(
+    actual: &proto::SCPEnvelope,
+    secret_key: &proto::SecretKey,
+    qset_hash: proto::SCPHash,
+    slot_index: proto::SCPSlotIndex,
+    votes: Vec<proto::SCPValue>,
+    accepted: Vec<proto::SCPValue>,
+    public_key: proto::PublicKey,
+) {
+    let expected = make_nominate(
+        secret_key,
+        qset_hash,
+        slot_index,
+        votes,
+        accepted,
+        public_key,
+    ).expect("Failed to create expected envelope");
+    
+    assert_eq!(expected.statement, actual.statement, 
+              "Statement mismatch: expected {:?}, actual {:?}", 
+              expected.statement, actual.statement);
+}

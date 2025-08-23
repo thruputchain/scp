@@ -1,4 +1,5 @@
 use crate::*;
+use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
 pub fn make_envelope(
@@ -103,11 +104,11 @@ pub fn make_nominate(
     // Sort votes and accepted as in C++ version
     votes.sort();
     accepted.sort();
-    
+
     // Convert to VecM
     let votes_vecm = VecM(votes);
     let accepted_vecm = VecM(accepted);
-    
+
     let statement = proto::SCPStatement {
         node_id: public_key.clone(),
         slot_index,
@@ -121,7 +122,6 @@ pub fn make_nominate(
     };
     make_envelope(secret_key, slot_index, statement, public_key)
 }
-
 
 // Verification functions - compare actual envelope with expected envelope
 pub fn verify_prepare(
@@ -146,11 +146,14 @@ pub fn verify_prepare(
         n_h,
         prepared_prime,
         public_key,
-    ).expect("Failed to create expected envelope");
-    
-    assert_eq!(expected.statement, actual.statement, 
-              "Statement mismatch: expected {:?}, actual {:?}", 
-              expected.statement, actual.statement);
+    )
+    .expect("Failed to create expected envelope");
+
+    assert_eq!(
+        expected.statement, actual.statement,
+        "Statement mismatch: expected {:?}, actual {:?}",
+        expected.statement, actual.statement
+    );
 }
 
 pub fn verify_confirm(
@@ -173,11 +176,14 @@ pub fn verify_confirm(
         n_c,
         n_h,
         public_key,
-    ).expect("Failed to create expected envelope");
-    
-    assert_eq!(expected.statement, actual.statement, 
-              "Statement mismatch: expected {:?}, actual {:?}", 
-              expected.statement, actual.statement);
+    )
+    .expect("Failed to create expected envelope");
+
+    assert_eq!(
+        expected.statement, actual.statement,
+        "Statement mismatch: expected {:?}, actual {:?}",
+        expected.statement, actual.statement
+    );
 }
 
 pub fn verify_externalize(
@@ -196,11 +202,14 @@ pub fn verify_externalize(
         commit_ballot,
         n_h,
         public_key,
-    ).expect("Failed to create expected envelope");
-    
-    assert_eq!(expected.statement, actual.statement, 
-              "Statement mismatch: expected {:?}, actual {:?}", 
-              expected.statement, actual.statement);
+    )
+    .expect("Failed to create expected envelope");
+
+    assert_eq!(
+        expected.statement, actual.statement,
+        "Statement mismatch: expected {:?}, actual {:?}",
+        expected.statement, actual.statement
+    );
 }
 
 pub fn verify_nominate(
@@ -213,17 +222,15 @@ pub fn verify_nominate(
     public_key: proto::PublicKey,
 ) {
     let expected = make_nominate(
-        secret_key,
-        qset_hash,
-        slot_index,
-        votes,
-        accepted,
-        public_key,
-    ).expect("Failed to create expected envelope");
-    
-    assert_eq!(expected.statement, actual.statement, 
-              "Statement mismatch: expected {:?}, actual {:?}", 
-              expected.statement, actual.statement);
+        secret_key, qset_hash, slot_index, votes, accepted, public_key,
+    )
+    .expect("Failed to create expected envelope");
+
+    assert_eq!(
+        expected.statement, actual.statement,
+        "Statement mismatch: expected {:?}, actual {:?}",
+        expected.statement, actual.statement
+    );
 }
 
 pub struct TestValues {
@@ -234,32 +241,58 @@ pub struct TestValues {
     pub k_value: proto::SCPValue,
 }
 
-pub fn setup_values() -> TestValues {
-    use sha2::{Sha256, Digest};
-    use xdr_common::BytesM;
-    
-    let mut hasher = Sha256::new();
-    hasher.update(format!("SEED_VALUE_DATA_{}", rand::random::<u64>()));
-    let base_seed = format!("{:x}", hasher.finalize_reset());
-    
-    let mut values = Vec::new();
-    for i in 0..4 {
-        hasher.update(format!("{}/{}", base_seed, i));
-        let hash = hasher.finalize_reset();
-        values.push(BytesM(hash.to_vec()));
+impl Default for TestValues {
+    fn default() -> Self {
+        use sha2::{Digest, Sha256};
+        use xdr_common::BytesM;
+
+        let mut hasher = Sha256::new();
+        hasher.update(format!("SEED_VALUE_DATA_{}", rand::random::<u64>()));
+        let base_seed = format!("{:x}", hasher.finalize_reset());
+
+        let mut values = Vec::new();
+        for i in 0..4 {
+            hasher.update(format!("{}/{}", base_seed, i));
+            let hash = hasher.finalize_reset();
+            values.push(BytesM(hash.to_vec()));
+        }
+
+        values.sort();
+
+        hasher.update(&base_seed);
+        let k_hash = hasher.finalize();
+        let k_value = BytesM(k_hash.to_vec());
+
+        TestValues {
+            x_value: values[0].clone(),
+            y_value: values[1].clone(),
+            z_value: values[2].clone(),
+            zz_value: values[3].clone(),
+            k_value,
+        }
     }
-    
-    values.sort();
-    
-    hasher.update(&base_seed);
-    let k_hash = hasher.finalize();
-    let k_value = BytesM(k_hash.to_vec());
-    
-    TestValues {
-        x_value: values[0].clone(),
-        y_value: values[1].clone(),
-        z_value: values[2].clone(),
-        zz_value: values[3].clone(),
-        k_value,
+}
+
+pub struct TestNode {
+    pub secret_key: proto::SecretKey,
+}
+
+impl TestNode {
+    pub fn new_batch(n: i64) -> Vec<TestNode> {
+        let mut v = Vec::new();
+        for i in 0..n {
+            v.push(TestNode::new(i));
+        }
+        v
+    }
+
+    pub fn new(n: i64) -> TestNode {
+        let seed = Sha256::digest(format!("NODE_SEED_{}", n));
+        let secret_key = proto::generate_secret_key(&seed);
+        TestNode { secret_key }
+    }
+
+    pub fn node_id(&self) -> proto::SCPNodeID {
+        proto::derive_public_key(&self.secret_key)
     }
 }

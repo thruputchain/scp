@@ -24,9 +24,6 @@ pub use slot::*;
 pub mod qset;
 pub use qset::*;
 
-#[cfg(test)]
-mod qset_tests;
-
 pub mod ballotutil;
 pub use ballotutil::*;
 
@@ -50,3 +47,9 @@ pub use testkernel::*;
 
 pub mod testutil;
 pub use testutil::*;
+
+#[cfg(test)]
+mod qset_test;
+
+#[cfg(test)]
+mod stellar_test;

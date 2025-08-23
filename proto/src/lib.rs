@@ -7,6 +7,9 @@ pub use hash::*;
 pub mod sign;
 pub use sign::*;
 
+pub mod keygen;
+pub use keygen::*;
+
 // proto mods
 
 #[rustfmt::skip]

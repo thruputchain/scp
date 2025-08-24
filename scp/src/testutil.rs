@@ -2,13 +2,16 @@ use crate::*;
 use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
+fn public_from_secret(secret_key: &proto::SecretKey) -> proto::PublicKey {
+    derive_public_key(secret_key)
+}
+
 pub fn make_envelope(
     secret_key: &proto::SecretKey,
     slot_index: proto::SCPSlotIndex,
     mut statement: proto::SCPStatement,
-    public_key: proto::PublicKey,
 ) -> Result<proto::SCPEnvelope, proto::SigningError> {
-    statement.node_id = public_key;
+    statement.node_id = derive_public_key(secret_key);
     statement.slot_index = slot_index;
     let signature = proto::sign_xdr(secret_key, &statement)?;
     Ok(proto::SCPEnvelope {
@@ -23,10 +26,9 @@ pub fn make_externalize(
     slot_index: proto::SCPSlotIndex,
     commit_ballot: proto::SCPBallot,
     n_h: proto::SCPCount,
-    public_key: proto::PublicKey,
 ) -> Result<proto::SCPEnvelope, proto::SigningError> {
     let statement = proto::SCPStatement {
-        node_id: public_key.clone(),
+        node_id: derive_public_key(secret_key),
         slot_index,
         pledges: proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
             externalize: proto::SCPStatementExternalize {
@@ -36,7 +38,7 @@ pub fn make_externalize(
             },
         },
     };
-    make_envelope(secret_key, slot_index, statement, public_key)
+    make_envelope(secret_key, slot_index, statement)
 }
 
 pub fn make_confirm(
@@ -47,10 +49,9 @@ pub fn make_confirm(
     ballot: proto::SCPBallot,
     n_c: proto::SCPCount,
     n_h: proto::SCPCount,
-    public_key: proto::PublicKey,
 ) -> Result<proto::SCPEnvelope, proto::SigningError> {
     let statement = proto::SCPStatement {
-        node_id: public_key.clone(),
+        node_id: derive_public_key(secret_key),
         slot_index,
         pledges: proto::SCPStatement_pledges::SCP_ST_CONFIRM {
             confirm: proto::SCPStatementConfirm {
@@ -62,7 +63,7 @@ pub fn make_confirm(
             },
         },
     };
-    make_envelope(secret_key, slot_index, statement, public_key)
+    make_envelope(secret_key, slot_index, statement)
 }
 
 pub fn make_prepare(
@@ -74,10 +75,9 @@ pub fn make_prepare(
     n_c: proto::SCPCount,
     n_h: proto::SCPCount,
     prepared_prime: Option<proto::SCPBallot>,
-    public_key: proto::PublicKey,
 ) -> Result<proto::SCPEnvelope, proto::SigningError> {
     let statement = proto::SCPStatement {
-        node_id: public_key.clone(),
+        node_id: derive_public_key(secret_key),
         slot_index,
         pledges: proto::SCPStatement_pledges::SCP_ST_PREPARE {
             prepare: proto::SCPStatementPrepare {
@@ -90,7 +90,7 @@ pub fn make_prepare(
             },
         },
     };
-    make_envelope(secret_key, slot_index, statement, public_key)
+    make_envelope(secret_key, slot_index, statement)
 }
 
 pub fn make_nominate(
@@ -99,7 +99,6 @@ pub fn make_nominate(
     slot_index: proto::SCPSlotIndex,
     mut votes: Vec<proto::SCPValue>,
     mut accepted: Vec<proto::SCPValue>,
-    public_key: proto::PublicKey,
 ) -> Result<proto::SCPEnvelope, proto::SigningError> {
     // Sort votes and accepted as in C++ version
     votes.sort();
@@ -110,7 +109,7 @@ pub fn make_nominate(
     let accepted_vecm = VecM(accepted);
 
     let statement = proto::SCPStatement {
-        node_id: public_key.clone(),
+        node_id: derive_public_key(secret_key),
         slot_index,
         pledges: proto::SCPStatement_pledges::SCP_ST_NOMINATE {
             nominate: proto::SCPStatementNominate {
@@ -120,7 +119,7 @@ pub fn make_nominate(
             },
         },
     };
-    make_envelope(secret_key, slot_index, statement, public_key)
+    make_envelope(secret_key, slot_index, statement)
 }
 
 // Verification functions - compare actual envelope with expected envelope
@@ -134,7 +133,6 @@ pub fn verify_prepare(
     n_c: proto::SCPCount,
     n_h: proto::SCPCount,
     prepared_prime: Option<proto::SCPBallot>,
-    public_key: proto::PublicKey,
 ) {
     let expected = make_prepare(
         secret_key,
@@ -145,7 +143,6 @@ pub fn verify_prepare(
         n_c,
         n_h,
         prepared_prime,
-        public_key,
     )
     .expect("Failed to create expected envelope");
 
@@ -165,7 +162,6 @@ pub fn verify_confirm(
     ballot: proto::SCPBallot,
     n_c: proto::SCPCount,
     n_h: proto::SCPCount,
-    public_key: proto::PublicKey,
 ) {
     let expected = make_confirm(
         secret_key,
@@ -175,7 +171,6 @@ pub fn verify_confirm(
         ballot,
         n_c,
         n_h,
-        public_key,
     )
     .expect("Failed to create expected envelope");
 
@@ -193,17 +188,9 @@ pub fn verify_externalize(
     slot_index: proto::SCPSlotIndex,
     commit_ballot: proto::SCPBallot,
     n_h: proto::SCPCount,
-    public_key: proto::PublicKey,
 ) {
-    let expected = make_externalize(
-        secret_key,
-        qset_hash,
-        slot_index,
-        commit_ballot,
-        n_h,
-        public_key,
-    )
-    .expect("Failed to create expected envelope");
+    let expected = make_externalize(secret_key, qset_hash, slot_index, commit_ballot, n_h)
+        .expect("Failed to create expected envelope");
 
     assert_eq!(
         expected.statement, actual.statement,
@@ -219,12 +206,9 @@ pub fn verify_nominate(
     slot_index: proto::SCPSlotIndex,
     votes: Vec<proto::SCPValue>,
     accepted: Vec<proto::SCPValue>,
-    public_key: proto::PublicKey,
 ) {
-    let expected = make_nominate(
-        secret_key, qset_hash, slot_index, votes, accepted, public_key,
-    )
-    .expect("Failed to create expected envelope");
+    let expected = make_nominate(secret_key, qset_hash, slot_index, votes, accepted)
+        .expect("Failed to create expected envelope");
 
     assert_eq!(
         expected.statement, actual.statement,

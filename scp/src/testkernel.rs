@@ -14,15 +14,15 @@ pub struct TestKernel {
 impl TestKernel {
     pub fn new(
         node_id: proto::SCPNodeID,
-        is_validator: bool,
         qset: proto::SCPQuorumSet,
+        is_validator: bool,
     ) -> TestKernel {
         let node_id_clone = node_id.clone();
         let driver = Rc::new(RefCell::new(TestDriver::new(
             Box::new(move |q: &proto::SCPNodeID| if q == &node_id_clone { 1000 } else { 1 }),
             Box::new(|_: &proto::SCPValue| 0),
         )));
-        driver.borrow_mut().set_quorum_set(&qset);
+        driver.borrow_mut().store_quorum_set(&qset);
         TestKernel {
             kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
         }
@@ -153,7 +153,7 @@ impl TestDriver {
         }
     }
 
-    pub fn set_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
+    pub fn store_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         self.quorum_sets
             .insert(proto::hash_xdr_scp(qset).unwrap(), qset.clone());
     }

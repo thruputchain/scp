@@ -6,10 +6,10 @@ use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::Duration;
 
-type TestDriverHandle = Rc<RefCell<TestDriver>>;
+pub type TestH = Rc<RefCell<TestDriver>>;
 
 pub struct TestKernel {
-    kernel: StellarKernel<TestDriverHandle, TestDriverHandle>,
+    kernel: StellarKernel<TestH, TestH>,
 }
 
 impl TestKernel {
@@ -29,7 +29,7 @@ impl TestKernel {
         }
     }
 
-    pub fn proto(&mut self) -> StellarProto<'_, TestDriverHandle, TestDriverHandle> {
+    pub fn proto(&mut self) -> StellarProto<'_, TestH, TestH> {
         self.kernel.proto()
     }
 

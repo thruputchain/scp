@@ -167,3 +167,69 @@ fn v_blocking_distance() {
     // v0..v2 and one of v6,v7
     check(&q_set, &good, 4);
 }
+
+type GenEnvelope = Box<dyn Fn(&proto::SecretKey) -> proto::SCPEnvelope>;
+
+fn make_prepare_gen(
+    qset_hash: proto::SCPHash,
+    ballot: proto::SCPBallot,
+    prepared: Option<proto::SCPBallot>,
+    n_c: proto::SCPCount,
+    n_h: proto::SCPCount,
+    prepared_prime: Option<proto::SCPBallot>,
+) -> GenEnvelope {
+    Box::new(move |secret_key: &proto::SecretKey| {
+        make_prepare(
+            secret_key,
+            qset_hash,
+            0, // slot_index
+            ballot.clone(),
+            prepared.clone(),
+            n_c,
+            n_h,
+            prepared_prime.clone(),
+            derive_public_key(secret_key),
+        )
+        .unwrap()
+    })
+}
+
+fn make_confirm_gen(
+    qset_hash: proto::SCPHash,
+    prepare_counter: proto::SCPCount,
+    ballot: proto::SCPBallot,
+    n_c: proto::SCPCount,
+    n_h: proto::SCPCount,
+) -> GenEnvelope {
+    Box::new(move |secret_key: &proto::SecretKey| {
+        make_confirm(
+            secret_key,
+            qset_hash,
+            0, // slot_index
+            prepare_counter,
+            ballot.clone(),
+            n_c,
+            n_h,
+            derive_public_key(secret_key),
+        )
+        .unwrap()
+    })
+}
+
+fn make_externalize_gen(
+    qset_hash: proto::SCPHash,
+    commit_ballot: proto::SCPBallot,
+    n_h: proto::SCPCount,
+) -> GenEnvelope {
+    Box::new(move |secret_key: &proto::SecretKey| {
+        make_externalize(
+            secret_key,
+            qset_hash,
+            0, // slot_index
+            commit_ballot.clone(),
+            n_h,
+            derive_public_key(secret_key),
+        )
+        .unwrap()
+    })
+}

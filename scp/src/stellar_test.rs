@@ -233,3 +233,68 @@ fn make_externalize_gen(
         .unwrap()
     })
 }
+
+struct NetworkConfig {
+    NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: u32,
+    NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: u32,
+    BALLOT_TIMEOUT_INITIAL_MILLISECONDS: u32,
+    BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: u32,
+}
+
+const MinNetworkConfig: NetworkConfig = NetworkConfig {
+    NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 750,
+    NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 750,
+    BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 750,
+    BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 750,
+};
+
+const MaxNetworkConfig: NetworkConfig = NetworkConfig {
+    NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 2500,
+    NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
+    BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 2500,
+    BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
+};
+
+const InitNetworkConfig: NetworkConfig = NetworkConfig {
+    NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 1000,
+    NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
+    BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 1000,
+    BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
+};
+
+// Testing matrix that covers interesting min/max values for each timeout
+// parameter
+fn test_timeouts<F>(tk: &mut TestKernel, f: F)
+where
+    F: Fn(&mut TestKernel),
+{
+    // minimum values
+    tk.driver().initial_nomination_timeout_ms =
+        MinNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().initial_ballot_timeout_ms = MinNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().increment_nomination_timeout_ms =
+        MinNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
+    tk.driver().increment_ballot_timeout_ms =
+        MinNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
+    f(tk);
+
+    // initial values
+    tk.driver().initial_nomination_timeout_ms =
+        InitNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().initial_ballot_timeout_ms = InitNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().increment_nomination_timeout_ms =
+        InitNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
+    tk.driver().increment_ballot_timeout_ms =
+        InitNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
+    f(tk);
+
+    // maximum values
+    tk.driver().initial_nomination_timeout_ms =
+        MaxNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().initial_ballot_timeout_ms = MaxNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
+    tk.driver().increment_nomination_timeout_ms =
+        MaxNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
+    tk.driver().increment_ballot_timeout_ms =
+        MaxNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
+    f(tk);
+}

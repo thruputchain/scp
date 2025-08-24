@@ -1,5 +1,5 @@
 use crate::*;
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -26,6 +26,10 @@ impl TestKernel {
         TestKernel {
             kernel: StellarKernel::new(node_id, is_validator, qset, driver.clone(), driver.clone()),
         }
+    }
+
+    pub fn driver(&mut self) -> RefMut<'_, TestDriver> {
+        self.kernel.proto().cd.driver.borrow_mut()
     }
 
     pub fn proto(&mut self) -> StellarProto<'_, TestH, TestH> {

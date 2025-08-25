@@ -217,6 +217,7 @@ pub fn verify_nominate(
     );
 }
 
+#[derive(Clone)]
 pub struct TestValues {
     pub x_value: proto::SCPValue,
     pub y_value: proto::SCPValue,

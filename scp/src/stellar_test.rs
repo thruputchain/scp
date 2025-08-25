@@ -269,7 +269,7 @@ mod stellar_tests {
     // parameter
     fn test_timeouts<X: Fixture, F>(f: F)
     where
-        F: Fn(&mut X),
+        F: Fn(X),
     {
         // minimum values
         let mut xmin = X::default();
@@ -281,7 +281,7 @@ mod stellar_tests {
             MinNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
         xmin.tk().driver().increment_ballot_timeout_ms =
             MinNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(&mut xmin);
+        f(xmin);
 
         // initial values
         let mut xinit = X::default();
@@ -293,7 +293,7 @@ mod stellar_tests {
             InitNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
         xinit.tk().driver().increment_ballot_timeout_ms =
             InitNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(&mut xinit);
+        f(xinit);
 
         // maximum values
         let mut xmax = X::default();
@@ -305,7 +305,7 @@ mod stellar_tests {
             MaxNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
         xmax.tk().driver().increment_ballot_timeout_ms =
             MaxNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(&mut xmax);
+        f(xmax);
     }
 
     #[test]
@@ -367,92 +367,111 @@ mod stellar_tests {
             }
         }
 
-        let test = |x: &mut Fix0| {
-            x.tk.driver().store_quorum_set(&x.q_set);
-            let qset_hash0 = x.tk.proto().local_proto().get_qset_hash().clone();
+        struct Fix1 {
+            x: Fix0,
+        }
+        impl Fix1 {
+            fn new(mut x: Fix0) -> Fix1 {
+                x.tk.driver().store_quorum_set(&x.q_set);
 
-            // Verify value ordering
-            assert!(x.values.x_value < x.values.y_value);
-            assert!(x.values.y_value < x.values.z_value);
-            assert!(x.values.z_value < x.values.zz_value);
+                // Verify value ordering
+                assert!(x.values.x_value < x.values.y_value);
+                assert!(x.values.y_value < x.values.z_value);
+                assert!(x.values.z_value < x.values.zz_value);
 
-            println!("");
-            println!("BEGIN TEST");
+                println!("");
+                println!("BEGIN TEST");
 
-            // Helper closure for v-blocking checks
-            let mut recv_v_blocking_checks = |gen_: &GenEnvelope, with_checks: bool| {
-                let e1 = gen_(&x.v1_secret_key);
-                let e2 = gen_(&x.v2_secret_key);
+                Fix1 { x }
+            }
+            fn qset_hash0(&mut self) -> proto::SCPHash {
+                self.x.tk.proto().local_proto().get_qset_hash().clone()
+            }
+            fn recv_v_blocking_checks(&mut self, gen_: &GenEnvelope, with_checks: bool) {
+                let e1 = gen_(&self.x.v1_secret_key);
+                let e2 = gen_(&self.x.v2_secret_key);
 
-                x.tk.driver().bump_timer_offset();
+                self.x.tk.driver().bump_timer_offset();
 
                 // Nothing should happen with first message
-                let i = x.tk.driver().envelopes.len();
-                x.tk.proto().received_envelope(&e1);
+                let i = self.x.tk.driver().envelopes.len();
+                self.x.tk.proto().received_envelope(&e1);
                 if with_checks {
-                    assert_eq!(x.tk.driver().envelopes.len(), i);
+                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
                 }
                 let i = i + 1;
-                x.tk.proto().received_envelope(&e2);
+                self.x.tk.proto().received_envelope(&e2);
                 if with_checks {
-                    assert_eq!(x.tk.driver().envelopes.len(), i);
+                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
                 }
-            };
+            }
 
-            let recv_v_blocking = |gen_: &GenEnvelope| recv_v_blocking_checks(gen_, true);
+            fn recv_v_blocking(&mut self, gen_: &GenEnvelope) {
+                self.recv_v_blocking_checks(gen_, true)
+            }
 
-            let mut recv_quorum_checks_ex =
-                |gen_: &GenEnvelope,
-                 with_checks: bool,
-                 delayed_quorum: bool,
-                 check_upcoming: bool| {
-                    let e1 = gen_(&x.v1_secret_key);
-                    let e2 = gen_(&x.v2_secret_key);
-                    let e3 = gen_(&x.v3_secret_key);
-                    let e4 = gen_(&x.v4_secret_key);
+            fn recv_quorum_checks_ex(
+                &mut self,
+                gen_: &GenEnvelope,
+                with_checks: bool,
+                delayed_quorum: bool,
+                check_upcoming: bool,
+            ) {
+                let e1 = gen_(&self.x.v1_secret_key);
+                let e2 = gen_(&self.x.v2_secret_key);
+                let e3 = gen_(&self.x.v3_secret_key);
+                let e4 = gen_(&self.x.v4_secret_key);
 
-                    x.tk.driver().bump_timer_offset();
+                self.x.tk.driver().bump_timer_offset();
 
-                    x.tk.proto().received_envelope(&e1);
-                    x.tk.proto().received_envelope(&e2);
-                    let i = x.tk.driver().envelopes.len() + 1;
-                    x.tk.proto().received_envelope(&e3);
-                    if with_checks && !delayed_quorum {
-                        assert_eq!(x.tk.driver().envelopes.len(), i);
-                    }
-                    if check_upcoming && !delayed_quorum {
-                        x.tk.driver().has_ballot_timer_upcoming();
-                    }
-                    // Nothing happens with an extra vote (unless we're in delayed_quorum)
-                    x.tk.proto().received_envelope(&e4);
-                    if with_checks && delayed_quorum {
-                        assert_eq!(x.tk.driver().envelopes.len(), i);
-                    }
-                    if check_upcoming && delayed_quorum {
-                        x.tk.driver().has_ballot_timer_upcoming();
-                    }
-                };
+                self.x.tk.proto().received_envelope(&e1);
+                self.x.tk.proto().received_envelope(&e2);
+                let i = self.x.tk.driver().envelopes.len() + 1;
+                self.x.tk.proto().received_envelope(&e3);
+                if with_checks && !delayed_quorum {
+                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
+                }
+                if check_upcoming && !delayed_quorum {
+                    self.x.tk.driver().has_ballot_timer_upcoming();
+                }
+                // Nothing happens with an extra vote (unless we're in delayed_quorum)
+                self.x.tk.proto().received_envelope(&e4);
+                if with_checks && delayed_quorum {
+                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
+                }
+                if check_upcoming && delayed_quorum {
+                    self.x.tk.driver().has_ballot_timer_upcoming();
+                }
+            }
 
-            let recv_quorum_checks =
-                |gen_: &GenEnvelope, with_checks: bool, delayed_quorum: bool| {
-                    recv_quorum_checks_ex(gen_, with_checks, delayed_quorum, true)
-                };
+            fn recv_quorum_checks(
+                &mut self,
+                gen_: &GenEnvelope,
+                with_checks: bool,
+                delayed_quorum: bool,
+            ) {
+                self.recv_quorum_checks_ex(gen_, with_checks, delayed_quorum, true)
+            }
 
-            let mut recv_quorum_ex = |gen_: &GenEnvelope, check_upcoming: bool| {
-                recv_quorum_checks_ex(gen_, true, false, check_upcoming)
-            };
+            fn recv_quorum_ex(&mut self, gen_: &GenEnvelope, check_upcoming: bool) {
+                self.recv_quorum_checks_ex(gen_, true, false, check_upcoming)
+            }
 
-            let recv_quorum = |gen_: &GenEnvelope| recv_quorum_ex(gen_, false);
+            fn recv_quorum(&mut self, gen_: &GenEnvelope) {
+                self.recv_quorum_ex(gen_, false)
+            }
 
-            let mut nodes_all_pledge_to_commit = || {
+            fn nodes_all_pledge_to_commit(&mut self) {
+                let qset_hash0 = self.qset_hash0();
+
                 let b = SCPBallot {
                     counter: 1,
-                    value: x.values.x_value.clone(),
+                    value: self.x.values.x_value.clone(),
                 };
 
                 let prepare1 = make_prepare(
-                    &x.v1_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v1_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -462,8 +481,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare2 = make_prepare(
-                    &x.v2_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v2_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -473,8 +492,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare3 = make_prepare(
-                    &x.v3_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v3_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -484,8 +503,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare4 = make_prepare(
-                    &x.v4_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v4_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -495,12 +514,12 @@ mod stellar_tests {
                 )
                 .unwrap();
 
-                assert!(x.tk.bump_state(0, &x.values.x_value));
-                assert_eq!(x.tk.driver().envelopes.len(), 1);
+                assert!(self.x.tk.bump_state(0, &self.x.values.x_value));
+                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
 
                 verify_prepare(
-                    &x.tk.driver().envelopes[0],
-                    &x.v0_secret_key,
+                    &self.x.tk.driver().envelopes[0],
+                    &self.x.v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -510,23 +529,32 @@ mod stellar_tests {
                     None,
                 );
 
-                x.tk.proto().received_envelope(&prepare1);
-                assert_eq!(x.tk.driver().envelopes.len(), 1);
-                assert_eq!(x.tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
+                self.x.tk.proto().received_envelope(&prepare1);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
+                assert_eq!(
+                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
+                    0
+                );
 
-                x.tk.proto().received_envelope(&prepare2);
-                assert_eq!(x.tk.driver().envelopes.len(), 1);
-                assert_eq!(x.tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
+                self.x.tk.proto().received_envelope(&prepare2);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
+                assert_eq!(
+                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
+                    0
+                );
 
-                x.tk.proto().received_envelope(&prepare3);
-                assert_eq!(x.tk.driver().envelopes.len(), 2);
-                assert_eq!(x.tk.driver().heard_from_quorums.get(&0).unwrap().len(), 1);
-                assert_eq!(x.tk.driver().heard_from_quorums.get(&0).unwrap()[0], b);
+                self.x.tk.proto().received_envelope(&prepare3);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
+                assert_eq!(
+                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
+                    1
+                );
+                assert_eq!(self.x.tk.driver().heard_from_quorums.get(&0).unwrap()[0], b);
 
                 // We have a quorum including us
                 verify_prepare(
-                    &x.tk.driver().envelopes[1],
-                    &x.v0_secret_key,
+                    &self.x.tk.driver().envelopes[1],
+                    &self.x.v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -536,12 +564,12 @@ mod stellar_tests {
                     None,
                 );
 
-                x.tk.proto().received_envelope(&prepare4);
-                assert_eq!(x.tk.driver().envelopes.len(), 2);
+                self.x.tk.proto().received_envelope(&prepare4);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
 
                 let prepared1 = make_prepare(
-                    &x.v1_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v1_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -551,8 +579,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared2 = make_prepare(
-                    &x.v2_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v2_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -562,8 +590,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared3 = make_prepare(
-                    &x.v3_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v3_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -573,8 +601,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared4 = make_prepare(
-                    &x.v4_secret_key,
-                    x.qset_hash.into_inner(),
+                    &self.x.v4_secret_key,
+                    self.x.qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -584,17 +612,17 @@ mod stellar_tests {
                 )
                 .unwrap();
 
-                x.tk.proto().received_envelope(&prepared4);
-                x.tk.proto().received_envelope(&prepared3);
-                assert_eq!(x.tk.driver().envelopes.len(), 2);
+                self.x.tk.proto().received_envelope(&prepared4);
+                self.x.tk.proto().received_envelope(&prepared3);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
 
-                x.tk.proto().received_envelope(&prepared2);
-                assert_eq!(x.tk.driver().envelopes.len(), 3);
+                self.x.tk.proto().received_envelope(&prepared2);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 3);
 
                 // confirms prepared
                 verify_prepare(
-                    &x.tk.driver().envelopes[2],
-                    &x.v0_secret_key,
+                    &self.x.tk.driver().envelopes[2],
+                    &self.x.v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -605,23 +633,24 @@ mod stellar_tests {
                 );
 
                 // extra statement doesn't do anything
-                x.tk.proto().received_envelope(&prepared1);
-                assert_eq!(x.tk.driver().envelopes.len(), 3);
-            };
+                self.x.tk.proto().received_envelope(&prepared1);
+                assert_eq!(self.x.tk.driver().envelopes.len(), 3);
+            }
 
-            let section_bump_state_x = |x: &mut Fix0| {
+            fn section_bump_state_x(&mut self) {
                 println!("SECTION: bumpState x");
-                assert!(x.tk.bump_state(0, &x.values.x_value.clone()));
-                assert_eq!(x.tk.driver().envelopes.len(), 1);
+                assert!(self.x.tk.bump_state(0, &self.x.values.x_value.clone()));
+                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
 
                 let expected_ballot = SCPBallot {
                     counter: 1,
-                    value: x.values.x_value.clone(),
+                    value: self.x.values.x_value.clone(),
                 };
 
+                let qset_hash0 = self.qset_hash0();
                 verify_prepare(
-                    &x.tk.driver().envelopes[0],
-                    &x.v0_secret_key,
+                    &self.x.tk.driver().envelopes[0],
+                    &self.x.v0_secret_key,
                     qset_hash0,
                     0,
                     expected_ballot,
@@ -630,17 +659,17 @@ mod stellar_tests {
                     0,
                     None,
                 );
-            };
+            }
 
-            let section_start_1x = |x: &mut Fix0| {
+            fn section_start_1x(&mut self) {
                 println!("SECTION: start <1,x>");
                 // No timer should be set initially
-                assert!(!x.tk.driver().has_ballot_timer());
+                assert!(!self.x.tk.driver().has_ballot_timer());
 
-                let a_value = &x.values.x_value;
-                let b_value = &x.values.z_value;
-                let mid_value = &x.values.y_value;
-                let big_value = &x.values.zz_value;
+                let a_value = &self.x.values.x_value;
+                let b_value = &self.x.values.z_value;
+                let mid_value = &self.x.values.y_value;
+                let big_value = &self.x.values.zz_value;
 
                 let a1 = SCPBallot {
                     counter: 1,
@@ -692,9 +721,9 @@ mod stellar_tests {
                 let mut big2 = big1.clone();
                 big2.counter += 1;
 
-                assert!(x.tk.bump_state(0, a_value));
-                assert_eq!(x.tk.driver().envelopes.len(), 1);
-                assert!(!x.tk.driver().has_ballot_timer());
+                assert!(self.x.tk.bump_state(0, a_value));
+                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
+                assert!(!self.x.tk.driver().has_ballot_timer());
 
                 println!("SECTION: prepared A1");
                 {}
@@ -707,7 +736,12 @@ mod stellar_tests {
 
                 println!("SECTION: confirm (v-blocking)");
                 {}
-            };
+            }
+        }
+
+        let test = |x: Fix0| {
+            // Fix1::new(x).section_bump_state_x();
+            // Fix1::new(x).section_start_1x();
         };
 
         test_timeouts(test);

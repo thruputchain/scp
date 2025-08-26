@@ -132,19 +132,29 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
                     (p, vs)
                 })
                 .collect(),
-            Rewritten::Unfolded(xs) => {
-                todo!()
+            Rewritten::Unfolded(last_unfoldings) => {
+                let mut unfolded = vec![];
+
+                let unchanged_prefix = &grab_unchanged(&stmts[..stmts.len() - 1]);
+
+                for (last_path, last_stmt) in last_unfoldings {
+                    let mut merged: Vec<Stmt> = unchanged_prefix.iter().cloned().cloned().collect(); // XXX: cloned^2 ???
+                    merged.push(last_stmt.clone());
+                    unfolded.push((last_path.clone(), merged));
+                }
+
+                unfolded
             }
         }
     }
 }
 
-fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<Stmt> {
+fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
     stmts
         .iter()
         .filter_map(|rewritten| {
             if let Rewritten::Unchanged(stmt) = rewritten {
-                Some(stmt.clone())
+                Some(stmt)
             } else {
                 None
             }

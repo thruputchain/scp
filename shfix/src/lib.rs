@@ -90,29 +90,66 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 
 fn rewrite_block2(description: &String, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
+    let unfolded_stmts = unfold_stmts(&rewritten_stmts);
+    let header_stmt = parse_quote! {
+        println!(#description);
+    };
 
     let mut unfoldings = Vec::new();
-
-    for (path, stmts) in unfold_stmts(&rewritten_stmts) {
-        let mut new_stmts = vec![];
-        new_stmts.push(parse_quote! {
-            println!(#description);
-        });
-        new_stmts.extend(stmts);
+    if unfolded_stmts.is_empty() {
         unfoldings.push((
-            path.clone(),
+            vec![],
             Block {
                 brace_token: block.brace_token.clone(),
-                stmts: new_stmts,
+                stmts: vec![header_stmt],
             },
         ));
+    } else {
+        for (path, stmts) in unfold_stmts(&rewritten_stmts) {
+            let mut new_stmts = vec![header_stmt.clone()];
+            new_stmts.extend(stmts);
+            unfoldings.push((
+                path.clone(),
+                Block {
+                    brace_token: block.brace_token.clone(),
+                    stmts: new_stmts,
+                },
+            ));
+        }
     }
-
     Rewritten::Unfolded(unfoldings)
 }
 
-fn unfold_stmts(stmts: &Vec<Rewritten<Stmt>>) -> Vec<(SectionPath, Vec<Stmt>)> {
-    todo!()
+fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
+    if stmts.is_empty() {
+        vec![]
+    } else {
+        match &stmts.last().unwrap() {
+            Rewritten::Unchanged(x) => unfold_stmts(&stmts[..stmts.len() - 1])
+                .into_iter()
+                .map(|(p, mut vs)| {
+                    vs.push(x.clone());
+                    (p, vs)
+                })
+                .collect(),
+            Rewritten::Unfolded(xs) => {
+                todo!()
+            }
+        }
+    }
+}
+
+fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<Stmt> {
+    stmts
+        .iter()
+        .filter_map(|rewritten| {
+            if let Rewritten::Unchanged(stmt) = rewritten {
+                Some(stmt.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn rewrite_block(block: &Box<Block>) -> Rewritten<Box<Block>> {

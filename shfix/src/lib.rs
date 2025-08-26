@@ -2,7 +2,10 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::Parse;
-use syn::{Block, ItemFn, LitStr, parse_quote};
+use syn::{
+    Block, Expr, ExprBlock, ItemFn, LitStr, Macro, Stmt, StmtMacro, parse_quote, token::Brace,
+    token::Semi,
+};
 
 #[proc_macro_attribute]
 pub fn shfix(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -34,9 +37,82 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
 type SectionPath = Vec<String>;
 
-enum Rewritten<T> {
-    Unchanged(T),
-    Unfolded(Vec<(SectionPath, T)>),
+enum Rewritten<Q> {
+    Unchanged(Q),
+    Unfolded(Vec<(SectionPath, Q)>),
+}
+
+// rewrites each individual statement
+fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
+    let mut rewritten = Vec::new();
+
+    for stmt in stmts {
+        match stmt {
+            Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_, _) => {
+                rewritten.push(Rewritten::Unchanged(stmt.clone()))
+            }
+            Stmt::Macro(stmt_macro) => {
+                if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
+                    match rewrite_block2(&description, &section_block) {
+                        Rewritten::Unchanged(_) => {
+                            rewritten
+                                .push(Rewritten::Unfolded(vec![(vec![id.clone()], stmt.clone())]));
+                        }
+                        Rewritten::Unfolded(rewritten_section_blocks) => {
+                            let mut stmt_rewrites = vec![];
+                            for (rewritten_path, rewritten_block) in rewritten_section_blocks {
+                                let mut path = vec![id.clone()];
+                                path.extend(rewritten_path);
+                                stmt_rewrites.push((
+                                    path,
+                                    Stmt::Expr(
+                                        Expr::Block(ExprBlock {
+                                            attrs: stmt_macro.attrs.clone(),
+                                            label: None,
+                                            block: rewritten_block,
+                                        }),
+                                        stmt_macro.semi_token.clone(),
+                                    ),
+                                ));
+                            }
+                            rewritten.push(Rewritten::Unfolded(stmt_rewrites));
+                        }
+                    }
+                } else {
+                    rewritten.push(Rewritten::Unchanged(stmt.clone()))
+                }
+            }
+        }
+    }
+
+    rewritten
+}
+
+fn rewrite_block2(description: &String, block: &Block) -> Rewritten<Block> {
+    let rewritten_stmts = rewrite_stmts(&block.stmts);
+
+    let mut unfoldings = Vec::new();
+
+    for (path, stmts) in unfold_stmts(&rewritten_stmts) {
+        let mut new_stmts = vec![];
+        new_stmts.push(parse_quote! {
+            println!(#description);
+        });
+        new_stmts.extend(stmts);
+        unfoldings.push((
+            path.clone(),
+            Block {
+                brace_token: block.brace_token.clone(),
+                stmts: new_stmts,
+            },
+        ));
+    }
+
+    Rewritten::Unfolded(unfoldings)
+}
+
+fn unfold_stmts(stmts: &Vec<Rewritten<Stmt>>) -> Vec<(SectionPath, Vec<Stmt>)> {
+    todo!()
 }
 
 fn rewrite_block(block: &Box<Block>) -> Rewritten<Box<Block>> {
@@ -123,30 +199,26 @@ fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, B
     }
 }
 
-fn stitch(description: &String, stmts: &Vec<syn::Stmt>, last: Box<Block>) -> Box<Block> {
+fn stitch(description: &String, stmts: &Vec<Stmt>, last: Box<Block>) -> Box<Block> {
     let mut new_stmts = Vec::new();
 
-    let println_stmt: syn::Stmt = parse_quote! {
+    new_stmts.push(parse_quote! {
         println!(#description);
-    };
-    new_stmts.push(println_stmt);
+    });
 
     new_stmts.extend(stmts.clone());
 
-    let block_expr = syn::Expr::Block(syn::ExprBlock {
+    let block_expr = Expr::Block(ExprBlock {
         attrs: Vec::new(),
         label: None,
         block: *last,
     });
 
     // add the block as a statement with semicolon
-    new_stmts.push(syn::Stmt::Expr(
-        block_expr,
-        Some(syn::token::Semi::default()),
-    ));
+    new_stmts.push(Stmt::Expr(block_expr, Some(Semi::default())));
 
     Box::new(Block {
-        brace_token: syn::token::Brace::default(),
+        brace_token: Brace::default(),
         stmts: new_stmts,
     })
 }

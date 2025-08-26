@@ -17,7 +17,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
     let mut output = TokenStream2::new();
 
-    match rewrite_block(&input_fn.block) {
+    match rewrite_block2(None, &input_fn.block) {
         Rewritten::Unchanged(_) => {
             output.extend(quote! { #input_fn });
         }
@@ -26,7 +26,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
                 let mut unfolded_fn = input_fn.clone();
                 let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
                 unfolded_fn.sig.ident = syn::Ident::new(&name, input_fn.sig.ident.span());
-                unfolded_fn.block = block;
+                unfolded_fn.block = Box::new(block);
                 output.extend(quote! { #unfolded_fn });
             }
         }
@@ -53,7 +53,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
             }
             Stmt::Macro(stmt_macro) => {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
-                    match rewrite_block2(&description, &section_block) {
+                    match rewrite_block2(Some(&description), &section_block) {
                         Rewritten::Unchanged(_) => {
                             rewritten
                                 .push(Rewritten::Unfolded(vec![(vec![id.clone()], stmt.clone())]));
@@ -88,12 +88,16 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
     rewritten
 }
 
-fn rewrite_block2(description: &String, block: &Block) -> Rewritten<Block> {
+fn rewrite_block2(description: Option<&String>, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
     let unfolded_stmts = unfold_stmts(&rewritten_stmts);
-    let header_stmt = parse_quote! {
-        println!(#description);
-    };
+
+    let header_stmt = description.map(|d| {
+        let s: Stmt = parse_quote! {
+            println!(#d);
+        };
+        s
+    });
 
     let mut unfoldings = Vec::new();
     if unfolded_stmts.is_empty() {
@@ -101,12 +105,20 @@ fn rewrite_block2(description: &String, block: &Block) -> Rewritten<Block> {
             vec![],
             Block {
                 brace_token: block.brace_token.clone(),
-                stmts: vec![header_stmt],
+                stmts: if let Some(h) = header_stmt {
+                    vec![h]
+                } else {
+                    vec![]
+                },
             },
         ));
     } else {
         for (path, stmts) in unfold_stmts(&rewritten_stmts) {
-            let mut new_stmts = vec![header_stmt.clone()];
+            let mut new_stmts = if let Some(h) = &header_stmt {
+                vec![h.clone()]
+            } else {
+                vec![]
+            };
             new_stmts.extend(stmts);
             unfoldings.push((
                 path.clone(),
@@ -162,52 +174,6 @@ fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
         .collect()
 }
 
-fn rewrite_block(block: &Box<Block>) -> Rewritten<Box<Block>> {
-    let mut unfoldings = Vec::new();
-
-    let mut prefix_stmts = Vec::new();
-    for stmt in &block.stmts {
-        match stmt {
-            syn::Stmt::Local(local) => prefix_stmts.push(syn::Stmt::Local(local.clone())),
-            syn::Stmt::Item(item) => prefix_stmts.push(syn::Stmt::Item(item.clone())),
-            syn::Stmt::Expr(expr, opt_token) => {
-                prefix_stmts.push(syn::Stmt::Expr(expr.clone(), opt_token.clone()))
-            }
-            syn::Stmt::Macro(stmt_macro) => {
-                if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
-                    // recursively, compute all unfoldings of the macro block
-                    match rewrite_block(&Box::new(section_block)) {
-                        Rewritten::Unfolded(section_unfoldings) =>
-                        // for each unfolded block `{ macro_stmts };` create `{ prefix_stmts; { macro_stmts }; }`
-                        {
-                            for (leaf_path, unfolded_section_block) in section_unfoldings {
-                                let stitched_block =
-                                    stitch(&description, &prefix_stmts, unfolded_section_block);
-                                let mut path = vec![id.clone()];
-                                path.extend(leaf_path);
-                                unfoldings.push((path, stitched_block));
-                            }
-                        }
-                        Rewritten::Unchanged(section_block) => {
-                            let stitched_block = stitch(&description, &prefix_stmts, section_block);
-                            unfoldings.push((vec![id.clone()], stitched_block));
-                        }
-                    }
-                } else {
-                    prefix_stmts.push(syn::Stmt::Macro(stmt_macro.clone()))
-                }
-            }
-        }
-    }
-
-    if unfoldings.is_empty() {
-        // leaf block
-        Rewritten::Unchanged(block.clone())
-    } else {
-        Rewritten::Unfolded(unfoldings)
-    }
-}
-
 /// parses macros of the form:
 ///     section!(identifier, "description", { ... });
 fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, Block)> {
@@ -246,30 +212,6 @@ fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, B
     }
 }
 
-fn stitch(description: &String, stmts: &Vec<Stmt>, last: Box<Block>) -> Box<Block> {
-    let mut new_stmts = Vec::new();
-
-    new_stmts.push(parse_quote! {
-        println!(#description);
-    });
-
-    new_stmts.extend(stmts.clone());
-
-    let block_expr = Expr::Block(ExprBlock {
-        attrs: Vec::new(),
-        label: None,
-        block: *last,
-    });
-
-    // add the block as a statement with semicolon
-    new_stmts.push(Stmt::Expr(block_expr, Some(Semi::default())));
-
-    Box::new(Block {
-        brace_token: Brace::default(),
-        stmts: new_stmts,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,7 +229,9 @@ mod tests {
                     println!(x);
                 });
                 let y = 2;
-                section!(b, "section b", { println!(y); });
+                section!(b, "section b", {
+                    println!(y);
+                });
                 let z = 2;
             }
         };

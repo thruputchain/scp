@@ -14,20 +14,33 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
     let mut output = TokenStream2::new();
 
-    for (path, block) in unfold_block(&input_fn.block) {
-        let mut unfolded_fn = input_fn.clone();
-        let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
-        unfolded_fn.sig.ident = syn::Ident::new(&name, input_fn.sig.ident.span());
-        unfolded_fn.block = block;
-        output.extend(quote! { #unfolded_fn });
+    match rewrite_block(&input_fn.block) {
+        Rewritten::Unchanged(_) => {
+            output.extend(quote! { #input_fn });
+        }
+        Rewritten::Unfolded(unfoldings) => {
+            for (path, block) in unfoldings {
+                let mut unfolded_fn = input_fn.clone();
+                let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
+                unfolded_fn.sig.ident = syn::Ident::new(&name, input_fn.sig.ident.span());
+                unfolded_fn.block = block;
+                output.extend(quote! { #unfolded_fn });
+            }
+        }
     }
 
     output
 }
 
-/// returns vector of (unfolded block, path to leaf section)
-fn unfold_block(block: &Box<Block>) -> Vec<(Vec<String>, Box<Block>)> {
-    let mut result = Vec::new();
+type SectionPath = Vec<String>;
+
+enum Rewritten<T> {
+    Unchanged(T),
+    Unfolded(Vec<(SectionPath, T)>),
+}
+
+fn rewrite_block(block: &Box<Block>) -> Rewritten<Box<Block>> {
+    let mut unfoldings = Vec::new();
 
     let mut prefix_stmts = Vec::new();
     for stmt in &block.stmts {
@@ -38,17 +51,24 @@ fn unfold_block(block: &Box<Block>) -> Vec<(Vec<String>, Box<Block>)> {
                 prefix_stmts.push(syn::Stmt::Expr(expr.clone(), opt_token.clone()))
             }
             syn::Stmt::Macro(stmt_macro) => {
-                if let Some((id, description, macro_block)) = parse_section_macro(stmt_macro) {
+                if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
                     // recursively, compute all unfoldings of the macro block
-                    let unfolded_macro_block = unfold_block(&Box::new(macro_block));
-
-                    // for each unfolded block `{ macro_stmts };` create `{ prefix_stmts; { macro_stmts }; }`
-                    for (leaf_path, unfolded_macro_block) in unfolded_macro_block {
-                        let stitched_block =
-                            stitch(&description, &prefix_stmts, unfolded_macro_block);
-                        let mut path = vec![id.clone()];
-                        path.extend(leaf_path);
-                        result.push((path, stitched_block));
+                    match rewrite_block(&Box::new(section_block)) {
+                        Rewritten::Unfolded(section_unfoldings) =>
+                        // for each unfolded block `{ macro_stmts };` create `{ prefix_stmts; { macro_stmts }; }`
+                        {
+                            for (leaf_path, unfolded_section_block) in section_unfoldings {
+                                let stitched_block =
+                                    stitch(&description, &prefix_stmts, unfolded_section_block);
+                                let mut path = vec![id.clone()];
+                                path.extend(leaf_path);
+                                unfoldings.push((path, stitched_block));
+                            }
+                        }
+                        Rewritten::Unchanged(section_block) => {
+                            let stitched_block = stitch(&description, &prefix_stmts, section_block);
+                            unfoldings.push((vec![id.clone()], stitched_block));
+                        }
                     }
                 } else {
                     prefix_stmts.push(syn::Stmt::Macro(stmt_macro.clone()))
@@ -57,12 +77,12 @@ fn unfold_block(block: &Box<Block>) -> Vec<(Vec<String>, Box<Block>)> {
         }
     }
 
-    if result.is_empty() {
+    if unfoldings.is_empty() {
         // leaf block
-        result.push((Vec::new(), block.clone()));
+        Rewritten::Unchanged(block.clone())
+    } else {
+        Rewritten::Unfolded(unfoldings)
     }
-
-    result
 }
 
 /// parses macros of the form:
@@ -141,6 +161,7 @@ mod tests {
     fn test_impl() {
         let attr_args = TokenStream2::new();
         let input_fn: ItemFn = parse_quote! {
+            #[test]
             fn root() {
                 let x = 1;
                 section!(a, "section a", {

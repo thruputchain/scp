@@ -17,7 +17,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
     let mut output = TokenStream2::new();
 
-    match rewrite_block2(None, &input_fn.block) {
+    match rewrite_block(None, &input_fn.block) {
         Rewritten::Unchanged(_) => {
             output.extend(quote! { #input_fn });
         }
@@ -53,7 +53,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
             }
             Stmt::Macro(stmt_macro) => {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
-                    match rewrite_block2(Some(&description), &section_block) {
+                    match rewrite_block(Some(&description), &section_block) {
                         Rewritten::Unchanged(_) => {
                             rewritten
                                 .push(Rewritten::Unfolded(vec![(vec![id.clone()], stmt.clone())]));
@@ -88,9 +88,38 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
     rewritten
 }
 
-fn rewrite_block2(description: Option<&String>, block: &Block) -> Rewritten<Block> {
+fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
+
+    println!("BEGIN rewritten_stmts");
+    for rw in &rewritten_stmts {
+        match rw {
+            Rewritten::Unchanged(s) => println!("unchanged: {}", quote! { #s }),
+            Rewritten::Unfolded(u) => {
+                print!("unfolded: ");
+                for (path, stmt) in u {
+                    print!("{}: {} ¶", path.join("_"), quote! { #stmt });
+                }
+                println!();
+            }
+        }
+    }
+    println!("END rewritten_stmts");
+
     let unfolded_stmts = unfold_stmts(&rewritten_stmts);
+
+    println!("BEGIN unfolded_stmts");
+    for (path, ss) in &unfolded_stmts {
+        println!(
+            "{}: {:?}",
+            path.join("_"),
+            ss.iter()
+                .map(|s| { format!("{}", quote! { #s }) })
+                .collect::<Vec<String>>()
+                .join(" ¶ ")
+        );
+    }
+    println!("END unfolded_stmts");
 
     let header_stmt = description.map(|d| {
         let s: Stmt = parse_quote! {
@@ -134,13 +163,13 @@ fn rewrite_block2(description: Option<&String>, block: &Block) -> Rewritten<Bloc
 
 fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
     if stmts.is_empty() {
-        vec![]
+        vec![(SectionPath::new(), Vec::new())]
     } else {
         match &stmts.last().unwrap() {
-            Rewritten::Unchanged(x) => unfold_stmts(&stmts[..stmts.len() - 1])
+            Rewritten::Unchanged(last_stmt) => unfold_stmts(&stmts[..stmts.len() - 1])
                 .into_iter()
                 .map(|(p, mut vs)| {
-                    vs.push(x.clone());
+                    vs.push(last_stmt.clone());
                     (p, vs)
                 })
                 .collect(),

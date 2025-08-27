@@ -3,8 +3,8 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::Parse;
 use syn::{
-    Block, Expr, ExprBlock, ItemFn, LitStr, Macro, Stmt, StmtMacro, parse_quote, token::Brace,
-    token::Semi,
+    Block, Expr, ExprBlock, ExprClosure, ItemFn, LitStr, Local, Macro, Pat, PatIdent, Stmt,
+    StmtMacro, parse_quote,
 };
 
 #[proc_macro_attribute]
@@ -48,9 +48,14 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 
     for stmt in stmts {
         match stmt {
-            Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_, _) => {
-                rewritten.push(Rewritten::Unchanged(stmt.clone()))
-            }
+            Stmt::Local(local) => match rewrite_local(local) {
+                Rewritten::Unchanged(_) => rewritten.push(Rewritten::Unchanged(stmt.clone())),
+                Rewritten::Unfolded(ls) => {
+                    let unfolded_stmts = ls.into_iter().map(|(p, l)| (p, Stmt::Local(l))).collect();
+                    rewritten.push(Rewritten::Unfolded(unfolded_stmts));
+                }
+            },
+            Stmt::Item(_) | Stmt::Expr(_, _) => rewritten.push(Rewritten::Unchanged(stmt.clone())),
             Stmt::Macro(stmt_macro) => {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
                     match rewrite_block(Some(&description), &section_block) {
@@ -86,6 +91,51 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
     }
 
     rewritten
+}
+
+fn rewrite_local(local: &Local) -> Rewritten<Local> {
+    if let Some((expr_closure, expr_block, block)) = parse_local_closure(local) {
+        match rewrite_block(None, block) {
+            Rewritten::Unchanged(_) => Rewritten::Unchanged(local.clone()),
+            Rewritten::Unfolded(bs) => Rewritten::Unfolded(
+                bs.into_iter()
+                    .map(|(p, b)| {
+                        let mut new_local = local.clone();
+                        let new_expr_closure =
+                            if let Expr::Closure(x) = &mut *new_local.init.as_mut().unwrap().expr {
+                                x
+                            } else {
+                                panic!("bug")
+                            };
+                        let expr_block = Expr::Block(ExprBlock {
+                            attrs: expr_block.attrs.clone(),
+                            label: expr_block.label.clone(),
+                            block: b,
+                        });
+                        new_expr_closure.body = Box::new(expr_block);
+                        (p, new_local)
+                    })
+                    .collect(),
+            ),
+        }
+    } else {
+        Rewritten::Unchanged(local.clone())
+    }
+}
+
+fn parse_local_closure(local: &Local) -> Option<(&ExprClosure, &ExprBlock, &Block)> {
+    if let Some(local_init) = &local.init {
+        if let Expr::Closure(expr_closure) = &*local_init.expr {
+            if let Expr::Block(expr_block) = &*expr_closure.body {
+                return Some((expr_closure, expr_block, &expr_block.block));
+            }
+        }
+    }
+    None
+}
+
+fn rewrite_closure(cl: &ExprClosure) -> Rewritten<ExprClosure> {
+    todo!()
 }
 
 fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {

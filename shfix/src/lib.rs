@@ -18,7 +18,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let mut output = TokenStream2::new();
 
     match rewrite_block(None, &input_fn.block) {
-        Rewritten::Unchanged(_) => {
+        Rewritten::Fix(_) => {
             output.extend(quote! { #input_fn });
         }
         Rewritten::Unfolded(unfoldings) => {
@@ -38,7 +38,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 type SectionPath = Vec<String>;
 
 enum Rewritten<Q> {
-    Unchanged(Q),
+    Fix(Q),
     Unfolded(Vec<(SectionPath, Q)>),
 }
 
@@ -49,17 +49,17 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
     for stmt in stmts {
         match stmt {
             Stmt::Local(local) => match rewrite_local(local) {
-                Rewritten::Unchanged(_) => rewritten.push(Rewritten::Unchanged(stmt.clone())),
+                Rewritten::Fix(_) => rewritten.push(Rewritten::Fix(stmt.clone())),
                 Rewritten::Unfolded(ls) => {
                     let unfolded_stmts = ls.into_iter().map(|(p, l)| (p, Stmt::Local(l))).collect();
                     rewritten.push(Rewritten::Unfolded(unfolded_stmts));
                 }
             },
-            Stmt::Item(_) | Stmt::Expr(_, _) => rewritten.push(Rewritten::Unchanged(stmt.clone())),
+            Stmt::Item(_) | Stmt::Expr(_, _) => rewritten.push(Rewritten::Fix(stmt.clone())),
             Stmt::Macro(stmt_macro) => {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
                     match rewrite_block(Some(&description), &section_block) {
-                        Rewritten::Unchanged(_) => {
+                        Rewritten::Fix(_) => {
                             rewritten
                                 .push(Rewritten::Unfolded(vec![(vec![id.clone()], stmt.clone())]));
                         }
@@ -84,7 +84,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                         }
                     }
                 } else {
-                    rewritten.push(Rewritten::Unchanged(stmt.clone()))
+                    rewritten.push(Rewritten::Fix(stmt.clone()))
                 }
             }
         }
@@ -96,7 +96,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 fn rewrite_local(local: &Local) -> Rewritten<Local> {
     if let Some((expr_closure, expr_block, block)) = parse_local_closure(local) {
         match rewrite_block(None, block) {
-            Rewritten::Unchanged(_) => Rewritten::Unchanged(local.clone()),
+            Rewritten::Fix(_) => Rewritten::Fix(local.clone()),
             Rewritten::Unfolded(bs) => Rewritten::Unfolded(
                 bs.into_iter()
                     .map(|(p, b)| {
@@ -119,7 +119,7 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
             ),
         }
     } else {
-        Rewritten::Unchanged(local.clone())
+        Rewritten::Fix(local.clone())
     }
 }
 
@@ -186,7 +186,7 @@ fn _rewritten_stmts_to_str(stmts: &[Rewritten<Stmt>]) -> String {
     let mut r = String::new();
     for rw in stmts {
         match rw {
-            Rewritten::Unchanged(s) => {
+            Rewritten::Fix(s) => {
                 r.push_str(&format!("unchanged({}) ", quote! { #s }));
             }
             Rewritten::Unfolded(u) => {
@@ -221,7 +221,7 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
         vec![(SectionPath::new(), Vec::new())]
     } else {
         match &stmts.last().unwrap() {
-            Rewritten::Unchanged(last_stmt) => unfold_stmts(&stmts[..stmts.len() - 1])
+            Rewritten::Fix(last_stmt) => unfold_stmts(&stmts[..stmts.len() - 1])
                 .into_iter()
                 .map(|(p, mut vs)| {
                     vs.push(last_stmt.clone());
@@ -252,7 +252,7 @@ fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
     stmts
         .iter()
         .filter_map(|rewritten| {
-            if let Rewritten::Unchanged(stmt) = rewritten {
+            if let Rewritten::Fix(stmt) = rewritten {
                 Some(stmt)
             } else {
                 None
@@ -305,62 +305,123 @@ mod tests {
     use quote::quote;
     use syn::{ItemFn, parse_quote};
 
+    use std::sync::LazyLock;
+
+    struct TestCase {
+        input: ItemFn,
+        expected: TokenStream2,
+    }
+
+    fn get_test_cases() -> Vec<TestCase> {
+        vec![
+            TestCase {
+                input: parse_quote! {
+                    #[test]
+                    fn root() {
+                        let x = 1;
+                        section!(a, "section a", {
+                            println!(x);
+                        });
+                        let y = 2;
+                        section!(b, "section b", {
+                            println!(y);
+                        });
+                        let z = 2;
+                    }
+                },
+                expected: quote! {
+                    #[test]
+                    fn root_b() {
+                        let x = 1;
+                        let y = 2;
+                        {
+                            println!("section b");
+                            println!(y);
+                        };
+                        let z = 2;
+                    }
+                    #[test]
+                    fn root_a() {
+                        let x = 1;
+                        {
+                            println!("section a");
+                            println!(x);
+                        };
+                        let y = 2;
+                        let z = 2;
+                    }
+                    #[test]
+                    fn root_() {
+                        let x = 1;
+                        let y = 2;
+                        let z = 2;
+                    }
+                },
+            },
+            TestCase {
+                input: parse_quote! {
+                    #[test]
+                    fn root() {
+                        let x = 1;
+                        section!(a, "section a", {
+                            println!(x);
+                        });
+                        let y = || {
+                            section!(b, "section b", {
+                                println!(y);
+                            });
+                        };
+                        let z = 2;
+                    }
+                },
+                expected: quote! {
+                    #[test]
+                    fn root_b() {
+                        let x = 1;
+                        let y = 2;
+                        {
+                            println!("section b");
+                            println!(y);
+                        };
+                        let z = 2;
+                    }
+                    #[test]
+                    fn root_a() {
+                        let x = 1;
+                        {
+                            println!("section a");
+                            println!(x);
+                        };
+                        let y = 2;
+                        let z = 2;
+                    }
+                    #[test]
+                    fn root_() {
+                        let x = 1;
+                        let y = 2;
+                        let z = 2;
+                    }
+                },
+            },
+        ]
+    }
+
     #[test]
     fn test_impl() {
-        let attr_args = TokenStream2::new();
-        let input_fn: ItemFn = parse_quote! {
-            #[test]
-            fn root() {
-                let x = 1;
-                section!(a, "section a", {
-                    println!(x);
-                });
-                let y = 2;
-                section!(b, "section b", {
-                    println!(y);
-                });
-                let z = 2;
-            }
-        };
-        let result = shfix_impl(attr_args, quote! { #input_fn });
-        let expected = quote! {
-            #[test]
-            fn root_b() {
-                let x = 1;
-                let y = 2;
-                {
-                    println!("section b");
-                    println!(y);
-                };
-                let z = 2;
-            }
-            #[test]
-            fn root_a() {
-                let x = 1;
-                {
-                    println!("section a");
-                    println!(x);
-                };
-                let y = 2;
-                let z = 2;
-            }
-            #[test]
-            fn root_() {
-                let x = 1;
-                let y = 2;
-                let z = 2;
-            }
-        };
+        for TestCase { input, expected } in get_test_cases() {
+            let attr_args = TokenStream2::new();
+            let result = shfix_impl(attr_args, quote! { #input });
 
-        let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
-        let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
+            let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
+            let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
 
-        let result_pretty = prettyplease::unparse(&result_file);
-        let expected_pretty = prettyplease::unparse(&expected_file);
+            let result_pretty = prettyplease::unparse(&result_file);
+            let expected_pretty = prettyplease::unparse(&expected_file);
 
-        println!("Result:\n{}", result_pretty);
-        println!("Expected:\n{}", expected_pretty);
+            println!("Result:\n{}", result_pretty);
+            println!("Expected:\n{}", expected_pretty);
 
-        assert_eq!(result.to_string(), expected.to_string());
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 }

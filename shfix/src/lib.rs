@@ -21,7 +21,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
         Rewritten::Fix(_) => {
             output.extend(quote! { #input_fn });
         }
-        Rewritten::Unfolded(unfoldings) => {
+        Rewritten::Exclusive(unfoldings) => {
             for (path, block) in unfoldings {
                 let mut unfolded_fn = input_fn.clone();
                 let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
@@ -30,6 +30,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
                 output.extend(quote! { #unfolded_fn });
             }
         }
+        Rewritten::ExclusiveOrFix(..) => todo!("XXX"),
     }
 
     output
@@ -39,7 +40,8 @@ type SectionPath = Vec<String>;
 
 enum Rewritten<Q> {
     Fix(Q),
-    Unfolded(Vec<(SectionPath, Q)>),
+    Exclusive(Vec<(SectionPath, Q)>), // can use one Q, and no other exclusive rewrites can be activated
+    ExclusiveOrFix(Vec<(SectionPath, Q)>, Q),
 }
 
 // rewrites each individual statement
@@ -50,9 +52,13 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
         match stmt {
             Stmt::Local(local) => match rewrite_local(local) {
                 Rewritten::Fix(_) => rewritten.push(Rewritten::Fix(stmt.clone())),
-                Rewritten::Unfolded(ls) => {
+                Rewritten::Exclusive(ls) => {
                     let unfolded_stmts = ls.into_iter().map(|(p, l)| (p, Stmt::Local(l))).collect();
-                    rewritten.push(Rewritten::Unfolded(unfolded_stmts));
+                    rewritten.push(Rewritten::Exclusive(unfolded_stmts));
+                }
+                Rewritten::ExclusiveOrFix(exc, fix) => {
+                    let exc_stmts = exc.into_iter().map(|(p, l)| (p, Stmt::Local(l))).collect();
+                    rewritten.push(Rewritten::ExclusiveOrFix(exc_stmts, Stmt::Local(fix)));
                 }
             },
             Stmt::Item(_) | Stmt::Expr(_, _) => rewritten.push(Rewritten::Fix(stmt.clone())),
@@ -61,26 +67,20 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                     match rewrite_block(Some(&description), &section_block) {
                         Rewritten::Fix(_) => {
                             rewritten
-                                .push(Rewritten::Unfolded(vec![(vec![id.clone()], stmt.clone())]));
+                                .push(Rewritten::Exclusive(vec![(vec![id.clone()], stmt.clone())]));
                         }
-                        Rewritten::Unfolded(rewritten_section_blocks) => {
-                            let mut stmt_rewrites = vec![];
-                            for (rewritten_path, rewritten_block) in rewritten_section_blocks {
-                                let mut path = vec![id.clone()];
-                                path.extend(rewritten_path);
-                                stmt_rewrites.push((
-                                    path,
-                                    Stmt::Expr(
-                                        Expr::Block(ExprBlock {
-                                            attrs: stmt_macro.attrs.clone(),
-                                            label: None,
-                                            block: rewritten_block,
-                                        }),
-                                        stmt_macro.semi_token.clone(),
-                                    ),
-                                ));
-                            }
-                            rewritten.push(Rewritten::Unfolded(stmt_rewrites));
+                        Rewritten::Exclusive(rewritten_blocks) => {
+                            rewritten.push(Rewritten::Exclusive(lift_blocks_to_stmts(
+                                &id,
+                                stmt_macro,
+                                rewritten_blocks,
+                            )));
+                        }
+                        Rewritten::ExclusiveOrFix(exc_blocks, fix_block) => {
+                            rewritten.push(Rewritten::ExclusiveOrFix(
+                                lift_blocks_to_stmts(&id, stmt_macro, exc_blocks),
+                                lift_block_to_stmt(stmt_macro, fix_block),
+                            ));
                         }
                     }
                 } else {
@@ -93,11 +93,36 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
     rewritten
 }
 
+fn lift_blocks_to_stmts(
+    id: &String,
+    stmt_macro: &StmtMacro,
+    rewritten_blocks: Vec<(Vec<String>, Block)>,
+) -> Vec<(Vec<String>, Stmt)> {
+    let mut stmt_rewrites = vec![];
+    for (rewritten_path, rewritten_block) in rewritten_blocks {
+        let mut path = vec![id.clone()];
+        path.extend(rewritten_path);
+        stmt_rewrites.push((path, lift_block_to_stmt(stmt_macro, rewritten_block)));
+    }
+    stmt_rewrites
+}
+
+fn lift_block_to_stmt(stmt_macro: &StmtMacro, block: Block) -> Stmt {
+    Stmt::Expr(
+        Expr::Block(ExprBlock {
+            attrs: stmt_macro.attrs.clone(),
+            label: None,
+            block: block,
+        }),
+        stmt_macro.semi_token.clone(),
+    )
+}
+
 fn rewrite_local(local: &Local) -> Rewritten<Local> {
     if let Some((expr_closure, expr_block, block)) = parse_local_closure(local) {
         match rewrite_block(None, block) {
             Rewritten::Fix(_) => Rewritten::Fix(local.clone()),
-            Rewritten::Unfolded(bs) => Rewritten::Unfolded(
+            Rewritten::Exclusive(bs) => Rewritten::Exclusive(
                 bs.into_iter()
                     .map(|(p, b)| {
                         let mut new_local = local.clone();
@@ -132,10 +157,6 @@ fn parse_local_closure(local: &Local) -> Option<(&ExprClosure, &ExprBlock, &Bloc
         }
     }
     None
-}
-
-fn rewrite_closure(cl: &ExprClosure) -> Rewritten<ExprClosure> {
-    todo!()
 }
 
 fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {
@@ -179,7 +200,7 @@ fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block
             ));
         }
     }
-    Rewritten::Unfolded(unfoldings)
+    Rewritten::Exclusive(unfoldings)
 }
 
 fn _rewritten_stmts_to_str(stmts: &[Rewritten<Stmt>]) -> String {
@@ -187,13 +208,21 @@ fn _rewritten_stmts_to_str(stmts: &[Rewritten<Stmt>]) -> String {
     for rw in stmts {
         match rw {
             Rewritten::Fix(s) => {
-                r.push_str(&format!("unchanged({}) ", quote! { #s }));
+                r.push_str(&format!("fix({}) ", quote! { #s }));
             }
-            Rewritten::Unfolded(u) => {
-                r.push_str(&format!("unfolded("));
+            Rewritten::Exclusive(u) => {
+                r.push_str(&format!("exclusive("));
                 for (path, stmt) in u {
                     r.push_str(&format!("{}: {} ¶", path.join("_"), quote! { #stmt }));
                 }
+                r.push_str(") ");
+            }
+            Rewritten::ExclusiveOrFix(u, x) => {
+                r.push_str(&format!("exclusive_or_fix("));
+                for (path, stmt) in u {
+                    r.push_str(&format!("{}: {} ¶ ", path.join("_"), quote! { #stmt }));
+                }
+                r.push_str(&format!("fix: {}", quote! { #x }));
                 r.push_str(") ");
             }
         }
@@ -228,11 +257,11 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
                     (p, vs)
                 })
                 .collect(),
-            Rewritten::Unfolded(last_unfoldings) => {
+            Rewritten::Exclusive(last_unfoldings) => {
                 let mut unfolded = vec![];
 
                 // unfold the last stmt
-                let unchanged_prefix = &grab_unchanged(&stmts[..stmts.len() - 1]);
+                let unchanged_prefix = &grab_fixed(&stmts[..stmts.len() - 1]);
                 for (last_path, last_stmt) in last_unfoldings {
                     let mut merged: Vec<Stmt> = unchanged_prefix.iter().cloned().cloned().collect(); // XXX: cloned^2 ???
                     merged.push(last_stmt.clone());
@@ -244,11 +273,31 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
 
                 unfolded
             }
+            Rewritten::ExclusiveOrFix(last_exc, last_fix) => {
+                let mut unfolded = vec![];
+
+                // unfold the last stmt
+                let fixed_prefix = &grab_fixed(&stmts[..stmts.len() - 1]);
+                for (last_path, last_stmt) in last_exc {
+                    let mut merged: Vec<Stmt> = fixed_prefix.iter().cloned().cloned().collect(); // XXX: cloned^2 ???
+                    merged.push(last_stmt.clone());
+                    unfolded.push((last_path.clone(), merged));
+                }
+
+                // unfold the fixed variant of the last stmt
+                let unfolded_prefix = unfold_stmts(&stmts[..stmts.len() - 1]);
+                for (p, mut stmts) in unfolded_prefix {
+                    stmts.push(last_fix.clone());
+                    unfolded.push((p, stmts));
+                }
+
+                unfolded
+            }
         }
     }
 }
 
-fn grab_unchanged(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
+fn grab_fixed(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
     stmts
         .iter()
         .filter_map(|rewritten| {

@@ -90,36 +90,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 
 fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
-
-    println!("BEGIN rewritten_stmts");
-    for rw in &rewritten_stmts {
-        match rw {
-            Rewritten::Unchanged(s) => println!("unchanged: {}", quote! { #s }),
-            Rewritten::Unfolded(u) => {
-                print!("unfolded: ");
-                for (path, stmt) in u {
-                    print!("{}: {} ¶", path.join("_"), quote! { #stmt });
-                }
-                println!();
-            }
-        }
-    }
-    println!("END rewritten_stmts");
-
     let unfolded_stmts = unfold_stmts(&rewritten_stmts);
-
-    println!("BEGIN unfolded_stmts");
-    for (path, ss) in &unfolded_stmts {
-        println!(
-            "{}: {:?}",
-            path.join("_"),
-            ss.iter()
-                .map(|s| { format!("{}", quote! { #s }) })
-                .collect::<Vec<String>>()
-                .join(" ¶ ")
-        );
-    }
-    println!("END unfolded_stmts");
 
     let header_stmt = description.map(|d| {
         let s: Stmt = parse_quote! {
@@ -161,6 +132,40 @@ fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block
     Rewritten::Unfolded(unfoldings)
 }
 
+fn _rewritten_stmts_to_str(stmts: &[Rewritten<Stmt>]) -> String {
+    let mut r = String::new();
+    for rw in stmts {
+        match rw {
+            Rewritten::Unchanged(s) => {
+                r.push_str(&format!("unchanged({}) ", quote! { #s }));
+            }
+            Rewritten::Unfolded(u) => {
+                r.push_str(&format!("unfolded("));
+                for (path, stmt) in u {
+                    r.push_str(&format!("{}: {} ¶", path.join("_"), quote! { #stmt }));
+                }
+                r.push_str(") ");
+            }
+        }
+    }
+    r
+}
+
+fn _unfolded_stmts_to_str(u: &[(SectionPath, Vec<Stmt>)]) -> String {
+    let mut r = String::new();
+    for (path, ss) in u {
+        r.push_str(&format!(
+            "{}({:?}) ",
+            path.join("_"),
+            ss.iter()
+                .map(|s| { format!("{}", quote! { #s }) })
+                .collect::<Vec<String>>()
+                .join(" ¶ ")
+        ));
+    }
+    r
+}
+
 fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
     if stmts.is_empty() {
         vec![(SectionPath::new(), Vec::new())]
@@ -176,13 +181,16 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> Vec<(SectionPath, Vec<Stmt>)> {
             Rewritten::Unfolded(last_unfoldings) => {
                 let mut unfolded = vec![];
 
+                // unfold the last stmt
                 let unchanged_prefix = &grab_unchanged(&stmts[..stmts.len() - 1]);
-
                 for (last_path, last_stmt) in last_unfoldings {
                     let mut merged: Vec<Stmt> = unchanged_prefix.iter().cloned().cloned().collect(); // XXX: cloned^2 ???
                     merged.push(last_stmt.clone());
                     unfolded.push((last_path.clone(), merged));
                 }
+
+                // skip the last statement
+                unfolded.extend(unfold_stmts(&stmts[..stmts.len() - 1]));
 
                 unfolded
             }
@@ -266,7 +274,31 @@ mod tests {
         };
         let result = shfix_impl(attr_args, quote! { #input_fn });
         let expected = quote! {
-            fn renamed() {
+            #[test]
+            fn root_b() {
+                let x = 1;
+                let y = 2;
+                {
+                    println!("section b");
+                    println!(y);
+                };
+                let z = 2;
+            }
+            #[test]
+            fn root_a() {
+                let x = 1;
+                {
+                    println!("section a");
+                    println!(x);
+                };
+                let y = 2;
+                let z = 2;
+            }
+            #[test]
+            fn root_() {
+                let x = 1;
+                let y = 2;
+                let z = 2;
             }
         };
 
@@ -279,6 +311,6 @@ mod tests {
         println!("Result:\n{}", result_pretty);
         println!("Expected:\n{}", expected_pretty);
 
-        // assert_eq!(result.to_string(), expected.to_string());
+        assert_eq!(result.to_string(), expected.to_string());
     }
 }

@@ -454,14 +454,14 @@ mod tests {
             let attr_args = TokenStream2::new();
             let result = shfix_impl(attr_args, quote! { #input });
 
-            let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
-            let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
+            // let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
+            // let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
 
-            let result_pretty = prettyplease::unparse(&result_file);
-            let expected_pretty = prettyplease::unparse(&expected_file);
+            // let result_pretty = prettyplease::unparse(&result_file);
+            // let expected_pretty = prettyplease::unparse(&expected_file);
 
-            println!("Result:\n{}", result_pretty);
-            println!("Expected:\n{}", expected_pretty);
+            // println!("result:\n{}", result_pretty);
+            // println!("expected:\n{}", expected_pretty);
 
             assert_eq!(result.to_string(), expected.to_string(), "test {}", i);
         }

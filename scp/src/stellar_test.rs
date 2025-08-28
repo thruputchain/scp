@@ -3,6 +3,7 @@ mod stellar_tests {
     use crate::testkernel::*;
     use crate::testutil::*;
     use crate::*;
+    use shfix::shfix;
     use std::collections::HashSet;
     use std::u32;
     use xdr_common::VecM;
@@ -233,6 +234,7 @@ mod stellar_tests {
         })
     }
 
+    #[derive(Clone)]
     struct NetworkConfig {
         NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: u32,
         NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: u32,
@@ -240,238 +242,153 @@ mod stellar_tests {
         BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: u32,
     }
 
-    const MinNetworkConfig: NetworkConfig = NetworkConfig {
-        NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 750,
-        NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 750,
-        BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 750,
-        BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 750,
-    };
-
-    const MaxNetworkConfig: NetworkConfig = NetworkConfig {
-        NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 2500,
-        NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
-        BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 2500,
-        BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
-    };
-
-    const InitNetworkConfig: NetworkConfig = NetworkConfig {
-        NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 1000,
-        NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
-        BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 1000,
-        BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
-    };
-
-    trait Fixture: Default {
-        fn tk<'a>(&'a mut self) -> &'a mut TestKernel;
+    impl NetworkConfig {
+        fn apply_to(&self, tk: &mut TestKernel) {
+            tk.driver().initial_nomination_timeout_ms =
+                self.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
+            tk.driver().initial_ballot_timeout_ms = self.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
+            tk.driver().increment_nomination_timeout_ms =
+                self.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
+            tk.driver().increment_ballot_timeout_ms = self.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
+        }
     }
 
-    // Testing matrix that covers interesting min/max values for each timeout
-    // parameter
-    fn test_timeouts<X: Fixture, F>(f: F)
-    where
-        F: Fn(X),
-    {
-        // minimum values
-        let mut xmin = X::default();
-        xmin.tk().driver().initial_nomination_timeout_ms =
-            MinNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
-        xmin.tk().driver().initial_ballot_timeout_ms =
-            MinNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
-        xmin.tk().driver().increment_nomination_timeout_ms =
-            MinNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
-        xmin.tk().driver().increment_ballot_timeout_ms =
-            MinNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(xmin);
+    fn get_network_cfgs() -> Vec<NetworkConfig> {
+        const MIN_CFG: NetworkConfig = NetworkConfig {
+            NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 750,
+            NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 750,
+            BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 750,
+            BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 750,
+        };
 
-        // initial values
-        let mut xinit = X::default();
-        xinit.tk().driver().initial_nomination_timeout_ms =
-            InitNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
-        xinit.tk().driver().initial_ballot_timeout_ms =
-            InitNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
-        xinit.tk().driver().increment_nomination_timeout_ms =
-            InitNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
-        xinit.tk().driver().increment_ballot_timeout_ms =
-            InitNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(xinit);
+        const MAX_CFG: NetworkConfig = NetworkConfig {
+            NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 2500,
+            NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
+            BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 2500,
+            BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 2000,
+        };
 
-        // maximum values
-        let mut xmax = X::default();
-        xmax.tk().driver().initial_nomination_timeout_ms =
-            MaxNetworkConfig.NOMINATION_TIMEOUT_INITIAL_MILLISECONDS;
-        xmax.tk().driver().initial_ballot_timeout_ms =
-            MaxNetworkConfig.BALLOT_TIMEOUT_INITIAL_MILLISECONDS;
-        xmax.tk().driver().increment_nomination_timeout_ms =
-            MaxNetworkConfig.NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS;
-        xmax.tk().driver().increment_ballot_timeout_ms =
-            MaxNetworkConfig.BALLOT_TIMEOUT_INCREMENT_MILLISECONDS;
-        f(xmax);
+        const INIT_CFG: NetworkConfig = NetworkConfig {
+            NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: 1000,
+            NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
+            BALLOT_TIMEOUT_INITIAL_MILLISECONDS: 1000,
+            BALLOT_TIMEOUT_INCREMENT_MILLISECONDS: 1000,
+        };
+        vec![MIN_CFG.clone(), MAX_CFG.clone(), INIT_CFG.clone()]
     }
 
+    #[shfix]
     #[test]
     fn ballot_protocol_core5() {
-        struct Fix0 {
-            values: TestValues,
-            v0_secret_key: SecretKey,
-            v1_secret_key: SecretKey,
-            v2_secret_key: SecretKey,
-            v3_secret_key: SecretKey,
-            v4_secret_key: SecretKey,
-            v0_node_id: PublicKey,
-            v1_node_id: PublicKey,
-            v2_node_id: PublicKey,
-            v3_node_id: PublicKey,
-            v4_node_id: PublicKey,
-            q_set: SCPQuorumSet,
-            qset_hash: SHA256Hash,
-            tk: TestKernel,
-        }
-        impl Fixture for Fix0 {
-            fn tk<'a>(&'a mut self) -> &'a mut TestKernel {
-                &mut self.tk
-            }
-        }
-        impl Default for Fix0 {
-            fn default() -> Fix0 {
-                let values = TestValues::default();
-                let nodes = TestNode::new_batch(5);
-                let q_set = SCPQuorumSet {
-                    threshold: 4,
-                    validators: VecM(vec![
-                        nodes[0].node_id().clone(),
-                        nodes[1].node_id().clone(),
-                        nodes[2].node_id().clone(),
-                        nodes[3].node_id().clone(),
-                        nodes[4].node_id().clone(),
-                    ]),
-                    inner_sets: VecM(vec![]),
-                };
-                let qset_hash = proto::hash_xdr(&q_set).unwrap();
-                let tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
-                Fix0 {
-                    values: values,
-                    v0_secret_key: nodes[0].secret_key.clone(),
-                    v1_secret_key: nodes[1].secret_key.clone(),
-                    v2_secret_key: nodes[2].secret_key.clone(),
-                    v3_secret_key: nodes[3].secret_key.clone(),
-                    v4_secret_key: nodes[4].secret_key.clone(),
-                    v0_node_id: nodes[0].node_id(),
-                    v1_node_id: nodes[1].node_id(),
-                    v2_node_id: nodes[2].node_id(),
-                    v3_node_id: nodes[3].node_id(),
-                    v4_node_id: nodes[4].node_id(),
-                    q_set: q_set,
-                    qset_hash: qset_hash,
-                    tk: tk,
-                }
-            }
-        }
+        let test = |net_cfg: &NetworkConfig| {
+            let values = TestValues::default();
+            let nodes = TestNode::new_batch(5);
+            let q_set = SCPQuorumSet {
+                threshold: 4,
+                validators: VecM(vec![
+                    nodes[0].node_id().clone(),
+                    nodes[1].node_id().clone(),
+                    nodes[2].node_id().clone(),
+                    nodes[3].node_id().clone(),
+                    nodes[4].node_id().clone(),
+                ]),
+                inner_sets: VecM(vec![]),
+            };
+            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+            let v0_secret_key = nodes[0].secret_key.clone();
+            let v1_secret_key = nodes[1].secret_key.clone();
+            let v2_secret_key = nodes[2].secret_key.clone();
+            let v3_secret_key = nodes[3].secret_key.clone();
+            let v4_secret_key = nodes[4].secret_key.clone();
+            let v0_node_id = nodes[0].node_id();
+            let v1_node_id = nodes[1].node_id();
+            let v2_node_id = nodes[2].node_id();
+            let v3_node_id = nodes[3].node_id();
+            let v4_node_id = nodes[4].node_id();
+            net_cfg.apply_to(&mut tk);
+            //
+            tk.driver().store_quorum_set(&q_set);
+            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
 
-        struct Fix1 {
-            x: Fix0,
-        }
-        impl Fix1 {
-            fn new(mut x: Fix0) -> Fix1 {
-                x.tk.driver().store_quorum_set(&x.q_set);
+            // Verify value ordering
+            assert!(values.x_value < values.y_value);
+            assert!(values.y_value < values.z_value);
+            assert!(values.z_value < values.zz_value);
 
-                // Verify value ordering
-                assert!(x.values.x_value < x.values.y_value);
-                assert!(x.values.y_value < x.values.z_value);
-                assert!(x.values.z_value < x.values.zz_value);
+            let mut recv_v_blocking_checks = |gen_: &GenEnvelope, with_checks: bool| {
+                let e1 = gen_(&v1_secret_key);
+                let e2 = gen_(&v2_secret_key);
 
-                println!("");
-                println!("BEGIN TEST");
-
-                Fix1 { x }
-            }
-            fn qset_hash0(&mut self) -> proto::SCPHash {
-                self.x.tk.proto().local_proto().get_qset_hash().clone()
-            }
-            fn recv_v_blocking_checks(&mut self, gen_: &GenEnvelope, with_checks: bool) {
-                let e1 = gen_(&self.x.v1_secret_key);
-                let e2 = gen_(&self.x.v2_secret_key);
-
-                self.x.tk.driver().bump_timer_offset();
+                tk.driver().bump_timer_offset();
 
                 // Nothing should happen with first message
-                let i = self.x.tk.driver().envelopes.len();
-                self.x.tk.proto().received_envelope(&e1);
+                let i = tk.driver().envelopes.len();
+                tk.proto().received_envelope(&e1);
                 if with_checks {
-                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
+                    assert_eq!(tk.driver().envelopes.len(), i);
                 }
                 let i = i + 1;
-                self.x.tk.proto().received_envelope(&e2);
+                tk.proto().received_envelope(&e2);
                 if with_checks {
-                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
+                    assert_eq!(tk.driver().envelopes.len(), i);
                 }
-            }
+            };
 
-            fn recv_v_blocking(&mut self, gen_: &GenEnvelope) {
-                self.recv_v_blocking_checks(gen_, true)
-            }
+            let mut recv_v_blocking = |gen_: &GenEnvelope| recv_v_blocking_checks(gen_, true);
 
-            fn recv_quorum_checks_ex(
-                &mut self,
-                gen_: &GenEnvelope,
-                with_checks: bool,
-                delayed_quorum: bool,
-                check_upcoming: bool,
-            ) {
-                let e1 = gen_(&self.x.v1_secret_key);
-                let e2 = gen_(&self.x.v2_secret_key);
-                let e3 = gen_(&self.x.v3_secret_key);
-                let e4 = gen_(&self.x.v4_secret_key);
+            let mut recv_quorum_checks_ex =
+                |gen_: &GenEnvelope,
+                 with_checks: bool,
+                 delayed_quorum: bool,
+                 check_upcoming: bool| {
+                    let e1 = gen_(&v1_secret_key);
+                    let e2 = gen_(&v2_secret_key);
+                    let e3 = gen_(&v3_secret_key);
+                    let e4 = gen_(&v4_secret_key);
 
-                self.x.tk.driver().bump_timer_offset();
+                    tk.driver().bump_timer_offset();
 
-                self.x.tk.proto().received_envelope(&e1);
-                self.x.tk.proto().received_envelope(&e2);
-                let i = self.x.tk.driver().envelopes.len() + 1;
-                self.x.tk.proto().received_envelope(&e3);
-                if with_checks && !delayed_quorum {
-                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
-                }
-                if check_upcoming && !delayed_quorum {
-                    self.x.tk.driver().has_ballot_timer_upcoming();
-                }
-                // Nothing happens with an extra vote (unless we're in delayed_quorum)
-                self.x.tk.proto().received_envelope(&e4);
-                if with_checks && delayed_quorum {
-                    assert_eq!(self.x.tk.driver().envelopes.len(), i);
-                }
-                if check_upcoming && delayed_quorum {
-                    self.x.tk.driver().has_ballot_timer_upcoming();
-                }
-            }
+                    tk.proto().received_envelope(&e1);
+                    tk.proto().received_envelope(&e2);
+                    let i = tk.driver().envelopes.len() + 1;
+                    tk.proto().received_envelope(&e3);
+                    if with_checks && !delayed_quorum {
+                        assert_eq!(tk.driver().envelopes.len(), i);
+                    }
+                    if check_upcoming && !delayed_quorum {
+                        tk.driver().has_ballot_timer_upcoming();
+                    }
+                    // Nothing happens with an extra vote (unless we're in delayed_quorum)
+                    tk.proto().received_envelope(&e4);
+                    if with_checks && delayed_quorum {
+                        assert_eq!(tk.driver().envelopes.len(), i);
+                    }
+                    if check_upcoming && delayed_quorum {
+                        tk.driver().has_ballot_timer_upcoming();
+                    }
+                };
 
-            fn recv_quorum_checks(
-                &mut self,
-                gen_: &GenEnvelope,
-                with_checks: bool,
-                delayed_quorum: bool,
-            ) {
-                self.recv_quorum_checks_ex(gen_, with_checks, delayed_quorum, true)
-            }
+            let mut recv_quorum_checks =
+                |gen_: &GenEnvelope, with_checks: bool, delayed_quorum: bool| {
+                    recv_quorum_checks_ex(gen_, with_checks, delayed_quorum, true)
+                };
 
-            fn recv_quorum_ex(&mut self, gen_: &GenEnvelope, check_upcoming: bool) {
-                self.recv_quorum_checks_ex(gen_, true, false, check_upcoming)
-            }
+            let mut recv_quorum_ex = |gen_: &GenEnvelope, check_upcoming: bool| {
+                recv_quorum_checks_ex(gen_, true, false, check_upcoming)
+            };
 
-            fn recv_quorum(&mut self, gen_: &GenEnvelope) {
-                self.recv_quorum_ex(gen_, false)
-            }
+            let mut recv_quorum = |gen_: &GenEnvelope| recv_quorum_ex(gen_, false);
 
-            fn nodes_all_pledge_to_commit(&mut self) {
-                let qset_hash0 = self.qset_hash0();
-
+            let mut nodes_all_pledge_to_commit = || {
                 let b = SCPBallot {
                     counter: 1,
-                    value: self.x.values.x_value.clone(),
+                    value: values.x_value.clone(),
                 };
 
                 let prepare1 = make_prepare(
-                    &self.x.v1_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -481,8 +398,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare2 = make_prepare(
-                    &self.x.v2_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -492,8 +409,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare3 = make_prepare(
-                    &self.x.v3_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -503,8 +420,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepare4 = make_prepare(
-                    &self.x.v4_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     None,
@@ -514,12 +431,12 @@ mod stellar_tests {
                 )
                 .unwrap();
 
-                assert!(self.x.tk.bump_state(0, &self.x.values.x_value));
-                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
+                assert!(tk.bump_state(0, &values.x_value));
+                assert_eq!(tk.driver().envelopes.len(), 1);
 
                 verify_prepare(
-                    &self.x.tk.driver().envelopes[0],
-                    &self.x.v0_secret_key,
+                    &tk.driver().envelopes[0],
+                    &v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -529,32 +446,23 @@ mod stellar_tests {
                     None,
                 );
 
-                self.x.tk.proto().received_envelope(&prepare1);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
-                assert_eq!(
-                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
-                    0
-                );
+                tk.proto().received_envelope(&prepare1);
+                assert_eq!(tk.driver().envelopes.len(), 1);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
 
-                self.x.tk.proto().received_envelope(&prepare2);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
-                assert_eq!(
-                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
-                    0
-                );
+                tk.proto().received_envelope(&prepare2);
+                assert_eq!(tk.driver().envelopes.len(), 1);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
 
-                self.x.tk.proto().received_envelope(&prepare3);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
-                assert_eq!(
-                    self.x.tk.driver().heard_from_quorums.get(&0).unwrap().len(),
-                    1
-                );
-                assert_eq!(self.x.tk.driver().heard_from_quorums.get(&0).unwrap()[0], b);
+                tk.proto().received_envelope(&prepare3);
+                assert_eq!(tk.driver().envelopes.len(), 2);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap().len(), 1);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap()[0], b);
 
                 // We have a quorum including us
                 verify_prepare(
-                    &self.x.tk.driver().envelopes[1],
-                    &self.x.v0_secret_key,
+                    &tk.driver().envelopes[1],
+                    &v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -564,12 +472,12 @@ mod stellar_tests {
                     None,
                 );
 
-                self.x.tk.proto().received_envelope(&prepare4);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
+                tk.proto().received_envelope(&prepare4);
+                assert_eq!(tk.driver().envelopes.len(), 2);
 
                 let prepared1 = make_prepare(
-                    &self.x.v1_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -579,8 +487,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared2 = make_prepare(
-                    &self.x.v2_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -590,8 +498,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared3 = make_prepare(
-                    &self.x.v3_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -601,8 +509,8 @@ mod stellar_tests {
                 )
                 .unwrap();
                 let prepared4 = make_prepare(
-                    &self.x.v4_secret_key,
-                    self.x.qset_hash.into_inner(),
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
                     0,
                     b.clone(),
                     Some(b.clone()),
@@ -612,17 +520,17 @@ mod stellar_tests {
                 )
                 .unwrap();
 
-                self.x.tk.proto().received_envelope(&prepared4);
-                self.x.tk.proto().received_envelope(&prepared3);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 2);
+                tk.proto().received_envelope(&prepared4);
+                tk.proto().received_envelope(&prepared3);
+                assert_eq!(tk.driver().envelopes.len(), 2);
 
-                self.x.tk.proto().received_envelope(&prepared2);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 3);
+                tk.proto().received_envelope(&prepared2);
+                assert_eq!(tk.driver().envelopes.len(), 3);
 
                 // confirms prepared
                 verify_prepare(
-                    &self.x.tk.driver().envelopes[2],
-                    &self.x.v0_secret_key,
+                    &tk.driver().envelopes[2],
+                    &v0_secret_key,
                     qset_hash0,
                     0,
                     b.clone(),
@@ -633,24 +541,22 @@ mod stellar_tests {
                 );
 
                 // extra statement doesn't do anything
-                self.x.tk.proto().received_envelope(&prepared1);
-                assert_eq!(self.x.tk.driver().envelopes.len(), 3);
-            }
+                tk.proto().received_envelope(&prepared1);
+                assert_eq!(tk.driver().envelopes.len(), 3);
+            };
 
-            fn section_bump_state_x(&mut self) {
-                println!("SECTION: bumpState x");
-                assert!(self.x.tk.bump_state(0, &self.x.values.x_value.clone()));
-                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
+            section!(bump_state_x, "bump_state x", {
+                assert!(tk.bump_state(0, &values.x_value.clone()));
+                assert_eq!(tk.driver().envelopes.len(), 1);
 
                 let expected_ballot = SCPBallot {
                     counter: 1,
-                    value: self.x.values.x_value.clone(),
+                    value: values.x_value.clone(),
                 };
 
-                let qset_hash0 = self.qset_hash0();
                 verify_prepare(
-                    &self.x.tk.driver().envelopes[0],
-                    &self.x.v0_secret_key,
+                    &tk.driver().envelopes[0],
+                    &v0_secret_key,
                     qset_hash0,
                     0,
                     expected_ballot,
@@ -659,91 +565,87 @@ mod stellar_tests {
                     0,
                     None,
                 );
-            }
+            });
 
-            fn section_start_1x(&mut self) {
-                println!("SECTION: start <1,x>");
-                // No timer should be set initially
-                assert!(!self.x.tk.driver().has_ballot_timer());
+            // section!(start_1x, "start <1,x>", {
+            //     // No timer should be set initially
+            //     assert!(!tk.driver().has_ballot_timer());
 
-                let a_value = &self.x.values.x_value;
-                let b_value = &self.x.values.z_value;
-                let mid_value = &self.x.values.y_value;
-                let big_value = &self.x.values.zz_value;
+            //     let a_value = &values.x_value;
+            //     let b_value = &values.z_value;
+            //     let mid_value = &values.y_value;
+            //     let big_value = &values.zz_value;
 
-                let a1 = SCPBallot {
-                    counter: 1,
-                    value: a_value.clone(),
-                };
-                let b1 = SCPBallot {
-                    counter: 1,
-                    value: b_value.clone(),
-                };
-                let mid1 = SCPBallot {
-                    counter: 1,
-                    value: mid_value.clone(),
-                };
-                let big1 = SCPBallot {
-                    counter: 1,
-                    value: big_value.clone(),
-                };
+            //     let a1 = SCPBallot {
+            //         counter: 1,
+            //         value: a_value.clone(),
+            //     };
+            //     let b1 = SCPBallot {
+            //         counter: 1,
+            //         value: b_value.clone(),
+            //     };
+            //     let mid1 = SCPBallot {
+            //         counter: 1,
+            //         value: mid_value.clone(),
+            //     };
+            //     let big1 = SCPBallot {
+            //         counter: 1,
+            //         value: big_value.clone(),
+            //     };
 
-                let mut a2 = a1.clone();
-                a2.counter += 1;
+            //     let mut a2 = a1.clone();
+            //     a2.counter += 1;
 
-                let mut a3 = a2.clone();
-                a3.counter += 1;
+            //     let mut a3 = a2.clone();
+            //     a3.counter += 1;
 
-                let mut a4 = a3.clone();
-                a4.counter += 1;
+            //     let mut a4 = a3.clone();
+            //     a4.counter += 1;
 
-                let mut a5 = a4.clone();
-                a5.counter += 1;
+            //     let mut a5 = a4.clone();
+            //     a5.counter += 1;
 
-                let a_inf = SCPBallot {
-                    counter: u32::MAX,
-                    value: a_value.clone(),
-                };
-                let b_inf = SCPBallot {
-                    counter: u32::MAX,
-                    value: b_value.clone(),
-                };
+            //     let a_inf = SCPBallot {
+            //         counter: u32::MAX,
+            //         value: a_value.clone(),
+            //     };
+            //     let b_inf = SCPBallot {
+            //         counter: u32::MAX,
+            //         value: b_value.clone(),
+            //     };
 
-                let mut b2 = b1.clone();
-                b2.counter += 1;
+            //     let mut b2 = b1.clone();
+            //     b2.counter += 1;
 
-                let mut b3 = b2.clone();
-                b3.counter += 1;
+            //     let mut b3 = b2.clone();
+            //     b3.counter += 1;
 
-                let mut mid2 = mid1.clone();
-                mid2.counter += 1;
+            //     let mut mid2 = mid1.clone();
+            //     mid2.counter += 1;
 
-                let mut big2 = big1.clone();
-                big2.counter += 1;
+            //     let mut big2 = big1.clone();
+            //     big2.counter += 1;
 
-                assert!(self.x.tk.bump_state(0, a_value));
-                assert_eq!(self.x.tk.driver().envelopes.len(), 1);
-                assert!(!self.x.tk.driver().has_ballot_timer());
+            //     assert!(tk.bump_state(0, a_value));
+            //     assert_eq!(tk.driver().envelopes.len(), 1);
+            //     assert!(!tk.driver().has_ballot_timer());
 
-                println!("SECTION: prepared A1");
-                {}
+            //     println!("SECTION: prepared A1");
+            //     {}
 
-                println!("SECTION: prepared B (v-blocking)");
-                {}
+            //     println!("SECTION: prepared B (v-blocking)");
+            //     {}
 
-                println!("SECTION: prepare B (quorum)");
-                {}
+            //     println!("SECTION: prepare B (quorum)");
+            //     {}
 
-                println!("SECTION: confirm (v-blocking)");
-                {}
-            }
-        }
-
-        let test = |x: Fix0| {
-            // Fix1::new(x).section_bump_state_x();
-            // Fix1::new(x).section_start_1x();
+            //     println!("SECTION: confirm (v-blocking)");
+            //     {}
+            // });
         };
 
-        test_timeouts(test);
+        for net_cfg in get_network_cfgs() {
+            test(&net_cfg);
+        }
     }
 }

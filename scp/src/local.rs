@@ -24,7 +24,7 @@ impl LocalState {
     ) -> LocalState {
         // Normalize the quorum set (equivalent to normalizeQSet(mQSet) in C++)
         let mut normalized_qset = qset;
-        crate::qset::normalize_qset(&mut normalized_qset, None);
+        normalize_qset(&mut normalized_qset, None);
 
         // Calculate hash of the normalized quorum set (equivalent to mQSetHash = driver.getHashOf(...))
         let qset_bytes = proto::marshal_xdr(&normalized_qset).unwrap();

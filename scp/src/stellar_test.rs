@@ -283,7 +283,7 @@ mod stellar_tests {
         let test = |net_cfg: &NetworkConfig| {
             let values = TestValues::default();
             let nodes = TestNode::new_batch(5);
-            let q_set = SCPQuorumSet {
+            let mut q_set = SCPQuorumSet {
                 threshold: 4,
                 validators: VecM(vec![
                     nodes[0].node_id().clone(),
@@ -294,6 +294,7 @@ mod stellar_tests {
                 ]),
                 inner_sets: VecM(vec![]),
             };
+            normalize_qset(&mut q_set, None); // NOTE: LocalProto internally normalizes qsets! This ensures parity.
             let qset_hash = proto::hash_xdr(&q_set).unwrap();
             let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
             let v0_secret_key = nodes[0].secret_key.clone();
@@ -645,20 +646,20 @@ mod stellar_tests {
                         true,
                     );
 
-                    // assert_eq!(tk.driver().envelopes.len(), 2);
-                    // verify_prepare(
-                    //     &tk.driver().envelopes[1],
-                    //     &v0_secret_key,
-                    //     qset_hash0,
-                    //     0,
-                    //     a1.clone(),
-                    //     Some(a1.clone()),
-                    //     0,
-                    //     0,
-                    //     None,
-                    // );
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_prepare(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        a1.clone(),
+                        Some(a1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
 
-                    // section!(prep_a2, "prepared A2", {});
+                    section!(prep_a2, "prepared A2", {});
                 });
             });
         };

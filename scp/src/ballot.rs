@@ -214,7 +214,6 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
-            dbg!("BBB INVALID");
             return EnvelopeState::Invalid;
         }
 

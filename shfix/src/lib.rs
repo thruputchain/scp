@@ -47,6 +47,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                 fixed: stmt.clone(),
             }),
             Stmt::Local(local) => {
+                //XXX:check
                 let rw_local = rewrite_local(local);
                 let unfolded_stmts = rw_local
                     .exclusive
@@ -62,12 +63,15 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
                     let rw_section_block = rewrite_block(Some(&description), &section_block);
                     rewritten.push(Rewritten {
-                        exclusive: lift_blocks_to_stmts(
-                            &id,
+                        exclusive: lift_blocks_to_stmts(&id, stmt_macro, rw_section_block),
+                        fixed: lift_block_to_stmt(
                             stmt_macro,
-                            rw_section_block.exclusive,
+                            Block {
+                                // empty block
+                                brace_token: section_block.brace_token.clone(),
+                                stmts: vec![],
+                            },
                         ),
-                        fixed: lift_block_to_stmt(stmt_macro, rw_section_block.fixed),
                     });
                 } else {
                     rewritten.push(Rewritten {
@@ -85,15 +89,19 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 fn lift_blocks_to_stmts(
     id: &String,
     stmt_macro: &StmtMacro,
-    rewritten_blocks: Vec<(Vec<String>, Block)>,
+    rewritten_block: Rewritten<Block>,
 ) -> Vec<(Vec<String>, Stmt)> {
-    let mut stmt_rewrites = vec![];
-    for (rewritten_path, rewritten_block) in rewritten_blocks {
+    let mut rw_stmts = vec![];
+    for (rw_path, rw_block) in rewritten_block.exclusive {
         let mut path = vec![id.clone()];
-        path.extend(rewritten_path);
-        stmt_rewrites.push((path, lift_block_to_stmt(stmt_macro, rewritten_block)));
+        path.extend(rw_path);
+        rw_stmts.push((path, lift_block_to_stmt(stmt_macro, rw_block)));
     }
-    stmt_rewrites
+    rw_stmts.push((
+        vec![id.clone()],
+        lift_block_to_stmt(stmt_macro, rewritten_block.fixed),
+    ));
+    rw_stmts
 }
 
 fn lift_block_to_stmt(stmt_macro: &StmtMacro, block: Block) -> Stmt {
@@ -350,6 +358,7 @@ mod tests {
                     #[test]
                     fn root_b() {
                         let x = 1;
+                        {};
                         let y = 2;
                         {
                             println!("section b");
@@ -365,12 +374,7 @@ mod tests {
                             println!(x);
                         };
                         let y = 2;
-                        let z = 2;
-                    }
-                    #[test]
-                    fn root_() {
-                        let x = 1;
-                        let y = 2;
+                        {};
                         let z = 2;
                     }
                 },

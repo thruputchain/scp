@@ -567,81 +567,91 @@ mod stellar_tests {
                 );
             });
 
-            // section!(start_1x, "start <1,x>", {
-            //     // No timer should be set initially
-            //     assert!(!tk.driver().has_ballot_timer());
+            section!(start_1x, "start <1,x>", {
+                // No timer should be set initially
+                assert!(!tk.driver().has_ballot_timer());
 
-            //     let a_value = &values.x_value;
-            //     let b_value = &values.z_value;
-            //     let mid_value = &values.y_value;
-            //     let big_value = &values.zz_value;
+                let a_value = &values.x_value;
+                let b_value = &values.z_value;
+                let mid_value = &values.y_value;
+                let big_value = &values.zz_value;
 
-            //     let a1 = SCPBallot {
-            //         counter: 1,
-            //         value: a_value.clone(),
-            //     };
-            //     let b1 = SCPBallot {
-            //         counter: 1,
-            //         value: b_value.clone(),
-            //     };
-            //     let mid1 = SCPBallot {
-            //         counter: 1,
-            //         value: mid_value.clone(),
-            //     };
-            //     let big1 = SCPBallot {
-            //         counter: 1,
-            //         value: big_value.clone(),
-            //     };
+                let a1 = SCPBallot {
+                    counter: 1,
+                    value: a_value.clone(),
+                };
+                let b1 = SCPBallot {
+                    counter: 1,
+                    value: b_value.clone(),
+                };
+                let mid1 = SCPBallot {
+                    counter: 1,
+                    value: mid_value.clone(),
+                };
+                let big1 = SCPBallot {
+                    counter: 1,
+                    value: big_value.clone(),
+                };
 
-            //     let mut a2 = a1.clone();
-            //     a2.counter += 1;
+                let mut a2 = a1.clone();
+                a2.counter += 1;
 
-            //     let mut a3 = a2.clone();
-            //     a3.counter += 1;
+                let mut a3 = a2.clone();
+                a3.counter += 1;
 
-            //     let mut a4 = a3.clone();
-            //     a4.counter += 1;
+                let mut a4 = a3.clone();
+                a4.counter += 1;
 
-            //     let mut a5 = a4.clone();
-            //     a5.counter += 1;
+                let mut a5 = a4.clone();
+                a5.counter += 1;
 
-            //     let a_inf = SCPBallot {
-            //         counter: u32::MAX,
-            //         value: a_value.clone(),
-            //     };
-            //     let b_inf = SCPBallot {
-            //         counter: u32::MAX,
-            //         value: b_value.clone(),
-            //     };
+                let a_inf = SCPBallot {
+                    counter: u32::MAX,
+                    value: a_value.clone(),
+                };
+                let b_inf = SCPBallot {
+                    counter: u32::MAX,
+                    value: b_value.clone(),
+                };
 
-            //     let mut b2 = b1.clone();
-            //     b2.counter += 1;
+                let mut b2 = b1.clone();
+                b2.counter += 1;
 
-            //     let mut b3 = b2.clone();
-            //     b3.counter += 1;
+                let mut b3 = b2.clone();
+                b3.counter += 1;
 
-            //     let mut mid2 = mid1.clone();
-            //     mid2.counter += 1;
+                let mut mid2 = mid1.clone();
+                mid2.counter += 1;
 
-            //     let mut big2 = big1.clone();
-            //     big2.counter += 1;
+                let mut big2 = big1.clone();
+                big2.counter += 1;
 
-            //     assert!(tk.bump_state(0, a_value));
-            //     assert_eq!(tk.driver().envelopes.len(), 1);
-            //     assert!(!tk.driver().has_ballot_timer());
+                assert!(tk.bump_state(0, a_value));
+                assert_eq!(tk.driver().envelopes.len(), 1);
+                assert!(!tk.driver().has_ballot_timer());
 
-            //     println!("SECTION: prepared A1");
-            //     {}
+                section!(prep_a1, "prepared A1", {
+                    recv_quorum_ex(
+                        &make_prepare_gen(qset_hash.into_inner(), a1.clone(), None, 0, 0, None),
+                        true,
+                    );
 
-            //     println!("SECTION: prepared B (v-blocking)");
-            //     {}
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_prepare(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        a1.clone(),
+                        Some(a1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
 
-            //     println!("SECTION: prepare B (quorum)");
-            //     {}
-
-            //     println!("SECTION: confirm (v-blocking)");
-            //     {}
-            // });
+                    section!(prep_a2, "prepared A2", {});
+                });
+            });
         };
 
         for net_cfg in get_network_cfgs() {

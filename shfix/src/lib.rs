@@ -404,7 +404,7 @@ mod tests {
                         section!(a, "section a", {
                             println!(x);
                         });
-                        let y = | | {
+                        let y = |x| {
                             let u = 0;
                             section!(b, "section b", {
                                 println!(y);
@@ -419,7 +419,7 @@ mod tests {
                     fn root_b() {
                         let x = 1;
                         {};
-                        let y = | | {
+                        let y = |x| {
                             let u = 0;
                             {
                                 println!("section b");
@@ -436,7 +436,7 @@ mod tests {
                             println!("section a");
                             println!(x);
                         };
-                        let y = | | {
+                        let y = |x| {
                             let u = 0;
                             {};
                             let w = 0;

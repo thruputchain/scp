@@ -316,29 +316,32 @@ mod stellar_tests {
             assert!(values.y_value < values.z_value);
             assert!(values.z_value < values.zz_value);
 
-            let mut recv_v_blocking_checks = |gen_: &GenEnvelope, with_checks: bool| {
-                let e1 = gen_(&v1_secret_key);
-                let e2 = gen_(&v2_secret_key);
+            let mut recv_v_blocking_checks =
+                |tk: &mut TestKernel, gen_: &GenEnvelope, with_checks: bool| {
+                    let e1 = gen_(&v1_secret_key);
+                    let e2 = gen_(&v2_secret_key);
 
-                tk.driver().bump_timer_offset();
+                    tk.driver().bump_timer_offset();
 
-                // Nothing should happen with first message
-                let i = tk.driver().envelopes.len();
-                tk.proto().received_envelope(&e1);
-                if with_checks {
-                    assert_eq!(tk.driver().envelopes.len(), i);
-                }
-                let i = i + 1;
-                tk.proto().received_envelope(&e2);
-                if with_checks {
-                    assert_eq!(tk.driver().envelopes.len(), i);
-                }
-            };
+                    // Nothing should happen with first message
+                    let i = tk.driver().envelopes.len();
+                    tk.proto().received_envelope(&e1);
+                    if with_checks {
+                        assert_eq!(tk.driver().envelopes.len(), i);
+                    }
+                    let i = i + 1;
+                    tk.proto().received_envelope(&e2);
+                    if with_checks {
+                        assert_eq!(tk.driver().envelopes.len(), i);
+                    }
+                };
 
-            let mut recv_v_blocking = |gen_: &GenEnvelope| recv_v_blocking_checks(gen_, true);
+            let mut recv_v_blocking =
+                |tk: &mut TestKernel, gen_: &GenEnvelope| recv_v_blocking_checks(tk, gen_, true);
 
             let mut recv_quorum_checks_ex =
-                |gen_: &GenEnvelope,
+                |tk: &mut TestKernel,
+                 gen_: &GenEnvelope,
                  with_checks: bool,
                  delayed_quorum: bool,
                  check_upcoming: bool| {
@@ -370,17 +373,22 @@ mod stellar_tests {
                 };
 
             let mut recv_quorum_checks =
-                |gen_: &GenEnvelope, with_checks: bool, delayed_quorum: bool| {
-                    recv_quorum_checks_ex(gen_, with_checks, delayed_quorum, true)
+                |tk: &mut TestKernel,
+                 gen_: &GenEnvelope,
+                 with_checks: bool,
+                 delayed_quorum: bool| {
+                    recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, true)
                 };
 
-            let mut recv_quorum_ex = |gen_: &GenEnvelope, check_upcoming: bool| {
-                recv_quorum_checks_ex(gen_, true, false, check_upcoming)
-            };
+            let mut recv_quorum_ex =
+                |tk: &mut TestKernel, gen_: &GenEnvelope, check_upcoming: bool| {
+                    recv_quorum_checks_ex(tk, gen_, true, false, check_upcoming)
+                };
 
-            let mut recv_quorum = |gen_: &GenEnvelope| recv_quorum_ex(gen_, false);
+            let mut recv_quorum =
+                |tk: &mut TestKernel, gen_: &GenEnvelope| recv_quorum_ex(tk, gen_, false);
 
-            let mut nodes_all_pledge_to_commit = || {
+            let mut nodes_all_pledge_to_commit = |tk: &mut TestKernel| {
                 let b = SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
@@ -632,6 +640,7 @@ mod stellar_tests {
 
                 section!(prep_a1, "prepared A1", {
                     recv_quorum_ex(
+                        &mut tk,
                         &make_prepare_gen(qset_hash.into_inner(), a1.clone(), None, 0, 0, None),
                         true,
                     );

@@ -193,7 +193,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             ours: bool,
             env: &proto::SCPEnvelope,
         ) -> EnvelopeState {
-            if ballot_proto.is_statement_sane(statement, ours) {
+            if !ballot_proto.is_statement_sane(statement, ours) {
                 if ours {
                     error!(env = ?env, "not sane statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false));
                 }
@@ -214,6 +214,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
+            dbg!("BBB INVALID");
             return EnvelopeState::Invalid;
         }
 

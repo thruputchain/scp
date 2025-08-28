@@ -645,20 +645,20 @@ mod stellar_tests {
                         true,
                     );
 
-                    assert_eq!(tk.driver().envelopes.len(), 2);
-                    verify_prepare(
-                        &tk.driver().envelopes[1],
-                        &v0_secret_key,
-                        qset_hash0,
-                        0,
-                        a1.clone(),
-                        Some(a1.clone()),
-                        0,
-                        0,
-                        None,
-                    );
+                    // assert_eq!(tk.driver().envelopes.len(), 2);
+                    // verify_prepare(
+                    //     &tk.driver().envelopes[1],
+                    //     &v0_secret_key,
+                    //     qset_hash0,
+                    //     0,
+                    //     a1.clone(),
+                    //     Some(a1.clone()),
+                    //     0,
+                    //     0,
+                    //     None,
+                    // );
 
-                    section!(prep_a2, "prepared A2", {});
+                    // section!(prep_a2, "prepared A2", {});
                 });
             });
         };

@@ -116,9 +116,10 @@ fn lift_block_to_stmt(stmt_macro: &StmtMacro, block: Block) -> Stmt {
 }
 
 fn rewrite_local(local: &Local) -> Rewritten<Local> {
-    let fixed = local.clone();
     if let Some((expr_block, block)) = parse_local_closure(local) {
         let rw_block = rewrite_block(None, block);
+
+        // exclusive
         let exclusive = rw_block
             .exclusive
             .into_iter()
@@ -139,14 +140,30 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
                 (p, new_local)
             })
             .collect();
+
+        // fixed
+        let mut new_fixed = local.clone();
+        let new_expr_closure = if let Expr::Closure(x) = &mut *new_fixed.init.as_mut().unwrap().expr
+        {
+            x
+        } else {
+            panic!("bug")
+        };
+        let expr_block = Expr::Block(ExprBlock {
+            attrs: expr_block.attrs.clone(),
+            label: expr_block.label.clone(),
+            block: rw_block.fixed,
+        });
+        new_expr_closure.body = Box::new(expr_block);
+
         Rewritten {
             exclusive: exclusive,
-            fixed: fixed,
+            fixed: new_fixed,
         }
     } else {
         Rewritten {
             exclusive: vec![],
-            fixed: fixed,
+            fixed: local.clone(),
         }
     }
 }
@@ -154,18 +171,18 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
 fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
 
-    println!(
-        "rewrite_block/rw_stmts: {}",
-        _rewritten_stmts_to_str(&rewritten_stmts)
-    );
+    // println!(
+    //     "rewrite_block/rw_stmts: {}",
+    //     _rewritten_stmts_to_str(&rewritten_stmts)
+    // );
 
     let (unfolded_stmts, fixed_stmts) = unfold_stmts(&rewritten_stmts);
 
-    println!(
-        "rewrite_block/unfolded_stmts: {} /fixed_stmts: {}",
-        _unfolded_stmts_to_str(&unfolded_stmts),
-        _stmts_to_str(&fixed_stmts),
-    );
+    // println!(
+    //     "rewrite_block/unfolded_stmts: {} /fixed_stmts: {}",
+    //     _unfolded_stmts_to_str(&unfolded_stmts),
+    //     _stmts_to_str(&fixed_stmts),
+    // );
 
     let header_stmt = description.map(|d| {
         let s: Stmt = parse_quote! {
@@ -387,10 +404,12 @@ mod tests {
                         section!(a, "section a", {
                             println!(x);
                         });
-                        let y = || {
+                        let y = | | {
+                            let u = 0;
                             section!(b, "section b", {
                                 println!(y);
                             });
+                            let w = 0;
                         };
                         let z = 2;
                     }
@@ -399,10 +418,14 @@ mod tests {
                     #[test]
                     fn root_b() {
                         let x = 1;
-                        let y = 2;
-                        {
-                            println!("section b");
-                            println!(y);
+                        {};
+                        let y = | | {
+                            let u = 0;
+                            {
+                                println!("section b");
+                                println!(y);
+                            };
+                            let w = 0;
                         };
                         let z = 2;
                     }
@@ -413,13 +436,11 @@ mod tests {
                             println!("section a");
                             println!(x);
                         };
-                        let y = 2;
-                        let z = 2;
-                    }
-                    #[test]
-                    fn root_() {
-                        let x = 1;
-                        let y = 2;
+                        let y = | | {
+                            let u = 0;
+                            {};
+                            let w = 0;
+                        };
                         let z = 2;
                     }
                 },
@@ -429,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_impl() {
-        for TestCase { input, expected } in get_test_cases() {
+        for (i, TestCase { input, expected }) in get_test_cases().iter().enumerate() {
             let attr_args = TokenStream2::new();
             let result = shfix_impl(attr_args, quote! { #input });
 
@@ -442,7 +463,7 @@ mod tests {
             println!("Result:\n{}", result_pretty);
             println!("Expected:\n{}", expected_pretty);
 
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_eq!(result.to_string(), expected.to_string(), "test {}", i);
         }
     }
 }

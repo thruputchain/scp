@@ -268,8 +268,9 @@ impl Driver for Rc<RefCell<TestDriver>> {
             )
         };
 
-        let timeout_ms = initial_timeout_ms + (round_number - 1) * increment_ms;
-        let timeout_ms = std::cmp::min(timeout_ms, TestKernel::MAX_TIMEOUT.as_millis() as u32);
+        let timeout_ms =
+            initial_timeout_ms as u64 + (round_number as u64 - 1) * increment_ms as u64;
+        let timeout_ms = std::cmp::min(timeout_ms, TestKernel::MAX_TIMEOUT.as_millis() as u64);
 
         Duration::from_millis(timeout_ms as u64)
     }

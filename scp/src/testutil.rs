@@ -146,11 +146,7 @@ pub fn verify_prepare(
     )
     .expect("Failed to create expected envelope");
 
-    assert_eq!(
-        expected.statement, actual.statement,
-        "Statement mismatch: expected {:?}, actual {:?}",
-        expected.statement, actual.statement
-    );
+    assert_eq!(expected.statement, actual.statement,);
 }
 
 pub fn verify_confirm(
@@ -174,11 +170,7 @@ pub fn verify_confirm(
     )
     .expect("Failed to create expected envelope");
 
-    assert_eq!(
-        expected.statement, actual.statement,
-        "Statement mismatch: expected {:?}, actual {:?}",
-        expected.statement, actual.statement
-    );
+    assert_eq!(expected.statement, actual.statement,);
 }
 
 pub fn verify_externalize(
@@ -192,11 +184,7 @@ pub fn verify_externalize(
     let expected = make_externalize(secret_key, qset_hash, slot_index, commit_ballot, n_h)
         .expect("Failed to create expected envelope");
 
-    assert_eq!(
-        expected.statement, actual.statement,
-        "Statement mismatch: expected {:?}, actual {:?}",
-        expected.statement, actual.statement
-    );
+    assert_eq!(expected.statement, actual.statement,);
 }
 
 pub fn verify_nominate(
@@ -210,11 +198,7 @@ pub fn verify_nominate(
     let expected = make_nominate(secret_key, qset_hash, slot_index, votes, accepted)
         .expect("Failed to create expected envelope");
 
-    assert_eq!(
-        expected.statement, actual.statement,
-        "Statement mismatch: expected {:?}, actual {:?}",
-        expected.statement, actual.statement
-    );
+    assert_eq!(expected.statement, actual.statement,);
 }
 
 #[derive(Clone)]

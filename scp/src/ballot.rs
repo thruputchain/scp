@@ -862,7 +862,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         trace!(
             slot_index = self.slot_proto().index(),
             ballot = ?ballot,
-            "BallotProtocol::setAcceptPrepared"
+            "ballot proto set_accept_prepared"
         );
 
         // Update our state

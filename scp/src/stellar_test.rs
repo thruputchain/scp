@@ -659,7 +659,48 @@ mod stellar_tests {
                         None,
                     );
 
-                    section!(prep_a2, "prepared A2", {});
+                    section!(prep_a2, "bump prepared A2", {
+                        // bump to (2,a)
+
+                        tk.driver().bump_timer_offset();
+                        assert!(tk.bump_state(0, a_value));
+                        assert_eq!(tk.driver().envelopes.len(), 3);
+                        verify_prepare(
+                            &tk.driver().envelopes[2],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a2.clone(),
+                            Some(a1.clone()),
+                            0,
+                            0,
+                            None,
+                        );
+                        assert!(!tk.driver().has_ballot_timer());
+
+                        recv_quorum_ex(
+                            &mut tk,
+                            &make_prepare_gen(qset_hash.into_inner(), a2.clone(), None, 0, 0, None),
+                            true,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 4);
+                        // BOMBS:
+                        verify_prepare(
+                            &tk.driver().envelopes[3],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a2.clone(),
+                            Some(a2.clone()),
+                            0,
+                            0,
+                            None,
+                        );
+
+                        // SECTION("Confirm prepared A2")
+                    });
+
+                    //
                 });
             });
         };

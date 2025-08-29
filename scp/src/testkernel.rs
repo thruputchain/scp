@@ -196,16 +196,18 @@ impl Driver for Rc<RefCell<TestDriver>> {
         panic!("not used")
     }
 
-    fn to_str_key(&self, _pk: &proto::SCPNodeID, _full_key: bool) -> String {
-        panic!("not used")
+    fn to_str_key(&self, pk: &proto::SCPNodeID, _full_key: bool) -> String {
+        match pk {
+            PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+        }
     }
 
     fn from_str_key(&self, _s: &str) -> Result<proto::SCPNodeID, String> {
         panic!("not used")
     } // XXX: get from KeyUtils.cpp
 
-    fn get_value_string(&self, _value: &proto::SCPValue) -> String {
-        panic!("not used")
+    fn get_value_string(&self, value: &proto::SCPValue) -> String {
+        format!("{}", hex_abbrev(&value.0))
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash {

@@ -28,7 +28,7 @@ pub fn compare_opt_ballots(
 }
 
 pub fn are_ballots_compatible(left: &proto::SCPBallot, right: &proto::SCPBallot) -> bool {
-    left.counter == right.counter
+    left.value == right.value
 }
 
 pub fn are_ballots_less_and_incompatible(

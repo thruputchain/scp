@@ -1,3 +1,0 @@
-- [x] stellar kernel
-- [x] C, D
-- [ ] impl driver

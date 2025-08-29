@@ -1213,7 +1213,299 @@ mod stellar_tests {
                                         }
                                     );
                                 });
-                                //1126
+
+                                section!(vblocking, "v-blocking", {
+                                    section!(confirm, "CONFIRM", {
+                                        section!(confirm_a2, "CONFIRM A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    a2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                a2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                                        });
+
+                                        section!(confirm_a3_4, "CONFIRM A3..4", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    4,
+                                                    a4.clone(),
+                                                    3,
+                                                    4,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                4,
+                                                a4.clone(),
+                                                3,
+                                                4,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+
+                                        section!(confirm_b2, "CONFIRM B2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    b2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                b2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                                        });
+                                    });
+
+                                    section!(externalize, "EXTERNALIZE", {
+                                        section!(externalize_a2, "EXTERNALIZE A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    a2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                a_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+
+                                        section!(externalize_b2, "EXTERNALIZE B2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    b2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                b_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+                                    });
+                                });
+                            });
+
+                            section!(get_conflicting_prepared_b, "get conflicting prepared B", {
+                                section!(same_counter, "same counter", {
+                                    recv_v_blocking(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b2.clone(),
+                                            Some(b2.clone()),
+                                            0,
+                                            0,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    verify_prepare(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        2,
+                                        Some(a2.clone()),
+                                    );
+                                    assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                    recv_quorum(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b2.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 7);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[6],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        2,
+                                        b2.clone(),
+                                        2,
+                                        2,
+                                    );
+                                    assert!(!tk.driver().has_ballot_timer_upcoming());
+                                });
+
+                                section!(higher_counter, "higher counter", {
+                                    recv_v_blocking(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b3.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    verify_prepare(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a3.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        2,
+                                        Some(a2.clone()),
+                                    );
+                                    assert!(!tk.driver().has_ballot_timer());
+
+                                    recv_quorum_checks_ex(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b3.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                        true,
+                                        true,
+                                        true,
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 7);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[6],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        3,
+                                        b3.clone(),
+                                        2,
+                                        2,
+                                    );
+                                });
+
+                                section!(higher_counter_mixed, "higher counter mixed", {
+                                    recv_v_blocking(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a3.clone(),
+                                            Some(b3.clone()),
+                                            0,
+                                            2,
+                                            Some(a2.clone()),
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    // h still A2
+                                    // v-blocking
+                                    //     prepared B3 -> p = B3, p'=A2 (1)
+                                    //     counter 3, b = A3 (9) (same value than h)
+                                    // c = 0 (1)
+                                    verify_prepare(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a3.clone(),
+                                        Some(b3.clone()),
+                                        0,
+                                        2,
+                                        Some(a2.clone()),
+                                    );
+                                    recv_quorum_ex(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a3.clone(),
+                                            Some(b3.clone()),
+                                            0,
+                                            2,
+                                            Some(a2.clone()),
+                                        ),
+                                        true,
+                                    );
+                                    // p=B3, p'=A3 (1)
+                                    // computed_h = B3
+                                    // b = computed_h = B3 (8)
+                                    // h = computed_h = B3 (2)
+                                    // c = h = B3 (3)
+                                    assert_eq!(tk.driver().envelopes.len(), 7);
+                                    verify_prepare(
+                                        &tk.driver().envelopes[6],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        b3.clone(),
+                                        Some(b3.clone()),
+                                        3,
+                                        3,
+                                        Some(a3.clone()),
+                                    );
+                                });
                             });
                         });
                     });

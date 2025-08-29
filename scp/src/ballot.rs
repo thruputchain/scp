@@ -1051,11 +1051,20 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         if let Some(new_h_ballot) = new_h {
-            let mut new_c: Option<&proto::SCPBallot> = None;
+            let mut new_c = proto::SCPBallot {
+                counter: 0,
+                value: Default::default(),
+            };
 
             // now, look for newC (left as None if no update)
             // step (3) from the paper
-            let current_ballot = self.ballot_state().current.as_ref();
+            let current = match &self.ballot_state().current {
+                Some(b) => b,
+                None => &proto::SCPBallot {
+                    counter: 0,
+                    value: Default::default(),
+                },
+            };
 
             let should_find_commit = self.ballot_state().commit.is_none()
                 && (self
@@ -1075,11 +1084,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 // continue where we left off (cur is at newH at this point)
                 while cur.is_some() {
                     let ballot = cur.unwrap();
+                    cur = iter.next();
 
-                    if let Some(current) = current_ballot {
-                        if compare_ballots(ballot, current) == Ordering::Less {
-                            break;
-                        }
+                    if compare_ballots(ballot, current) == Ordering::Less {
+                        break;
                     }
 
                     // c and h must be compatible
@@ -1092,16 +1100,14 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     });
 
                     if ratified {
-                        new_c = Some(ballot);
+                        new_c = ballot.clone();
                     } else {
                         break;
                     }
-
-                    cur = iter.next();
                 }
             }
 
-            return self.set_confirm_prepared(new_c.unwrap(), &new_h_ballot);
+            return self.set_confirm_prepared(&new_c, &new_h_ballot);
         }
 
         false

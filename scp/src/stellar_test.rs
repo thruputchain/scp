@@ -863,7 +863,130 @@ mod stellar_tests {
                                                 }
                                             );
                                         });
-                                        //978
+
+                                        section!(
+                                            vblocking_accept_more_a3,
+                                            "v-blocking accept more A3",
+                                            {
+                                                section!(confirm_a3, "Confirm A3", {
+                                                    recv_v_blocking(
+                                                        &mut tk,
+                                                        &make_confirm_gen(
+                                                            qset_hash.into_inner(),
+                                                            3,
+                                                            a3.clone(),
+                                                            2,
+                                                            3,
+                                                        ),
+                                                    );
+                                                    assert_eq!(tk.driver().envelopes.len(), 9);
+                                                    verify_confirm(
+                                                        &tk.driver().envelopes[8],
+                                                        &v0_secret_key,
+                                                        qset_hash0,
+                                                        0,
+                                                        3,
+                                                        a3.clone(),
+                                                        2,
+                                                        3,
+                                                    );
+                                                    assert!(
+                                                        !tk.driver().has_ballot_timer_upcoming()
+                                                    );
+                                                });
+
+                                                section!(externalize_a3, "Externalize A3", {
+                                                    recv_v_blocking(
+                                                        &mut tk,
+                                                        &make_externalize_gen(
+                                                            qset_hash.into_inner(),
+                                                            a2.clone(),
+                                                            3,
+                                                        ),
+                                                    );
+                                                    assert_eq!(tk.driver().envelopes.len(), 9);
+                                                    verify_confirm(
+                                                        &tk.driver().envelopes[8],
+                                                        &v0_secret_key,
+                                                        qset_hash0,
+                                                        0,
+                                                        u32::MAX,
+                                                        a_inf.clone(),
+                                                        2,
+                                                        u32::MAX,
+                                                    );
+                                                    assert!(!tk.driver().has_ballot_timer());
+                                                });
+
+                                                section!(
+                                                    other_nodes_moved_c_a4_h_a5,
+                                                    "other nodes moved to c=A4 h=A5",
+                                                    {
+                                                        section!(confirm_a4_5, "Confirm A4..5", {
+                                                            recv_v_blocking(
+                                                                &mut tk,
+                                                                &make_confirm_gen(
+                                                                    qset_hash.into_inner(),
+                                                                    3,
+                                                                    a5.clone(),
+                                                                    4,
+                                                                    5,
+                                                                ),
+                                                            );
+                                                            assert_eq!(
+                                                                tk.driver().envelopes.len(),
+                                                                9
+                                                            );
+                                                            verify_confirm(
+                                                                &tk.driver().envelopes[8],
+                                                                &v0_secret_key,
+                                                                qset_hash0,
+                                                                0,
+                                                                3,
+                                                                a5.clone(),
+                                                                4,
+                                                                5,
+                                                            );
+                                                            assert!(
+                                                                !tk.driver().has_ballot_timer()
+                                                            );
+                                                        });
+
+                                                        section!(
+                                                            externalize_a4_5,
+                                                            "Externalize A4..5",
+                                                            {
+                                                                recv_v_blocking(
+                                                                    &mut tk,
+                                                                    &make_externalize_gen(
+                                                                        qset_hash.into_inner(),
+                                                                        a4.clone(),
+                                                                        5,
+                                                                    ),
+                                                                );
+                                                                assert_eq!(
+                                                                    tk.driver().envelopes.len(),
+                                                                    9
+                                                                );
+                                                                verify_confirm(
+                                                                    &tk.driver().envelopes[8],
+                                                                    &v0_secret_key,
+                                                                    qset_hash0,
+                                                                    0,
+                                                                    u32::MAX,
+                                                                    a_inf.clone(),
+                                                                    4,
+                                                                    u32::MAX,
+                                                                );
+                                                                assert!(
+                                                                    !tk.driver().has_ballot_timer()
+                                                                );
+                                                            }
+                                                        );
+                                                    }
+                                                );
+                                            }
+                                        );
                                     });
                                 });
                             });

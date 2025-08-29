@@ -1508,7 +1508,392 @@ mod stellar_tests {
                                 });
                             });
                         });
+
+                        section!(confirm_prepared_mixed, "Confirm prepared mixed", {
+                            // a few nodes prepared B2
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b2.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    0,
+                                    Some(a2.clone()),
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 5);
+                            verify_prepare(
+                                &tk.driver().envelopes[4],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(b2.clone()),
+                                0,
+                                0,
+                                Some(a2.clone()),
+                            );
+                            assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                            section!(mixed_a2, "mixed A2", {
+                                // causes h=A2
+                                // but c = 0, as p >!~ h
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                verify_prepare(
+                                    &tk.driver().envelopes[5],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    a2.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    2,
+                                    Some(a2.clone()),
+                                );
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+                            });
+
+                            section!(mixed_b2, "mixed B2", {
+                                // causes h=B2, c=B2
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                verify_prepare(
+                                    &tk.driver().envelopes[5],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    b2.clone(),
+                                    Some(b2.clone()),
+                                    2,
+                                    2,
+                                    Some(a2.clone()),
+                                );
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+                            });
+                        });
                     });
+
+                    section!(switch_prepared_b1_from_a1, "switch prepared B1 from A1", {
+                        // (p,p') = (B1, A1) [ from (A1, null) ]
+                        recv_v_blocking(
+                            &mut tk,
+                            &make_prepare_gen(
+                                qset_hash.into_inner(),
+                                b1.clone(),
+                                Some(b1.clone()),
+                                0,
+                                0,
+                                None,
+                            ),
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 3);
+                        verify_prepare(
+                            &tk.driver().envelopes[2],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a1.clone(),
+                            Some(b1.clone()),
+                            0,
+                            0,
+                            Some(a1.clone()),
+                        );
+                        assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                        // v-blocking with n=2 -> bump n
+                        recv_v_blocking(
+                            &mut tk,
+                            &make_prepare_gen(qset_hash.into_inner(), b2.clone(), None, 0, 0, None),
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 4);
+                        verify_prepare(
+                            &tk.driver().envelopes[3],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a2.clone(),
+                            Some(b1.clone()),
+                            0,
+                            0,
+                            Some(a1.clone()),
+                        );
+
+                        // move to (p,p') = (B2, A1) [update p from B1 -> B2]
+                        recv_v_blocking(
+                            &mut tk,
+                            &make_prepare_gen(
+                                qset_hash.into_inner(),
+                                b2.clone(),
+                                Some(b2.clone()),
+                                0,
+                                0,
+                                None,
+                            ),
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 5);
+                        verify_prepare(
+                            &tk.driver().envelopes[4],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a2.clone(),
+                            Some(b2.clone()),
+                            0,
+                            0,
+                            Some(a1.clone()),
+                        );
+                        assert!(!tk.driver().has_ballot_timer()); // no quorum (other nodes on (A,1))
+
+                        section!(
+                            vblocking_switches_to_previous_value_of_p,
+                            "v-blocking switches to previous value of p",
+                            {
+                                // v-blocking with n=3 -> bump n
+                                recv_v_blocking(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        b3.clone(),
+                                        None,
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                verify_prepare(
+                                    &tk.driver().envelopes[5],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    a3.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    0,
+                                    Some(a1.clone()),
+                                );
+                                assert!(!tk.driver().has_ballot_timer()); // no quorum (other nodes on (A,1))
+
+                                // vBlocking set says "B1" is prepared - but we already have p=B2
+                                recv_v_blocking_checks(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        b3.clone(),
+                                        Some(b1.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                    false,
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                assert!(!tk.driver().has_ballot_timer());
+                            }
+                        );
+
+                        section!(switch_p_prime_to_mid2, "switch p' to Mid2", {
+                            // (p,p') = (B2, Mid2)
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b2.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    0,
+                                    Some(mid2.clone()),
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 6);
+                            verify_prepare(
+                                &tk.driver().envelopes[5],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(b2.clone()),
+                                0,
+                                0,
+                                Some(mid2.clone()),
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+                        });
+
+                        section!(switch_again_big2, "switch again Big2", {
+                            // both p and p' get updated
+                            // (p,p') = (Big2, B2)
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b2.clone(),
+                                    Some(big2.clone()),
+                                    0,
+                                    0,
+                                    Some(b2.clone()),
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 6);
+                            verify_prepare(
+                                &tk.driver().envelopes[5],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(big2.clone()),
+                                0,
+                                0,
+                                Some(b2.clone()),
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+                        });
+                    });
+
+                    section!(switch_prepare_b1, "switch prepare B1", {
+                        recv_quorum_checks(
+                            &mut tk,
+                            &make_prepare_gen(qset_hash.into_inner(), b1.clone(), None, 0, 0, None),
+                            true,
+                            true,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 3);
+                        verify_prepare(
+                            &tk.driver().envelopes[2],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            a1.clone(),
+                            Some(b1.clone()),
+                            0,
+                            0,
+                            Some(a1.clone()),
+                        );
+                        assert!(!tk.driver().has_ballot_timer_upcoming());
+                    });
+
+                    section!(
+                        prepare_higher_counter_vblocking,
+                        "prepare higher counter (v-blocking)",
+                        {
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b2.clone(),
+                                    None,
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+                            verify_prepare(
+                                &tk.driver().envelopes[2],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(a1.clone()),
+                                0,
+                                0,
+                                None,
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+
+                            // more timeout from vBlocking set
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b3.clone(),
+                                    None,
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 4);
+                            verify_prepare(
+                                &tk.driver().envelopes[3],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a3.clone(),
+                                Some(a1.clone()),
+                                0,
+                                0,
+                                None,
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+                        }
+                    );
                 });
             });
         };

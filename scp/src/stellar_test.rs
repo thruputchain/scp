@@ -821,8 +821,49 @@ mod stellar_tests {
                                                 3,
                                             );
                                             assert!(!tk.driver().has_ballot_timer_upcoming());
-                                            //956
+
+                                            assert_eq!(tk.driver().externalized_values.len(), 0);
+
+                                            section!(
+                                                quorum_externalize_a3,
+                                                "Quorum externalize A3",
+                                                {
+                                                    recv_quorum(
+                                                        &mut tk,
+                                                        &make_confirm_gen(
+                                                            qset_hash.into_inner(),
+                                                            3,
+                                                            a3.clone(),
+                                                            2,
+                                                            3,
+                                                        ),
+                                                    );
+                                                    assert_eq!(tk.driver().envelopes.len(), 10);
+                                                    verify_externalize(
+                                                        &tk.driver().envelopes[9],
+                                                        &v0_secret_key,
+                                                        qset_hash0,
+                                                        0,
+                                                        a2.clone(),
+                                                        3,
+                                                    );
+                                                    assert!(!tk.driver().has_ballot_timer());
+
+                                                    assert_eq!(
+                                                        tk.driver().externalized_values.len(),
+                                                        1
+                                                    );
+                                                    assert_eq!(
+                                                        tk.driver()
+                                                            .externalized_values
+                                                            .get(&0)
+                                                            .unwrap(),
+                                                        a_value
+                                                    );
+                                                }
+                                            );
                                         });
+                                        //978
                                     });
                                 });
                             });

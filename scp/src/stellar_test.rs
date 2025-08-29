@@ -684,7 +684,6 @@ mod stellar_tests {
                             true,
                         );
                         assert_eq!(tk.driver().envelopes.len(), 4);
-                        // BOMBS:
                         verify_prepare(
                             &tk.driver().envelopes[3],
                             &v0_secret_key,
@@ -697,10 +696,138 @@ mod stellar_tests {
                             None,
                         );
 
-                        // SECTION("Confirm prepared A2")
-                    });
+                        section!(confirm_prep_a2, "Confirm prepared A2", {
+                            recv_quorum(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 5);
+                            verify_prepare(
+                                &tk.driver().envelopes[4],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(a2.clone()),
+                                2,
+                                2,
+                                None,
+                            );
+                            assert!(!tk.driver().has_ballot_timer_upcoming());
 
-                    //
+                            section!(accept_commit, "Accept commit", {
+                                section!(quorum_a2, "Quorum A2", {
+                                    recv_quorum(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a2.clone(),
+                                            Some(a2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        2,
+                                        a2.clone(),
+                                        2,
+                                        2,
+                                    );
+                                    assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                    section!(quorum_prep_a3, "Quorum prepared A3", {
+                                        recv_v_blocking(
+                                            &mut tk,
+                                            &make_prepare_gen(
+                                                qset_hash.into_inner(),
+                                                a3.clone(),
+                                                Some(a2.clone()),
+                                                2,
+                                                2,
+                                                None,
+                                            ),
+                                        );
+                                        assert_eq!(tk.driver().envelopes.len(), 7);
+                                        verify_confirm(
+                                            &tk.driver().envelopes[6],
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            2,
+                                            a3.clone(),
+                                            2,
+                                            2,
+                                        );
+                                        assert!(!tk.driver().has_ballot_timer());
+
+                                        recv_quorum_ex(
+                                            &mut tk,
+                                            &make_prepare_gen(
+                                                qset_hash.into_inner(),
+                                                a3.clone(),
+                                                Some(a2.clone()),
+                                                2,
+                                                2,
+                                                None,
+                                            ),
+                                            true,
+                                        );
+                                        assert_eq!(tk.driver().envelopes.len(), 8);
+                                        verify_confirm(
+                                            &tk.driver().envelopes[7],
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            3,
+                                            a3.clone(),
+                                            2,
+                                            2,
+                                        );
+
+                                        section!(accept_more_commit_a3, "Accept more commit A3", {
+                                            recv_quorum(
+                                                &mut tk,
+                                                &make_prepare_gen(
+                                                    qset_hash.into_inner(),
+                                                    a3.clone(),
+                                                    Some(a3.clone()),
+                                                    2,
+                                                    3,
+                                                    None,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 9);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[8],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                3,
+                                                a3.clone(),
+                                                2,
+                                                3,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                                            //956
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
                 });
             });
         };

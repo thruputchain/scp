@@ -2517,8 +2517,152 @@ mod stellar_tests {
                                         assert!(!tk.driver().has_ballot_timer());
                                     });
 
-                                    //1634
+                                    section!(
+                                        hang_does_not_switch_to_b_in_confirm,
+                                        "Hang - does not switch to B in CONFIRM",
+                                        {
+                                            section!(network_externalize, "Network EXTERNALIZE", {
+                                                // externalize messages have a counter
+                                                // at infinite
+                                                recv_v_blocking(
+                                                    &mut tk,
+                                                    &make_externalize_gen(
+                                                        qset_hash.into_inner(),
+                                                        b2.clone(),
+                                                        3,
+                                                    ),
+                                                );
+                                                assert_eq!(tk.driver().envelopes.len(), 7);
+                                                verify_confirm(
+                                                    &tk.driver().envelopes[6],
+                                                    &v0_secret_key,
+                                                    qset_hash0,
+                                                    0,
+                                                    2,
+                                                    a_inf.clone(),
+                                                    2,
+                                                    2,
+                                                );
+                                                assert!(!tk.driver().has_ballot_timer());
+
+                                                // stuck
+                                                recv_quorum_checks(
+                                                    &mut tk,
+                                                    &make_externalize_gen(
+                                                        qset_hash.into_inner(),
+                                                        b2.clone(),
+                                                        3,
+                                                    ),
+                                                    false,
+                                                    false,
+                                                );
+                                                assert_eq!(tk.driver().envelopes.len(), 7);
+                                                assert_eq!(
+                                                    tk.driver().externalized_values.len(),
+                                                    0
+                                                );
+                                                // timer scheduled as there is a quorum
+                                                // with (inf, *)
+                                                assert!(tk.driver().has_ballot_timer_upcoming());
+                                            });
+                                            section!(
+                                                network_confirms_other_ballot,
+                                                "Network CONFIRMS other ballot",
+                                                {
+                                                    section!(at_same_counter, "at same counter", {
+                                                        // nothing should happen here, in
+                                                        // particular, node should not
+                                                        // attempt to switch 'p'
+                                                        recv_quorum_checks(
+                                                            &mut tk,
+                                                            &make_confirm_gen(
+                                                                qset_hash.into_inner(),
+                                                                3,
+                                                                b2.clone(),
+                                                                2,
+                                                                3,
+                                                            ),
+                                                            false,
+                                                            false,
+                                                        );
+                                                        assert_eq!(tk.driver().envelopes.len(), 6);
+                                                        assert_eq!(
+                                                            tk.driver().externalized_values.len(),
+                                                            0
+                                                        );
+                                                        assert!(
+                                                            !tk.driver()
+                                                                .has_ballot_timer_upcoming()
+                                                        );
+                                                    });
+                                                    section!(
+                                                        at_different_counter,
+                                                        "at a different counter",
+                                                        {
+                                                            recv_v_blocking(
+                                                                &mut tk,
+                                                                &make_confirm_gen(
+                                                                    qset_hash.into_inner(),
+                                                                    3,
+                                                                    b3.clone(),
+                                                                    3,
+                                                                    3,
+                                                                ),
+                                                            );
+                                                            assert_eq!(
+                                                                tk.driver().envelopes.len(),
+                                                                7
+                                                            );
+                                                            verify_confirm(
+                                                                &tk.driver().envelopes[6],
+                                                                &v0_secret_key,
+                                                                qset_hash0,
+                                                                0,
+                                                                2,
+                                                                a3.clone(),
+                                                                2,
+                                                                2,
+                                                            );
+                                                            assert!(
+                                                                !tk.driver().has_ballot_timer()
+                                                            );
+
+                                                            recv_quorum_checks(
+                                                                &mut tk,
+                                                                &make_confirm_gen(
+                                                                    qset_hash.into_inner(),
+                                                                    3,
+                                                                    b3.clone(),
+                                                                    3,
+                                                                    3,
+                                                                ),
+                                                                false,
+                                                                false,
+                                                            );
+                                                            assert_eq!(
+                                                                tk.driver().envelopes.len(),
+                                                                7
+                                                            );
+                                                            assert_eq!(
+                                                                tk.driver()
+                                                                    .externalized_values
+                                                                    .len(),
+                                                                0
+                                                            );
+                                                            // timer scheduled as there is a
+                                                            // quorum with (3, *)
+                                                            assert!(
+                                                                tk.driver()
+                                                                    .has_ballot_timer_upcoming()
+                                                            );
+                                                        }
+                                                    );
+                                                }
+                                            );
+                                        }
+                                    );
                                 });
+                                //1703
                             });
                         });
                     });

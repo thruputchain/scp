@@ -2662,8 +2662,132 @@ mod stellar_tests {
                                         }
                                     );
                                 });
-                                //1703
+                                section!(v_blocking, "v-blocking", {
+                                    section!(confirm_section, "CONFIRM", {
+                                        section!(confirm_a2, "CONFIRM A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    a2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                a2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                                        });
+                                        section!(confirm_a3_4, "CONFIRM A3..4", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    4,
+                                                    a4.clone(),
+                                                    3,
+                                                    4,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                4,
+                                                a4.clone(),
+                                                3,
+                                                4,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+                                        section!(confirm_b2, "CONFIRM B2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    b2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                b2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                                        });
+                                    });
+                                    section!(externalize_section, "EXTERNALIZE", {
+                                        section!(externalize_a2, "EXTERNALIZE A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    a2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                a_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+                                        section!(externalize_b2, "EXTERNALIZE B2", {
+                                            // can switch to B2 with externalize
+                                            // (higher counter)
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    b2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 6);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[5],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                b_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        });
+                                    });
+                                });
                             });
+                            //1765
                         });
                     });
                 });

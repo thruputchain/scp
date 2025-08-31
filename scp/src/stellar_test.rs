@@ -2363,15 +2363,670 @@ mod stellar_tests {
                                                     );
                                                     assert!(!tk.driver().has_ballot_timer());
                                                 });
+
+                                                section!(
+                                                    other_nodes_moved_c_a4_h_a5_2,
+                                                    "other nodes moved to c=A4 h=A5",
+                                                    {
+                                                        section!(
+                                                            confirm_a4_5_2,
+                                                            "Confirm A4..5",
+                                                            {
+                                                                recv_v_blocking(
+                                                                    &mut tk,
+                                                                    &make_confirm_gen(
+                                                                        qset_hash.into_inner(),
+                                                                        3,
+                                                                        a5.clone(),
+                                                                        4,
+                                                                        5,
+                                                                    ),
+                                                                );
+                                                                assert_eq!(
+                                                                    tk.driver().envelopes.len(),
+                                                                    9
+                                                                );
+                                                                verify_confirm(
+                                                                    &tk.driver().envelopes[8],
+                                                                    &v0_secret_key,
+                                                                    qset_hash0,
+                                                                    0,
+                                                                    3,
+                                                                    a5.clone(),
+                                                                    4,
+                                                                    5,
+                                                                );
+                                                                assert!(
+                                                                    !tk.driver().has_ballot_timer()
+                                                                );
+                                                            }
+                                                        );
+                                                        section!(
+                                                            externalize_a4_5,
+                                                            "Externalize A4..5",
+                                                            {
+                                                                recv_v_blocking(
+                                                                    &mut tk,
+                                                                    &make_externalize_gen(
+                                                                        qset_hash.into_inner(),
+                                                                        a4.clone(),
+                                                                        5,
+                                                                    ),
+                                                                );
+                                                                assert_eq!(
+                                                                    tk.driver().envelopes.len(),
+                                                                    9
+                                                                );
+                                                                verify_confirm(
+                                                                    &tk.driver().envelopes[8],
+                                                                    &v0_secret_key,
+                                                                    qset_hash0,
+                                                                    0,
+                                                                    u32::MAX,
+                                                                    a_inf.clone(),
+                                                                    4,
+                                                                    u32::MAX,
+                                                                );
+                                                                assert!(
+                                                                    !tk.driver().has_ballot_timer()
+                                                                );
+                                                            }
+                                                        );
+                                                    }
+                                                );
                                             }
                                         );
                                     });
+
+                                    //1607
                                 });
                             });
                         });
                     });
                 });
             });
+
+            /*
+                //XXX:1816
+                assert!(tk.driver().has_ballot_timer_upcoming());
+                let cb = tk.driver().get_ballot_timer().unwrap();
+                tk.proto().driver_calling_back(cb.callback);
+                // computed_h = B3
+                // h = B3 (2)
+                // c = 0
+                assert_eq!(tk.driver().envelopes.len(), 8);
+                verify_prepare(
+                    &tk.driver().envelopes[7],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    b4.clone(),
+                    Some(a3.clone()),
+                    0,
+                    2,
+                    Some(b3.clone()),
+                );
+
+            */
+
+            // the transitions that are observable when starting from empty
+            /*
+            section!(start_pristine, "start from pristine", {
+                let a_value = &values.x_value;
+                let b_value = &values.z_value;
+
+                let a1 = SCPBallot {
+                    counter: 1,
+                    value: a_value.clone(),
+                };
+                let b1 = SCPBallot {
+                    counter: 1,
+                    value: b_value.clone(),
+                };
+
+                let mut a2 = a1.clone();
+                a2.counter += 1;
+
+                let mut a3 = a2.clone();
+                a3.counter += 1;
+
+                let mut a4 = a3.clone();
+                a4.counter += 1;
+
+                let mut _a5 = a4.clone();
+                _a5.counter += 1;
+
+                let a_inf = SCPBallot {
+                    counter: u32::MAX,
+                    value: a_value.clone(),
+                };
+                let b_inf = SCPBallot {
+                    counter: u32::MAX,
+                    value: b_value.clone(),
+                };
+
+                let mut b2 = b1.clone();
+                b2.counter += 1;
+
+                let mut _b3 = b2.clone();
+                _b3.counter += 1;
+
+                assert_eq!(tk.driver().envelopes.len(), 0);
+
+                section!(prepared_a1, "prepared A1", {
+                    recv_quorum_checks(
+                        &mut tk,
+                        &make_prepare_gen(qset_hash.into_inner(), a1.clone(), None, 0, 0, None),
+                        false,
+                        false,
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    section!(bump_prep_a2, "bump prepared A2", {
+                        section!(confirm_prep_a2, "Confirm prepared A2", {
+                            recv_v_blocking_checks(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                                false,
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 0);
+
+                            section!(quorum_a2, "Quorum A2", {
+                                recv_v_blocking_checks(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                    false,
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 0);
+                                recv_quorum(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                                verify_prepare(
+                                    &tk.driver().envelopes[0],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    1,
+                                    2,
+                                    None,
+                                );
+                            });
+
+                            section!(quorum_b2, "Quorum B2", {
+                                recv_v_blocking_checks(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                    false,
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 0);
+                                recv_quorum(
+                                    &mut tk,
+                                    &make_prepare_gen(
+                                        qset_hash.into_inner(),
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    ),
+                                );
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                                verify_prepare(
+                                    &tk.driver().envelopes[0],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    b2.clone(),
+                                    Some(b2.clone()),
+                                    2,
+                                    2,
+                                    Some(a2.clone()),
+                                );
+                            });
+
+                            section!(accept_commit, "Accept commit", {
+                                section!(quorum_a2, "Quorum A2", {
+                                    recv_quorum(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a2.clone(),
+                                            Some(a2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 1);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[0],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        2,
+                                        a2.clone(),
+                                        2,
+                                        2,
+                                    );
+                                });
+
+                                section!(quorum_b2, "Quorum B2", {
+                                    recv_quorum(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b2.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 1);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[0],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        2,
+                                        b2.clone(),
+                                        2,
+                                        2,
+                                    );
+                                });
+
+                                section!(vblocking, "v-blocking", {
+                                    section!(confirm, "CONFIRM", {
+                                        section!(confirm_a2, "CONFIRM A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    a2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 1);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[0],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                a2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                        });
+
+                                        section!(confirm_a3_4, "CONFIRM A3..4", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    4,
+                                                    a4.clone(),
+                                                    3,
+                                                    4,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 1);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[0],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                4,
+                                                a4.clone(),
+                                                3,
+                                                4,
+                                            );
+                                        });
+
+                                        section!(confirm_b2, "CONFIRM B2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_confirm_gen(
+                                                    qset_hash.into_inner(),
+                                                    2,
+                                                    b2.clone(),
+                                                    2,
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 1);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[0],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                2,
+                                                b2.clone(),
+                                                2,
+                                                2,
+                                            );
+                                        });
+                                    });
+
+                                    section!(externalize, "EXTERNALIZE", {
+                                        section!(externalize_a2, "EXTERNALIZE A2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    a2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 1);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[0],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                a_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                        });
+
+                                        section!(externalize_b2, "EXTERNALIZE B2", {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_externalize_gen(
+                                                    qset_hash.into_inner(),
+                                                    b2.clone(),
+                                                    2,
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 1);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[0],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                u32::MAX,
+                                                b_inf.clone(),
+                                                2,
+                                                u32::MAX,
+                                            );
+                                        });
+                                    });
+                                });
+                            });
+                        });
+
+                        section!(confirm_prep_mixed, "Confirm prepared mixed", {
+                            // a few nodes prepared A2
+                            // causes p=A2
+                            recv_v_blocking_checks(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                                false,
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 0);
+
+                            // a few nodes prepared B2
+                            // causes p=B2, p'=A2
+                            recv_v_blocking_checks(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    0,
+                                    Some(a2.clone()),
+                                ),
+                                false,
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 0);
+
+                            section!(mixed_a2, "mixed A2", {
+                                // causes h=A2
+                                // but c = 0, as p >!~ h
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                                verify_prepare(
+                                    &tk.driver().envelopes[0],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    a2.clone(),
+                                    Some(b2.clone()),
+                                    0,
+                                    2,
+                                    Some(a2.clone()),
+                                );
+
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                            });
+
+                            section!(mixed_b2, "mixed B2", {
+                                // causes h=B2, c=B2
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                                verify_prepare(
+                                    &tk.driver().envelopes[0],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    b2.clone(),
+                                    Some(b2.clone()),
+                                    2,
+                                    2,
+                                    Some(a2.clone()),
+                                );
+
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+                            });
+                        });
+                    });
+
+                    section!(switch_prep_b1, "switch prepared B1", {
+                        recv_v_blocking_checks(
+                            &mut tk,
+                            &make_prepare_gen(
+                                qset_hash.into_inner(),
+                                b1.clone(),
+                                Some(b1.clone()),
+                                0,
+                                0,
+                                None,
+                            ),
+                            false,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 0);
+                    });
+                });
+
+                section!(prepared_b_vblocking, "prepared B (v-blocking)", {
+                    recv_v_blocking_checks(
+                        &mut tk,
+                        &make_prepare_gen(
+                            qset_hash.into_inner(),
+                            b1.clone(),
+                            Some(b1.clone()),
+                            0,
+                            0,
+                            None,
+                        ),
+                        false,
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+                });
+
+                section!(confirm_vblocking, "confirm (v-blocking)", {
+                    section!(via_confirm, "via CONFIRM", {
+                        tk.proto().received_envelope(
+                            &make_confirm(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                3,
+                                a3.clone(),
+                                3,
+                                3,
+                            )
+                            .unwrap(),
+                        );
+                        tk.proto().received_envelope(
+                            &make_confirm(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                4,
+                                a4.clone(),
+                                2,
+                                4,
+                            )
+                            .unwrap(),
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        verify_confirm(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            3,
+                            a3.clone(),
+                            3,
+                            3,
+                        );
+                    });
+
+                    section!(via_externalize, "via EXTERNALIZE", {
+                        tk.proto().received_envelope(
+                            &make_externalize(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                a2.clone(),
+                                4,
+                            )
+                            .unwrap(),
+                        );
+                        tk.proto().received_envelope(
+                            &make_externalize(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                a3.clone(),
+                                5,
+                            )
+                            .unwrap(),
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        verify_confirm(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            u32::MAX,
+                            a_inf.clone(),
+                            3,
+                            u32::MAX,
+                        );
+                    });
+                });
+            });
+            */
         };
 
         for net_cfg in get_network_cfgs() {

@@ -2787,34 +2787,162 @@ mod stellar_tests {
                                     });
                                 });
                             });
-                            //1765
+                            section!(get_conflicting_prepared_b, "get conflicting prepared B", {
+                                section!(same_counter, "same counter", {
+                                    // messages are ignored as B2 < A2
+                                    recv_quorum_checks(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b2.clone(),
+                                            Some(b2.clone()),
+                                            0,
+                                            0,
+                                            None,
+                                        ),
+                                        false,
+                                        false,
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 5);
+                                    assert!(!tk.driver().has_ballot_timer_upcoming());
+                                });
+                                section!(higher_counter, "higher counter", {
+                                    recv_v_blocking(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b3.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    // A2 > B2 -> p = A2, p'=B2
+                                    verify_prepare(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a3.clone(),
+                                        Some(a2.clone()),
+                                        2,
+                                        2,
+                                        Some(b2.clone()),
+                                    );
+                                    assert!(!tk.driver().has_ballot_timer());
+
+                                    // node is trying to commit A2=<2,y> but rest
+                                    // of its quorum is trying to commit B2
+                                    // we end up with a delayed quorum
+                                    recv_quorum_checks_ex(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            b3.clone(),
+                                            Some(b2.clone()),
+                                            2,
+                                            2,
+                                            None,
+                                        ),
+                                        true,
+                                        true,
+                                        true,
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 7);
+                                    verify_confirm(
+                                        &tk.driver().envelopes[6],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        3,
+                                        b3.clone(),
+                                        2,
+                                        2,
+                                    );
+                                });
+                                section!(higher_counter_mixed, "higher counter mixed", {
+                                    recv_v_blocking(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a3.clone(),
+                                            Some(b3.clone()),
+                                            0,
+                                            2,
+                                            Some(a2.clone()),
+                                        ),
+                                    );
+                                    assert_eq!(tk.driver().envelopes.len(), 6);
+                                    // h still A2
+                                    // v-blocking
+                                    //     prepared B3 -> p = B3, p'=A2 (1)
+                                    //     counter 3, b = A3 (9) (same value than h)
+                                    // c = 0 (1)
+                                    verify_prepare(
+                                        &tk.driver().envelopes[5],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a3.clone(),
+                                        Some(b3.clone()),
+                                        0,
+                                        2,
+                                        Some(a2.clone()),
+                                    );
+                                    recv_quorum_ex(
+                                        &mut tk,
+                                        &make_prepare_gen(
+                                            qset_hash.into_inner(),
+                                            a3.clone(),
+                                            Some(b3.clone()),
+                                            0,
+                                            2,
+                                            Some(a2.clone()),
+                                        ),
+                                        true,
+                                    );
+                                    // p=A3, p'=B3 (1)
+                                    // computed_h = B3 (2) z = B - cannot update b
+                                    assert_eq!(tk.driver().envelopes.len(), 7);
+                                    verify_prepare(
+                                        &tk.driver().envelopes[6],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        a3.clone(),
+                                        Some(a3.clone()),
+                                        0,
+                                        2,
+                                        Some(b3.clone()),
+                                    );
+                                    // timeout, bump to B4
+                                    assert!(tk.driver().has_ballot_timer_upcoming());
+                                    let cb = tk.driver().get_ballot_timer().unwrap();
+                                    tk.proto().driver_calling_back(cb.callback);
+                                    // computed_h = B3
+                                    // h = B3 (2)
+                                    // c = 0
+                                    assert_eq!(tk.driver().envelopes.len(), 8);
+                                    verify_prepare(
+                                        &tk.driver().envelopes[7],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        b4.clone(),
+                                        Some(a3.clone()),
+                                        0,
+                                        3,
+                                        Some(b3.clone()),
+                                    );
+                                });
+                            });
                         });
+                        //1830
                     });
                 });
             });
-
-            /*
-                //XXX:1816
-                assert!(tk.driver().has_ballot_timer_upcoming());
-                let cb = tk.driver().get_ballot_timer().unwrap();
-                tk.proto().driver_calling_back(cb.callback);
-                // computed_h = B3
-                // h = B3 (2)
-                // c = 0
-                assert_eq!(tk.driver().envelopes.len(), 8);
-                verify_prepare(
-                    &tk.driver().envelopes[7],
-                    &v0_secret_key,
-                    qset_hash0,
-                    0,
-                    b4.clone(),
-                    Some(a3.clone()),
-                    0,
-                    2,
-                    Some(b3.clone()),
-                );
-
-            */
 
             // the transitions that are observable when starting from empty
             /*

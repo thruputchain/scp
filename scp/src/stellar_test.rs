@@ -2438,7 +2438,86 @@ mod stellar_tests {
                                         );
                                     });
 
-                                    //1607
+                                    section!(v_blocking_prepared_a3, "v-blocking prepared A3", {
+                                        recv_v_blocking(
+                                            &mut tk,
+                                            &make_prepare_gen(
+                                                qset_hash.into_inner(),
+                                                a3.clone(),
+                                                Some(a3.clone()),
+                                                2,
+                                                2,
+                                                None,
+                                            ),
+                                        );
+                                        assert_eq!(tk.driver().envelopes.len(), 7);
+                                        verify_confirm(
+                                            &tk.driver().envelopes[6],
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            3,
+                                            a3.clone(),
+                                            2,
+                                            2,
+                                        );
+                                        assert!(!tk.driver().has_ballot_timer());
+                                    });
+                                    section!(
+                                        v_blocking_prepared_a3_b3,
+                                        "v-blocking prepared A3+B3",
+                                        {
+                                            recv_v_blocking(
+                                                &mut tk,
+                                                &make_prepare_gen(
+                                                    qset_hash.into_inner(),
+                                                    a3.clone(),
+                                                    Some(a3.clone()),
+                                                    2,
+                                                    2,
+                                                    Some(b3.clone()),
+                                                ),
+                                            );
+                                            assert_eq!(tk.driver().envelopes.len(), 7);
+                                            verify_confirm(
+                                                &tk.driver().envelopes[6],
+                                                &v0_secret_key,
+                                                qset_hash0,
+                                                0,
+                                                3,
+                                                a3.clone(),
+                                                2,
+                                                2,
+                                            );
+                                            assert!(!tk.driver().has_ballot_timer());
+                                        }
+                                    );
+                                    section!(v_blocking_confirm_a3, "v-blocking confirm A3", {
+                                        recv_v_blocking(
+                                            &mut tk,
+                                            &make_confirm_gen(
+                                                qset_hash.into_inner(),
+                                                3,
+                                                a3.clone(),
+                                                2,
+                                                2,
+                                            ),
+                                        );
+                                        assert_eq!(tk.driver().envelopes.len(), 7);
+                                        verify_confirm(
+                                            &tk.driver().envelopes[6],
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            3,
+                                            a3.clone(),
+                                            2,
+                                            2,
+                                        );
+                                        assert!(!tk.driver().has_ballot_timer());
+                                    });
+
+                                    //1634
                                 });
                             });
                         });

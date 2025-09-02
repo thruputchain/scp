@@ -176,7 +176,7 @@ impl TestDriver {
         if let Some(x) = self.get_ballot_timer() {
             self.current_timer_offset < x.absolute_timeout
         } else {
-            panic!("bug")
+            panic!("timer must be scheduled in the past or future")
         }
     }
 }

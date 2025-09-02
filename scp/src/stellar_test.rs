@@ -378,7 +378,7 @@ mod stellar_tests {
                  gen_: &GenEnvelope,
                  with_checks: bool,
                  delayed_quorum: bool| {
-                    recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, true)
+                    recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, false)
                 };
 
             let mut recv_quorum_ex =
@@ -3270,8 +3270,8 @@ mod stellar_tests {
                 });
             });
 
+            // this is the same test suite than "start <1,x>" but only keeping
             // the transitions that are observable when starting from empty
-            /*
             section!(start_pristine, "start from pristine", {
                 let a_value = &values.x_value;
                 let b_value = &values.z_value;
@@ -3322,7 +3322,7 @@ mod stellar_tests {
                         false,
                     );
                     assert_eq!(tk.driver().envelopes.len(), 0);
-
+                    /*
                     section!(bump_prep_a2, "bump prepared A2", {
                         section!(confirm_prep_a2, "Confirm prepared A2", {
                             recv_v_blocking_checks(
@@ -3735,8 +3735,9 @@ mod stellar_tests {
                         );
                         assert_eq!(tk.driver().envelopes.len(), 0);
                     });
+                    */
                 });
-
+                /*
                 section!(prepared_b_vblocking, "prepared B (v-blocking)", {
                     recv_v_blocking_checks(
                         &mut tk,
@@ -3826,8 +3827,8 @@ mod stellar_tests {
                         );
                     });
                 });
+                */
             });
-            */
         };
 
         for net_cfg in get_network_cfgs() {

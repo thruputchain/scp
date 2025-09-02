@@ -2939,8 +2939,127 @@ mod stellar_tests {
                                 });
                             });
                         });
-                        //1830
+
+                        section!(confirm_prepared_mixed, "Confirm prepared mixed", {
+                            // a few nodes prepared B2
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    0,
+                                    0,
+                                    Some(b2.clone()),
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 5);
+                            verify_prepare(
+                                &tk.driver().envelopes[4],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(a2.clone()),
+                                0,
+                                0,
+                                Some(b2.clone()),
+                            );
+                            assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                            section!(mixed_a2, "mixed A2", {
+                                // causes h=A2, c=A2
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                verify_prepare(
+                                    &tk.driver().envelopes[5],
+                                    &v0_secret_key,
+                                    qset_hash0,
+                                    0,
+                                    a2.clone(),
+                                    Some(a2.clone()),
+                                    2,
+                                    2,
+                                    Some(b2.clone()),
+                                );
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(a2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 6);
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+                            });
+
+                            section!(mixed_b2, "mixed B2", {
+                                // causes computed_h=B2 ~ not set as h ~!= b
+                                // -> noop
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        a2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 5);
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                                tk.driver().bump_timer_offset();
+                                tk.proto().received_envelope(
+                                    &make_prepare(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        b2.clone(),
+                                        Some(b2.clone()),
+                                        0,
+                                        0,
+                                        None,
+                                    )
+                                    .unwrap(),
+                                );
+
+                                assert_eq!(tk.driver().envelopes.len(), 5);
+                                assert!(!tk.driver().has_ballot_timer_upcoming());
+                            });
+                        });
                     });
+
+                    //1879
                 });
             });
 

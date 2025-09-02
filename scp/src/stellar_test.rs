@@ -3059,8 +3059,94 @@ mod stellar_tests {
                         });
                     });
 
-                    //1879
+                    section!(switch_prepared_b1_from_a1, "switch prepared B1 from A1", {
+                        // can't switch to B1
+                        recv_quorum_checks(
+                            &mut tk,
+                            &make_prepare_gen(
+                                qset_hash.into_inner(),
+                                b1.clone(),
+                                Some(b1.clone()),
+                                0,
+                                0,
+                                None,
+                            ),
+                            false,
+                            false,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 2);
+                        assert!(!tk.driver().has_ballot_timer_upcoming());
+                    });
+                    section!(switch_prepare_b1, "switch prepare B1", {
+                        // doesn't switch as B1 < A1
+                        recv_quorum_checks(
+                            &mut tk,
+                            &make_prepare_gen(qset_hash.into_inner(), b1.clone(), None, 0, 0, None),
+                            false,
+                            false,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 2);
+                        assert!(!tk.driver().has_ballot_timer_upcoming());
+                    });
+                    section!(
+                        prepare_higher_counter_v_blocking,
+                        "prepare higher counter (v-blocking)",
+                        {
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b2.clone(),
+                                    None,
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+                            verify_prepare(
+                                &tk.driver().envelopes[2],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a2.clone(),
+                                Some(a1.clone()),
+                                0,
+                                0,
+                                None,
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+
+                            // more timeout from vBlocking set
+                            recv_v_blocking(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    b3.clone(),
+                                    None,
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 4);
+                            verify_prepare(
+                                &tk.driver().envelopes[3],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a3.clone(),
+                                Some(a1.clone()),
+                                0,
+                                0,
+                                None,
+                            );
+                            assert!(!tk.driver().has_ballot_timer());
+                        }
+                    );
                 });
+
+                //1911
             });
 
             // the transitions that are observable when starting from empty

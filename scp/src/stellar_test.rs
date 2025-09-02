@@ -3322,7 +3322,7 @@ mod stellar_tests {
                         false,
                     );
                     assert_eq!(tk.driver().envelopes.len(), 0);
-                    /*
+
                     section!(bump_prep_a2, "bump prepared A2", {
                         section!(confirm_prep_a2, "Confirm prepared A2", {
                             recv_v_blocking_checks(
@@ -3735,9 +3735,8 @@ mod stellar_tests {
                         );
                         assert_eq!(tk.driver().envelopes.len(), 0);
                     });
-                    */
                 });
-                /*
+
                 section!(prepared_b_vblocking, "prepared B (v-blocking)", {
                     recv_v_blocking_checks(
                         &mut tk,
@@ -3827,7 +3826,6 @@ mod stellar_tests {
                         );
                     });
                 });
-                */
             });
         };
 

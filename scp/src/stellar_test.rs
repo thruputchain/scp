@@ -5765,6 +5765,13 @@ mod stellar_tests {
                             assert!(values.y_value < values.z_value);
                             assert_eq!(tk.driver().envelopes.len(), 1);
 
+                            // Update round leader to v1
+                            let v1_node_id = nodes[1].node_id().clone();
+                            tk.driver().priority_lookup =
+                                Box::new(
+                                    move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 },
+                                );
+
                             let nom1 = make_nominate(
                                 &v1_secret_key,
                                 qset_hash.into_inner(),
@@ -5779,8 +5786,56 @@ mod stellar_tests {
                                 tk.proto().received_envelope(&nom1);
                                 assert_eq!(tk.driver().envelopes.len(), 1);
 
-                                // Test would continue with timeout logic
+                                // Update round leaders, vote for accepted value (y)
+                                assert!(tk.nominate(0, &values.x_value, true));
+                                assert_eq!(tk.driver().envelopes.len(), 2);
                             });
+
+                            section!(receive_after_timeout, "receive accepted after timeout", {
+                                assert!(!tk.nominate(0, &values.x_value, true));
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+
+                                // Vote for accepted value (y)
+                                tk.proto().received_envelope(&nom1);
+                                assert_eq!(tk.driver().envelopes.len(), 2);
+                            });
+
+                            let votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
+                            // votes_xy.sort(); // XXX: no sorting in c++
+
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                votes_xy.clone(),
+                                vec![], // empty accepted
+                            );
+
+                            let nom2 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                vec![
+                                    values.y_value.clone(),
+                                    values.z_value.clone(),
+                                    values.zz_value.clone(),
+                                ],
+                                vec![values.y_value.clone()],
+                            )
+                            .unwrap();
+                            tk.proto().received_envelope(&nom2);
+                            // Nothing happens, as v0 already voted for the accepted
+                            // value (y)
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                votes_xy,
+                                vec![], // empty accepted
+                            );
                         }
                     );
                 });
@@ -5789,8 +5844,13 @@ mod stellar_tests {
                     self_nominates_x_others_y,
                     "self nominates 'x', others nominate y -> prepare y",
                     {
-                        let my_votes = vec![values.x_value.clone()];
+                        let mut my_votes = vec![values.x_value.clone()];
                         let accepted = vec![];
+
+                        tk.driver()
+                            .expected_candidates
+                            .insert(values.x_value.clone());
+                        tk.driver().composite_value = Some(values.x_value.clone());
 
                         assert!(tk.nominate(0, &values.x_value, false));
 
@@ -5804,7 +5864,7 @@ mod stellar_tests {
                             accepted.clone(),
                         );
 
-                        let votes_y = vec![values.y_value.clone()];
+                        let votes = vec![values.y_value.clone()];
                         let accepted_y = vec![values.y_value.clone()];
 
                         section!(others_vote_y, "others only vote for y", {
@@ -5812,7 +5872,7 @@ mod stellar_tests {
                                 &v1_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted.clone(),
                             )
                             .unwrap();
@@ -5820,7 +5880,7 @@ mod stellar_tests {
                                 &v2_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted.clone(),
                             )
                             .unwrap();
@@ -5828,7 +5888,7 @@ mod stellar_tests {
                                 &v3_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted.clone(),
                             )
                             .unwrap();
@@ -5836,7 +5896,7 @@ mod stellar_tests {
                                 &v4_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted.clone(),
                             )
                             .unwrap();
@@ -5851,15 +5911,13 @@ mod stellar_tests {
                             tk.proto().received_envelope(&nom4);
                             assert_eq!(tk.driver().envelopes.len(), 2);
 
-                            let mut my_votes_xy = my_votes.clone();
-                            my_votes_xy.push(values.y_value.clone());
-                            my_votes_xy.sort();
+                            my_votes.push(values.y_value.clone());
                             verify_nominate(
                                 &tk.driver().envelopes[1],
                                 &v0_secret_key,
                                 qset_hash0,
                                 0,
-                                my_votes_xy,
+                                my_votes,
                                 accepted_y.clone(),
                             );
                         });
@@ -5869,7 +5927,7 @@ mod stellar_tests {
                                 &v1_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted_y.clone(),
                             )
                             .unwrap();
@@ -5877,7 +5935,7 @@ mod stellar_tests {
                                 &v2_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted_y.clone(),
                             )
                             .unwrap();
@@ -5885,15 +5943,15 @@ mod stellar_tests {
                                 &v3_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted_y.clone(),
                             )
                             .unwrap();
-                            let _acc4 = make_nominate(
+                            let acc4 = make_nominate(
                                 &v4_secret_key,
                                 qset_hash.into_inner(),
                                 0,
-                                votes_y.clone(),
+                                votes.clone(),
                                 accepted_y.clone(),
                             )
                             .unwrap();
@@ -5905,17 +5963,21 @@ mod stellar_tests {
                             tk.proto().received_envelope(&acc2);
                             assert_eq!(tk.driver().envelopes.len(), 2);
 
-                            let mut my_votes_xy = my_votes.clone();
-                            my_votes_xy.push(values.y_value.clone());
-                            my_votes_xy.sort();
+                            my_votes.push(values.y_value.clone());
                             verify_nominate(
                                 &tk.driver().envelopes[1],
                                 &v0_secret_key,
                                 qset_hash0,
                                 0,
-                                my_votes_xy,
+                                my_votes,
                                 accepted_y.clone(),
                             );
+
+                            tk.driver().expected_candidates.clear();
+                            tk.driver()
+                                .expected_candidates
+                                .insert(values.y_value.clone());
+                            tk.driver().composite_value = Some(values.y_value.clone());
 
                             // this causes the node to send a prepare message (quorum)
                             tk.proto().received_envelope(&acc3);
@@ -5935,6 +5997,9 @@ mod stellar_tests {
                                 0,
                                 None,
                             );
+
+                            tk.proto().received_envelope(&acc4);
+                            assert_eq!(tk.driver().envelopes.len(), 4);
                         });
                     }
                 );

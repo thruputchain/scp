@@ -457,11 +457,11 @@ mod stellar_tests {
 
                 tk.proto().received_envelope(&prepare1);
                 assert_eq!(tk.driver().envelopes.len(), 1);
-                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0), None);
 
                 tk.proto().received_envelope(&prepare2);
                 assert_eq!(tk.driver().envelopes.len(), 1);
-                assert_eq!(tk.driver().heard_from_quorums.get(&0).unwrap().len(), 0);
+                assert_eq!(tk.driver().heard_from_quorums.get(&0), None);
 
                 tk.proto().received_envelope(&prepare3);
                 assert_eq!(tk.driver().envelopes.len(), 2);
@@ -3826,6 +3826,344 @@ mod stellar_tests {
                         );
                     });
                 });
+            });
+
+            section!(normal_round_1x, "normal round (1,x)", {
+                nodes_all_pledge_to_commit(&mut tk);
+                assert_eq!(tk.driver().envelopes.len(), 3);
+
+                let b = proto::SCPBallot {
+                    counter: 1,
+                    value: values.x_value.clone(),
+                };
+
+                // bunch of prepare messages with "commit b"
+                let prepared_c1 = make_prepare(
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let prepared_c2 = make_prepare(
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let prepared_c3 = make_prepare(
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let prepared_c4 = make_prepare(
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+
+                // those should not trigger anything just yet
+                tk.proto().received_envelope(&prepared_c1);
+                tk.proto().received_envelope(&prepared_c2);
+                assert_eq!(tk.driver().envelopes.len(), 3);
+
+                // this should cause the node to accept 'commit b' (quorum)
+                // and therefore send a "CONFIRM" message
+                tk.proto().received_envelope(&prepared_c3);
+                assert_eq!(tk.driver().envelopes.len(), 4);
+
+                verify_confirm(
+                    &tk.driver().envelopes[3],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    1,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                );
+
+                // bunch of confirm messages
+                let confirm1 = make_confirm(
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.counter,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                )
+                .unwrap();
+                let confirm2 = make_confirm(
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.counter,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                )
+                .unwrap();
+                let confirm3 = make_confirm(
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.counter,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                )
+                .unwrap();
+                let confirm4 = make_confirm(
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.counter,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                )
+                .unwrap();
+
+                // those should not trigger anything just yet
+                tk.proto().received_envelope(&confirm1);
+                tk.proto().received_envelope(&confirm2);
+                assert_eq!(tk.driver().envelopes.len(), 4);
+
+                tk.proto().received_envelope(&confirm3);
+                // this causes our node to
+                // externalize (confirm commit c)
+                assert_eq!(tk.driver().envelopes.len(), 5);
+
+                // The slot should have externalized the value
+                assert_eq!(tk.driver().externalized_values.len(), 1);
+                assert_eq!(
+                    tk.driver().externalized_values.get(&0).unwrap(),
+                    &values.x_value
+                );
+
+                verify_externalize(
+                    &tk.driver().envelopes[4],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    b.clone(),
+                    b.counter,
+                );
+
+                // extra vote should not do anything
+                tk.proto().received_envelope(&confirm4);
+                assert_eq!(tk.driver().envelopes.len(), 5);
+                assert_eq!(tk.driver().externalized_values.len(), 1);
+
+                // duplicate should just no-op
+                tk.proto().received_envelope(&confirm2);
+                assert_eq!(tk.driver().envelopes.len(), 5);
+                assert_eq!(tk.driver().externalized_values.len(), 1);
+
+                section!(
+                    bump_prevented_committed,
+                    "bumpToBallot prevented once committed",
+                    {
+                        section!(
+                            by_value,
+                            "bumpToBallot prevented once committed (by value)",
+                            {
+                                let b2 = proto::SCPBallot {
+                                    counter: 1,
+                                    value: values.z_value.clone(),
+                                };
+
+                                let confirm1_b2 = make_confirm(
+                                    &v1_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm2_b2 = make_confirm(
+                                    &v2_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm3_b2 = make_confirm(
+                                    &v3_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm4_b2 = make_confirm(
+                                    &v4_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+
+                                tk.proto().received_envelope(&confirm1_b2);
+                                tk.proto().received_envelope(&confirm2_b2);
+                                tk.proto().received_envelope(&confirm3_b2);
+                                tk.proto().received_envelope(&confirm4_b2);
+                                assert_eq!(tk.driver().envelopes.len(), 5);
+                                assert_eq!(tk.driver().externalized_values.len(), 1);
+                            }
+                        );
+
+                        section!(
+                            by_counter,
+                            "bumpToBallot prevented once committed (by counter)",
+                            {
+                                let b2 = proto::SCPBallot {
+                                    counter: 2,
+                                    value: values.x_value.clone(),
+                                };
+
+                                let confirm1_b2 = make_confirm(
+                                    &v1_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm2_b2 = make_confirm(
+                                    &v2_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm3_b2 = make_confirm(
+                                    &v3_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm4_b2 = make_confirm(
+                                    &v4_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+
+                                tk.proto().received_envelope(&confirm1_b2);
+                                tk.proto().received_envelope(&confirm2_b2);
+                                tk.proto().received_envelope(&confirm3_b2);
+                                tk.proto().received_envelope(&confirm4_b2);
+                                assert_eq!(tk.driver().envelopes.len(), 5);
+                                assert_eq!(tk.driver().externalized_values.len(), 1);
+                            }
+                        );
+
+                        section!(
+                            by_value_and_counter,
+                            "bumpToBallot prevented once committed (by value and counter)",
+                            {
+                                let b2 = proto::SCPBallot {
+                                    counter: 2,
+                                    value: values.z_value.clone(),
+                                };
+
+                                let confirm1_b2 = make_confirm(
+                                    &v1_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm2_b2 = make_confirm(
+                                    &v2_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm3_b2 = make_confirm(
+                                    &v3_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+                                let confirm4_b2 = make_confirm(
+                                    &v4_secret_key,
+                                    qset_hash.into_inner(),
+                                    0,
+                                    b2.counter,
+                                    b2.clone(),
+                                    b2.counter,
+                                    b2.counter,
+                                )
+                                .unwrap();
+
+                                tk.proto().received_envelope(&confirm1_b2);
+                                tk.proto().received_envelope(&confirm2_b2);
+                                tk.proto().received_envelope(&confirm3_b2);
+                                tk.proto().received_envelope(&confirm4_b2);
+                                assert_eq!(tk.driver().envelopes.len(), 5);
+                                assert_eq!(tk.driver().externalized_values.len(), 1);
+                            }
+                        );
+                    }
+                );
             });
         };
 

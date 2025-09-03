@@ -4482,7 +4482,455 @@ mod stellar_tests {
                 }
             );
 
-            //2393
+            section!(timeout_multiple_nodes, "timeout from multiple nodes", {
+                assert!(tk.bump_state(0, &values.x_value));
+
+                let x1 = proto::SCPBallot {
+                    counter: 1,
+                    value: values.x_value.clone(),
+                };
+
+                assert_eq!(tk.driver().envelopes.len(), 1);
+                verify_prepare(
+                    &tk.driver().envelopes[0],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x1.clone(),
+                    None,
+                    0,
+                    0,
+                    None,
+                );
+
+                recv_quorum(
+                    &mut tk,
+                    &make_prepare_gen(qset_hash.into_inner(), x1.clone(), None, 0, 0, None),
+                );
+                // quorum -> prepared (1,x)
+                assert_eq!(tk.driver().envelopes.len(), 2);
+                verify_prepare(
+                    &tk.driver().envelopes[1],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x1.clone(),
+                    Some(x1.clone()),
+                    0,
+                    0,
+                    None,
+                );
+
+                let x2 = proto::SCPBallot {
+                    counter: 2,
+                    value: values.x_value.clone(),
+                };
+                // timeout from local node
+                assert!(tk.bump_state(0, &values.x_value));
+                // prepares (2,x)
+                assert_eq!(tk.driver().envelopes.len(), 3);
+                verify_prepare(
+                    &tk.driver().envelopes[2],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x2.clone(),
+                    Some(x1.clone()),
+                    0,
+                    0,
+                    None,
+                );
+
+                recv_quorum(
+                    &mut tk,
+                    &make_prepare_gen(
+                        qset_hash.into_inner(),
+                        x1.clone(),
+                        Some(x1.clone()),
+                        0,
+                        0,
+                        None,
+                    ),
+                );
+                // quorum -> set nH=1
+                assert_eq!(tk.driver().envelopes.len(), 4);
+                verify_prepare(
+                    &tk.driver().envelopes[3],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x2.clone(),
+                    Some(x1.clone()),
+                    0,
+                    1,
+                    None,
+                );
+                assert_eq!(tk.driver().envelopes.len(), 4);
+
+                recv_v_blocking(
+                    &mut tk,
+                    &make_prepare_gen(
+                        qset_hash.into_inner(),
+                        x2.clone(),
+                        Some(x2.clone()),
+                        1,
+                        1,
+                        None,
+                    ),
+                );
+                // v-blocking prepared (2,x) -> prepared (2,x)
+                assert_eq!(tk.driver().envelopes.len(), 5);
+                verify_prepare(
+                    &tk.driver().envelopes[4],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x2.clone(),
+                    Some(x2.clone()),
+                    0,
+                    1,
+                    None,
+                );
+
+                recv_quorum(
+                    &mut tk,
+                    &make_prepare_gen(
+                        qset_hash.into_inner(),
+                        x2.clone(),
+                        Some(x2.clone()),
+                        1,
+                        1,
+                        None,
+                    ),
+                );
+                // quorum (including us) confirms (2,x) prepared -> set h=c=x2
+                // we also get extra message: a quorum not including us confirms
+                // (1,x) prepared
+                //  -> we confirm c=h=x1
+                assert_eq!(tk.driver().envelopes.len(), 7);
+                verify_prepare(
+                    &tk.driver().envelopes[5],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    x2.clone(),
+                    Some(x2.clone()),
+                    2,
+                    2,
+                    None,
+                );
+                verify_confirm(
+                    &tk.driver().envelopes[6],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    2,
+                    x2.clone(),
+                    1,
+                    1,
+                );
+            });
+
+            section!(
+                timeout_after_prepare,
+                "timeout after prepare, receive old messages to prepare",
+                {
+                    assert!(tk.bump_state(0, &values.x_value));
+
+                    let x1 = proto::SCPBallot {
+                        counter: 1,
+                        value: values.x_value.clone(),
+                    };
+
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+                    verify_prepare(
+                        &tk.driver().envelopes[0],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x1.clone(),
+                        None,
+                        0,
+                        0,
+                        None,
+                    );
+
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v1_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x1.clone(),
+                            None,
+                            0,
+                            0,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v2_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x1.clone(),
+                            None,
+                            0,
+                            0,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v3_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x1.clone(),
+                            None,
+                            0,
+                            0,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+
+                    // quorum -> prepared (1,x)
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_prepare(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x1.clone(),
+                        Some(x1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+
+                    let x2 = proto::SCPBallot {
+                        counter: 2,
+                        value: values.x_value.clone(),
+                    };
+                    // timeout from local node
+                    assert!(tk.bump_state(0, &values.x_value));
+                    // prepares (2,x)
+                    assert_eq!(tk.driver().envelopes.len(), 3);
+                    verify_prepare(
+                        &tk.driver().envelopes[2],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x2.clone(),
+                        Some(x1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+
+                    let x3 = proto::SCPBallot {
+                        counter: 3,
+                        value: values.x_value.clone(),
+                    };
+                    // timeout again
+                    assert!(tk.bump_state(0, &values.x_value));
+                    // prepares (3,x)
+                    assert_eq!(tk.driver().envelopes.len(), 4);
+                    verify_prepare(
+                        &tk.driver().envelopes[3],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x3.clone(),
+                        Some(x1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+
+                    // other nodes moved on with x2
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v1_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x2.clone(),
+                            Some(x2.clone()),
+                            1,
+                            2,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v2_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x2.clone(),
+                            Some(x2.clone()),
+                            1,
+                            2,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+                    // v-blocking -> prepared x2
+                    assert_eq!(tk.driver().envelopes.len(), 5);
+                    verify_prepare(
+                        &tk.driver().envelopes[4],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x3.clone(),
+                        Some(x2.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+
+                    tk.proto().received_envelope(
+                        &make_prepare(
+                            &v3_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            x2.clone(),
+                            Some(x2.clone()),
+                            1,
+                            2,
+                            None,
+                        )
+                        .unwrap(),
+                    );
+                    // quorum -> set nH=2
+                    assert_eq!(tk.driver().envelopes.len(), 6);
+                    verify_prepare(
+                        &tk.driver().envelopes[5],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        x3.clone(),
+                        Some(x2.clone()),
+                        0,
+                        2,
+                        None,
+                    );
+                }
+            );
+
+            section!(
+                non_validator_watching,
+                "non validator watching the network",
+                {
+                    // Create a non-validator node
+                    let nv_node = TestNode::new(5); // NV = 5th node
+                    let mut tk_nv =
+                        TestKernel::new(nv_node.node_id().clone(), q_set.clone(), false);
+                    tk_nv.driver().store_quorum_set(&q_set);
+                    let qset_hash_nv = tk_nv.proto().local_proto().get_qset_hash().clone();
+
+                    let b = proto::SCPBallot {
+                        counter: 1,
+                        value: values.x_value.clone(),
+                    };
+                    assert!(tk_nv.bump_state(0, &values.x_value));
+                    assert_eq!(tk_nv.driver().envelopes.len(), 0);
+
+                    // Non-validator should not emit envelopes but track state
+                    let current_env = tk_nv.get_current_envelope(0, &nv_node.node_id());
+                    verify_prepare(
+                        &current_env,
+                        &nv_node.secret_key,
+                        qset_hash_nv,
+                        0,
+                        b.clone(),
+                        None,
+                        0,
+                        0,
+                        None,
+                    );
+
+                    let ext1 =
+                        make_externalize(&v1_secret_key, qset_hash.into_inner(), 0, b.clone(), 1)
+                            .unwrap();
+                    let ext2 =
+                        make_externalize(&v2_secret_key, qset_hash.into_inner(), 0, b.clone(), 1)
+                            .unwrap();
+                    let ext3 =
+                        make_externalize(&v3_secret_key, qset_hash.into_inner(), 0, b.clone(), 1)
+                            .unwrap();
+                    let ext4 =
+                        make_externalize(&v4_secret_key, qset_hash.into_inner(), 0, b.clone(), 1)
+                            .unwrap();
+
+                    tk_nv.proto().received_envelope(&ext1);
+                    tk_nv.proto().received_envelope(&ext2);
+                    tk_nv.proto().received_envelope(&ext3);
+                    assert_eq!(tk_nv.driver().envelopes.len(), 0);
+
+                    let current_env = tk_nv.get_current_envelope(0, &nv_node.node_id());
+                    verify_confirm(
+                        &current_env,
+                        &nv_node.secret_key,
+                        qset_hash_nv,
+                        0,
+                        u32::MAX,
+                        proto::SCPBallot {
+                            counter: u32::MAX,
+                            value: values.x_value.clone(),
+                        },
+                        1,
+                        u32::MAX,
+                    );
+
+                    tk_nv.proto().received_envelope(&ext4);
+                    assert_eq!(tk_nv.driver().envelopes.len(), 0);
+
+                    let current_env = tk_nv.get_current_envelope(0, &nv_node.node_id());
+                    verify_externalize(
+                        &current_env,
+                        &nv_node.secret_key,
+                        qset_hash_nv,
+                        0,
+                        b.clone(),
+                        u32::MAX,
+                    );
+                    assert_eq!(
+                        tk_nv.driver().externalized_values.get(&0).unwrap(),
+                        &values.x_value
+                    );
+                }
+            );
+
+            section!(restore_ballot_protocol, "restore ballot protocol", {
+                let b = proto::SCPBallot {
+                    counter: 2,
+                    value: values.x_value.clone(),
+                };
+
+                let mut tk2 = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+                tk2.driver().store_quorum_set(&q_set);
+
+                section!(restore_prepare, "prepare", {
+                    let prepare_env =
+                        make_prepare(&v0_secret_key, qset_hash0, 0, b.clone(), None, 0, 0, None)
+                            .unwrap();
+                    tk2.proto().set_state_from_envelope(0, &prepare_env);
+                });
+
+                section!(restore_confirm, "confirm", {
+                    let confirm_env =
+                        make_confirm(&v0_secret_key, qset_hash0, 0, 2, b.clone(), 1, 2).unwrap();
+                    tk2.proto().set_state_from_envelope(0, &confirm_env);
+                });
+
+                section!(restore_externalize, "externalize", {
+                    let externalize_env =
+                        make_externalize(&v0_secret_key, qset_hash0, 0, b.clone(), 2).unwrap();
+                    tk2.proto().set_state_from_envelope(0, &externalize_env);
+                });
+            });
         };
 
         for net_cfg in get_network_cfgs() {

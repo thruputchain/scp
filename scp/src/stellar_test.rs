@@ -6168,51 +6168,72 @@ mod stellar_tests {
                 );
 
                 section!(nomination_waits_v1, "nomination waits for v1", {
-                    //3223
+                    assert!(!tk.nominate(0, &values.x_value, false));
+
+                    check_leaders(&mut tk, &[nodes[1].node_id().clone()]);
+
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    let nom4 = make_nominate(
+                        &v4_secret_key,
+                        qset_hash.into_inner(),
+                        0,
+                        votes_xk.clone(),
+                        empty_v.clone(),
+                    )
+                    .unwrap();
+
+                    // Nothing happens with non top nodes
+                    tk.proto().received_envelope(&nom2);
+                    // (note: don't receive anything from node3 - we want to pick another dead node)
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    // v1 is leader -> nominate the first value from its message
+                    // that's "y"
+                    tk.proto().received_envelope(&nom1);
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+                    verify_nominate(
+                        &tk.driver().envelopes[0],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        votes_y.clone(),
+                        empty_v.clone(),
+                    );
+
+                    tk.proto().received_envelope(&nom4);
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+
+                    // "timeout -> pick another value from v1"
+                    tk.driver()
+                        .expected_candidates
+                        .insert(values.x_value.clone());
+                    tk.driver().composite_value = Some(values.x_value.clone());
+
+                    // Allows to pick another leader,
+                    // pick another dead node v3 as to force picking up
+                    // a new value from v1
+                    let v3_node_id = nodes[3].node_id().clone();
+                    tk.driver().priority_lookup =
+                        Box::new(move |n: &PublicKey| if n == &v3_node_id { 1000 } else { 1 });
+
+                    // note: value passed in here should be ignored
+                    assert!(tk.nominate(0, &values.k_value, true));
+                    // picks up 'x' from v1 (as we already have 'y')
+                    // which also happens to cause 'x' to be accepted
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_nominate(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        votes_xy.clone(),
+                        votes_x.clone(),
+                    );
                 });
 
                 section!(v1_dead_timeout, "v1 dead, timeout", {
-                    assert!(!tk.nominate(0, &values.x_value, false));
-
-                    // Process non-leader message (should do nothing)
-                    tk.proto().received_envelope(&nom2);
-                    assert_eq!(tk.driver().envelopes.len(), 0);
-
-                    section!(v0_new_top, "v0 is new top node", {
-                        // In full implementation:
-                        // - Set v0 as priority leader
-                        // - Successfully nominate x_value
-                        // - Verify leaders include both v0 and v1
-                        // - Check nomination message for x_value
-
-                        // Placeholder test
-                        // assert!(tk.nominate(0, &values.x_value, true));
-                        // verify_nominate(&tk.driver().envelopes[0], &v0_secret_key, qset_hash0, 0, votes_x, empty_v);
-                    });
-
-                    section!(v2_new_top, "v2 is new top node", {
-                        // In full implementation:
-                        // - Set v2 as priority leader
-                        // - Pick highest value from v2's votes (max of x,k)
-                        // - Verify nomination with highest value only
-
-                        let v2_top = vec![std::cmp::max(&values.x_value, &values.z_value).clone()];
-
-                        // Placeholder test
-                        // assert!(tk.nominate(0, &values.x_value, true));
-                        // verify_nominate(&tk.driver().envelopes[0], &v0_secret_key, qset_hash0, 0, v2_top, empty_v);
-                    });
-
-                    section!(v3_new_top, "v3 is new top node", {
-                        // In full implementation:
-                        // - Set v3 as priority leader
-                        // - Should fail since no message from v3
-                        // - Leaders should include v1 and v3
-
-                        // Placeholder test
-                        // assert!(!tk.nominate(0, &values.x_value, true));
-                        // assert_eq!(tk.driver().envelopes.len(), 0);
-                    });
+                    //3269
                 });
             });
         };

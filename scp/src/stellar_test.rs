@@ -3871,7 +3871,7 @@ mod stellar_tests {
                     None,
                 )
                 .unwrap();
-                let prepared_c4 = make_prepare(
+                let _prepared_c4 = make_prepare(
                     &v4_secret_key,
                     qset_hash.into_inner(),
                     0,
@@ -4165,6 +4165,324 @@ mod stellar_tests {
                     }
                 );
             });
+
+            section!(range_check, "range check", {
+                nodes_all_pledge_to_commit(&mut tk);
+                assert_eq!(tk.driver().envelopes.len(), 3);
+
+                let b = proto::SCPBallot {
+                    counter: 1,
+                    value: values.x_value.clone(),
+                };
+
+                // bunch of prepare messages with "commit b"
+                let prepared_c1 = make_prepare(
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let prepared_c2 = make_prepare(
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let prepared_c3 = make_prepare(
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+                let _prepared_c4 = make_prepare(
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    b.clone(),
+                    Some(b.clone()),
+                    b.counter,
+                    b.counter,
+                    None,
+                )
+                .unwrap();
+
+                // those should not trigger anything just yet
+                tk.proto().received_envelope(&prepared_c1);
+                tk.proto().received_envelope(&prepared_c2);
+                assert_eq!(tk.driver().envelopes.len(), 3);
+
+                // this should cause the node to accept 'commit b' (quorum)
+                // and therefore send a "CONFIRM" message
+                tk.proto().received_envelope(&prepared_c3);
+                assert_eq!(tk.driver().envelopes.len(), 4);
+
+                verify_confirm(
+                    &tk.driver().envelopes[3],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    1,
+                    b.clone(),
+                    b.counter,
+                    b.counter,
+                );
+
+                // bunch of confirm messages with different ranges
+                let confirm1 = make_confirm(
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    4,
+                    proto::SCPBallot {
+                        counter: 4,
+                        value: values.x_value.clone(),
+                    },
+                    2,
+                    4,
+                )
+                .unwrap();
+                let confirm2 = make_confirm(
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    6,
+                    proto::SCPBallot {
+                        counter: 6,
+                        value: values.x_value.clone(),
+                    },
+                    2,
+                    6,
+                )
+                .unwrap();
+                let confirm3 = make_confirm(
+                    &v3_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    5,
+                    proto::SCPBallot {
+                        counter: 5,
+                        value: values.x_value.clone(),
+                    },
+                    3,
+                    5,
+                )
+                .unwrap();
+                let confirm4 = make_confirm(
+                    &v4_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    6,
+                    proto::SCPBallot {
+                        counter: 6,
+                        value: values.x_value.clone(),
+                    },
+                    3,
+                    6,
+                )
+                .unwrap();
+
+                // this should not trigger anything just yet
+                tk.proto().received_envelope(&confirm1);
+
+                // v-blocking
+                //   * b gets bumped to (4,x)
+                //   * p gets bumped to (4,x)
+                //   * (c,h) gets bumped to (2,4)
+                tk.proto().received_envelope(&confirm2);
+                assert_eq!(tk.driver().envelopes.len(), 5);
+                verify_confirm(
+                    &tk.driver().envelopes[4],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    4,
+                    proto::SCPBallot {
+                        counter: 4,
+                        value: values.x_value.clone(),
+                    },
+                    2,
+                    4,
+                );
+
+                // this causes to externalize
+                // range is [3,4]
+                tk.proto().received_envelope(&confirm4);
+                assert_eq!(tk.driver().envelopes.len(), 6);
+
+                // The slot should have externalized the value
+                assert_eq!(tk.driver().externalized_values.len(), 1);
+                assert_eq!(
+                    tk.driver().externalized_values.get(&0).unwrap(),
+                    &values.x_value
+                );
+
+                verify_externalize(
+                    &tk.driver().envelopes[5],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    proto::SCPBallot {
+                        counter: 3,
+                        value: values.x_value.clone(),
+                    },
+                    4,
+                );
+            });
+
+            section!(
+                timeout_h_set,
+                "timeout when h is set -> stay locked on h",
+                {
+                    let bx = proto::SCPBallot {
+                        counter: 1,
+                        value: values.x_value.clone(),
+                    };
+                    assert!(tk.bump_state(0, &values.x_value));
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+
+                    // v-blocking -> prepared
+                    // quorum -> confirm prepared
+                    recv_quorum(
+                        &mut tk,
+                        &make_prepare_gen(
+                            qset_hash.into_inner(),
+                            bx.clone(),
+                            Some(bx.clone()),
+                            0,
+                            0,
+                            None,
+                        ),
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 3);
+                    verify_prepare(
+                        &tk.driver().envelopes[2],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        bx.clone(),
+                        Some(bx.clone()),
+                        bx.counter,
+                        bx.counter,
+                        None,
+                    );
+
+                    // now, see if we can timeout and move to a different value
+                    assert!(tk.bump_state(0, &values.y_value));
+                    assert_eq!(tk.driver().envelopes.len(), 4);
+                    let newbx = proto::SCPBallot {
+                        counter: 2,
+                        value: values.x_value.clone(),
+                    };
+                    verify_prepare(
+                        &tk.driver().envelopes[3],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        newbx,
+                        Some(bx.clone()),
+                        bx.counter,
+                        bx.counter,
+                        None,
+                    );
+                }
+            );
+
+            section!(
+                timeout_h_cant_set,
+                "timeout when h exists but can't be set -> vote for h",
+                {
+                    // start with (1,y)
+                    let by = proto::SCPBallot {
+                        counter: 1,
+                        value: values.y_value.clone(),
+                    };
+                    assert!(tk.bump_state(0, &values.y_value));
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+
+                    let bx = proto::SCPBallot {
+                        counter: 1,
+                        value: values.x_value.clone(),
+                    };
+                    // but quorum goes with (1,x)
+                    // v-blocking -> prepared
+                    recv_v_blocking(
+                        &mut tk,
+                        &make_prepare_gen(
+                            qset_hash.into_inner(),
+                            bx.clone(),
+                            Some(bx.clone()),
+                            0,
+                            0,
+                            None,
+                        ),
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_prepare(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        by.clone(),
+                        Some(bx.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+                    // quorum -> confirm prepared (no-op as b > h)
+                    recv_quorum_checks(
+                        &mut tk,
+                        &make_prepare_gen(
+                            qset_hash.into_inner(),
+                            bx.clone(),
+                            Some(bx.clone()),
+                            0,
+                            0,
+                            None,
+                        ),
+                        false,
+                        false,
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+
+                    assert!(tk.bump_state(0, &values.y_value));
+                    assert_eq!(tk.driver().envelopes.len(), 3);
+                    let newbx = proto::SCPBallot {
+                        counter: 2,
+                        value: values.x_value.clone(),
+                    };
+                    // on timeout:
+                    // * we should move to the quorum's h value
+                    // * c can't be set yet as b > h
+                    verify_prepare(
+                        &tk.driver().envelopes[2],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        newbx,
+                        Some(bx.clone()),
+                        0,
+                        bx.counter,
+                        None,
+                    );
+                }
+            );
+
+            //2393
         };
 
         for net_cfg in get_network_cfgs() {

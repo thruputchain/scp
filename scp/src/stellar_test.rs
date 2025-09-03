@@ -6233,7 +6233,78 @@ mod stellar_tests {
                 });
 
                 section!(v1_dead_timeout, "v1 dead, timeout", {
-                    //3269
+                    assert!(!tk.nominate(0, &values.x_value, false));
+
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    tk.proto().received_envelope(&nom2);
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    check_leaders(&mut tk, &[nodes[1].node_id().clone()]);
+
+                    section!(v0_new_top_node, "v0 is new top node", {
+                        let v0_node_id = nodes[0].node_id().clone();
+                        tk.driver().priority_lookup =
+                            Box::new(move |n: &PublicKey| if n == &v0_node_id { 1000 } else { 1 });
+
+                        assert!(tk.nominate(0, &values.x_value, true));
+                        check_leaders(
+                            &mut tk,
+                            &[nodes[0].node_id().clone(), nodes[1].node_id().clone()],
+                        );
+
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        verify_nominate(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            votes_x.clone(),
+                            empty_v.clone(),
+                        );
+                    });
+
+                    section!(v2_new_top_node, "v2 is new top node", {
+                        let v2_node_id = nodes[2].node_id().clone();
+                        tk.driver().priority_lookup =
+                            Box::new(move |n: &PublicKey| if n == &v2_node_id { 1000 } else { 1 });
+
+                        assert!(tk.nominate(0, &values.x_value, true));
+                        check_leaders(
+                            &mut tk,
+                            &[nodes[1].node_id().clone(), nodes[2].node_id().clone()],
+                        );
+
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        // v2 votes for XK, but nomination only picks the highest value
+                        let v2_top = vec![std::cmp::max(
+                            values.x_value.clone(),
+                            values.k_value.clone(),
+                        )];
+                        verify_nominate(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            v2_top,
+                            empty_v.clone(),
+                        );
+                    });
+
+                    section!(v3_new_top_node, "v3 is new top node", {
+                        let v3_node_id = nodes[3].node_id().clone();
+                        tk.driver().priority_lookup =
+                            Box::new(move |n: &PublicKey| if n == &v3_node_id { 1000 } else { 1 });
+
+                        // nothing happens, we don't have any message for v3
+                        assert!(!tk.nominate(0, &values.x_value, true));
+                        check_leaders(
+                            &mut tk,
+                            &[nodes[1].node_id().clone(), nodes[3].node_id().clone()],
+                        );
+
+                        assert_eq!(tk.driver().envelopes.len(), 0);
+                    });
                 });
             });
         };

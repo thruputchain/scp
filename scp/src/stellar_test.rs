@@ -6006,16 +6006,214 @@ mod stellar_tests {
             });
 
             section!(v1_top_node, "v1 is top node", {
-                // Test would implement v1 as leader scenarios
-                // This requires priority lookup and leader selection logic
-                let _empty_votes: Vec<proto::SCPValue> = vec![];
+                let v1_node_id = nodes[1].node_id().clone();
+                tk.driver().priority_lookup =
+                    Box::new(move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 });
 
-                // Placeholder for v1 top node tests
-                // Implementation would require:
-                // - Priority lookup functions
-                // - Leader selection logic
-                // - Hash value calculator
-                // - Timeout management
+                // Prepare vote vectors for different combinations
+                let votes_x = vec![values.x_value.clone()];
+                let votes_y = vec![values.y_value.clone()];
+                let votes_k = vec![values.k_value.clone()];
+                let empty_v: Vec<proto::SCPValue> = vec![];
+
+                let mut votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
+
+                let mut votes_yk = vec![values.y_value.clone(), values.k_value.clone()];
+                votes_yk.sort();
+
+                let mut votes_xk = vec![values.x_value.clone(), values.z_value.clone()];
+                votes_xk.sort();
+
+                let mut values_hash = vec![
+                    values.x_value.clone(),
+                    values.y_value.clone(),
+                    values.k_value.clone(),
+                ];
+                values_hash.sort();
+
+                let values_hash_clone = values_hash.clone();
+                tk.driver().hash_value_calculator = Box::new(move |v: &proto::SCPValue| -> u64 {
+                    if let Some(pos) = values_hash_clone.iter().position(|val| val == v) {
+                        (pos + 1) as u64
+                    } else {
+                        panic!("value not found in hash values");
+                    }
+                });
+
+                let nom1 = make_nominate(
+                    &v1_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    votes_xy.clone(),
+                    empty_v.clone(),
+                )
+                .unwrap();
+                let nom2 = make_nominate(
+                    &v2_secret_key,
+                    qset_hash.into_inner(),
+                    0,
+                    votes_xk.clone(),
+                    empty_v.clone(),
+                )
+                .unwrap();
+
+                section!(
+                    value_from_v1_candidate,
+                    "value from v1 is a candidate, self should not introduce new value on timeout",
+                    {
+                        assert!(!tk.nominate(0, &values.x_value, false));
+                        check_leaders(&mut tk, &[nodes[1].node_id().clone()]);
+
+                        assert_eq!(tk.driver().envelopes.len(), 0);
+
+                        // Recreate nomination messages for x_value only
+                        let nom1 = make_nominate(
+                            &v1_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            empty_v.clone(),
+                        )
+                        .unwrap();
+                        let nom2 = make_nominate(
+                            &v2_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            empty_v.clone(),
+                        )
+                        .unwrap();
+                        let nom3 = make_nominate(
+                            &v3_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            empty_v.clone(),
+                        )
+                        .unwrap();
+
+                        // Receive `x` from v1, vote for it
+                        tk.proto().received_envelope(&nom1);
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        verify_nominate(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            votes_x.clone(),
+                            empty_v.clone(),
+                        );
+
+                        tk.proto().received_envelope(&nom2);
+                        tk.proto().received_envelope(&nom3);
+                        assert_eq!(tk.driver().envelopes.len(), 2);
+                        verify_nominate(
+                            &tk.driver().envelopes[1],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            votes_x.clone(),
+                            votes_x.clone(),
+                        );
+
+                        let acc1 = make_nominate(
+                            &v1_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            votes_x.clone(),
+                        )
+                        .unwrap();
+                        let acc2 = make_nominate(
+                            &v2_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            votes_x.clone(),
+                        )
+                        .unwrap();
+                        let acc3 = make_nominate(
+                            &v3_secret_key,
+                            qset_hash.into_inner(),
+                            0,
+                            votes_x.clone(),
+                            votes_x.clone(),
+                        )
+                        .unwrap();
+
+                        tk.proto().received_envelope(&acc1);
+                        tk.proto().received_envelope(&acc2);
+                        assert_eq!(tk.driver().envelopes.len(), 2);
+
+                        // Receive accept from quorum, ratify and generate a candidate value
+                        assert!(tk.driver().has_nomination_timer());
+                        tk.driver().composite_value = Some(values.x_value.clone());
+                        tk.driver()
+                            .expected_candidates
+                            .insert(values.x_value.clone());
+
+                        tk.proto().received_envelope(&acc3);
+                        assert_eq!(tk.driver().envelopes.len(), 3);
+
+                        // Timer is cancelled
+                        assert!(!tk.driver().has_nomination_timer());
+
+                        // v0 is the new leader, but we already have a candidate
+                        let v0_node_id = nodes[0].node_id().clone();
+                        tk.driver().priority_lookup =
+                            Box::new(move |n: &PublicKey| if n == &v0_node_id { 1000 } else { 1 });
+
+                        assert!(!tk.nominate(0, &values.k_value, true));
+                    }
+                );
+
+                section!(nomination_waits_v1, "nomination waits for v1", {
+                    //3223
+                });
+
+                section!(v1_dead_timeout, "v1 dead, timeout", {
+                    assert!(!tk.nominate(0, &values.x_value, false));
+
+                    // Process non-leader message (should do nothing)
+                    tk.proto().received_envelope(&nom2);
+                    assert_eq!(tk.driver().envelopes.len(), 0);
+
+                    section!(v0_new_top, "v0 is new top node", {
+                        // In full implementation:
+                        // - Set v0 as priority leader
+                        // - Successfully nominate x_value
+                        // - Verify leaders include both v0 and v1
+                        // - Check nomination message for x_value
+
+                        // Placeholder test
+                        // assert!(tk.nominate(0, &values.x_value, true));
+                        // verify_nominate(&tk.driver().envelopes[0], &v0_secret_key, qset_hash0, 0, votes_x, empty_v);
+                    });
+
+                    section!(v2_new_top, "v2 is new top node", {
+                        // In full implementation:
+                        // - Set v2 as priority leader
+                        // - Pick highest value from v2's votes (max of x,k)
+                        // - Verify nomination with highest value only
+
+                        let v2_top = vec![std::cmp::max(&values.x_value, &values.z_value).clone()];
+
+                        // Placeholder test
+                        // assert!(tk.nominate(0, &values.x_value, true));
+                        // verify_nominate(&tk.driver().envelopes[0], &v0_secret_key, qset_hash0, 0, v2_top, empty_v);
+                    });
+
+                    section!(v3_new_top, "v3 is new top node", {
+                        // In full implementation:
+                        // - Set v3 as priority leader
+                        // - Should fail since no message from v3
+                        // - Leaders should include v1 and v3
+
+                        // Placeholder test
+                        // assert!(!tk.nominate(0, &values.x_value, true));
+                        // assert_eq!(tk.driver().envelopes.len(), 0);
+                    });
+                });
             });
         };
 

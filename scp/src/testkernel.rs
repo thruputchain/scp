@@ -162,6 +162,10 @@ impl TestDriver {
         self.timers.get(&Timer::Ballot).cloned()
     }
 
+    pub fn get_nomination_timer(&self) -> Option<TimerData> {
+        self.timers.get(&Timer::Nomination).cloned()
+    }
+
     pub fn bump_timer_offset(&mut self) -> Duration {
         // increase by more than the maximum timeout
         self.current_timer_offset += Duration::from_secs(60 * 60 * 5); // 5 hours
@@ -170,6 +174,10 @@ impl TestDriver {
 
     pub fn has_ballot_timer(&self) -> bool {
         self.get_ballot_timer().is_some()
+    }
+
+    pub fn has_nomination_timer(&self) -> bool {
+        self.get_nomination_timer().is_some()
     }
 
     pub fn has_ballot_timer_upcoming(&self) -> bool {

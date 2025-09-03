@@ -5329,4 +5329,633 @@ mod stellar_tests {
             test(&net_cfg);
         }
     }
+
+    #[shfix]
+    #[test]
+    fn nomination_tests_core5() {
+        let test = |net_cfg: &NetworkConfig| {
+            let values = TestValues::default();
+            let nodes = TestNode::new_batch(5);
+
+            // we need 5 nodes to avoid sharing various thresholds:
+            // v-blocking set size: 2
+            // threshold: 4 = 3 + self or 4 others
+            let mut q_set = SCPQuorumSet {
+                threshold: 4,
+                validators: VecM(vec![
+                    nodes[0].node_id().clone(),
+                    nodes[1].node_id().clone(),
+                    nodes[2].node_id().clone(),
+                    nodes[3].node_id().clone(),
+                    nodes[4].node_id().clone(),
+                ]),
+                inner_sets: VecM(vec![]),
+            };
+            normalize_qset(&mut q_set, None);
+            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+            let v0_secret_key = nodes[0].secret_key.clone();
+            let v1_secret_key = nodes[1].secret_key.clone();
+            let v2_secret_key = nodes[2].secret_key.clone();
+            let v3_secret_key = nodes[3].secret_key.clone();
+            let v4_secret_key = nodes[4].secret_key.clone();
+
+            net_cfg.apply_to(&mut tk);
+            tk.driver().store_quorum_set(&q_set);
+            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
+
+            assert!(values.x_value < values.y_value);
+            assert!(values.y_value < values.z_value);
+
+            let mut check_leaders = |tk: &mut TestKernel, expected_leaders: &[proto::SCPNodeID]| {
+                let leaders = tk.get_nomination_leaders(0);
+                let expected_set: HashSet<_> = expected_leaders.iter().cloned().collect();
+                assert_eq!(leaders, expected_set);
+            };
+
+            section!(nomination_v0_top, "nomination - v0 is top", {
+                section!(v0_starts_nominate, "v0 starts to nominates xValue", {
+                    assert!(tk.nominate(0, &values.x_value, false));
+
+                    let expected_leaders = [nodes[0].node_id().clone()];
+                    check_leaders(&mut tk, &expected_leaders);
+
+                    section!(
+                        others_nominate_x,
+                        "others nominate what v0 says (x) -> prepare x",
+                        {
+                            let votes = vec![values.x_value.clone()];
+                            let mut accepted = vec![];
+
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+                            verify_nominate(
+                                &tk.driver().envelopes[0],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            );
+
+                            let nom1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom2 = make_nominate(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom3 = make_nominate(
+                                &v3_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom4 = make_nominate(
+                                &v4_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+
+                            // nothing happens yet
+                            tk.proto().received_envelope(&nom1);
+                            tk.proto().received_envelope(&nom2);
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+
+                            // this causes 'x' to be accepted (quorum)
+                            tk.proto().received_envelope(&nom3);
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            tk.driver()
+                                .expected_candidates
+                                .insert(values.x_value.clone());
+                            tk.driver().composite_value = Some(values.x_value.clone());
+
+                            accepted.push(values.x_value.clone());
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            );
+
+                            // extra message doesn't do anything
+                            tk.proto().received_envelope(&nom4);
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            let acc1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let acc2 = make_nominate(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let acc3 = make_nominate(
+                                &v3_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let acc4 = make_nominate(
+                                &v4_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+
+                            // nothing happens yet
+                            tk.proto().received_envelope(&acc1);
+                            tk.proto().received_envelope(&acc2);
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            // this causes the node to send a prepare message (quorum)
+                            tk.proto().received_envelope(&acc3);
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+
+                            verify_prepare(
+                                &tk.driver().envelopes[2],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                proto::SCPBallot {
+                                    counter: 1,
+                                    value: values.x_value.clone(),
+                                },
+                                None,
+                                0,
+                                0,
+                                None,
+                            );
+
+                            tk.proto().received_envelope(&acc4);
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+
+                            section!(
+                                nominate_update_composite,
+                                "nominate x -> accept x -> prepare (x) ; others accepted y -> update latest to (z=x+y)",
+                                {
+                                    let mut votes2 = votes.clone();
+                                    votes2.push(values.y_value.clone());
+                                    // votes2.sort(); //XXX: sorting not in c++
+
+                                    let acc1_2 = make_nominate(
+                                        &v1_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        votes2.clone(),
+                                        votes2.clone(),
+                                    )
+                                    .unwrap();
+                                    let acc2_2 = make_nominate(
+                                        &v2_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        votes2.clone(),
+                                        votes2.clone(),
+                                    )
+                                    .unwrap();
+                                    let acc3_2 = make_nominate(
+                                        &v3_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        votes2.clone(),
+                                        votes2.clone(),
+                                    )
+                                    .unwrap();
+                                    let acc4_2 = make_nominate(
+                                        &v4_secret_key,
+                                        qset_hash.into_inner(),
+                                        0,
+                                        votes2.clone(),
+                                        votes2.clone(),
+                                    )
+                                    .unwrap();
+
+                                    tk.proto().received_envelope(&acc1_2);
+                                    assert_eq!(tk.driver().envelopes.len(), 3);
+
+                                    // v-blocking
+                                    tk.proto().received_envelope(&acc2_2);
+                                    assert_eq!(tk.driver().envelopes.len(), 4);
+                                    verify_nominate(
+                                        &tk.driver().envelopes[3],
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        votes2.clone(),
+                                        votes2.clone(),
+                                    );
+
+                                    tk.driver()
+                                        .expected_candidates
+                                        .insert(values.y_value.clone());
+                                    tk.driver().composite_value = Some(values.k_value.clone());
+
+                                    // this updates the composite value to use next time
+                                    // but does not prepare it
+                                    tk.proto().received_envelope(&acc3_2);
+                                    assert_eq!(tk.driver().envelopes.len(), 4);
+
+                                    assert_eq!(
+                                        &tk.get_latest_composite_candidate(0).unwrap(),
+                                        &values.k_value
+                                    );
+
+                                    tk.proto().received_envelope(&acc4_2);
+                                    assert_eq!(tk.driver().envelopes.len(), 4);
+                                }
+                            );
+
+                            section!(nomination_restored_state, "nomination - restored state", {
+                                let mut tk2 = TestKernel::new(
+                                    nodes[0].node_id().clone(),
+                                    q_set.clone(),
+                                    true,
+                                );
+                                tk2.driver().store_quorum_set(&q_set);
+
+                                // at this point
+                                // votes = { x }
+                                // accepted = { x }
+
+                                // tests if nomination proceeds like normal
+                                // nominates x
+                                let nomination_restore = |tk2: &mut TestKernel| {
+                                    // restores from the previous state
+                                    let restore_env = make_nominate(
+                                        &v0_secret_key,
+                                        qset_hash0,
+                                        0,
+                                        votes.clone(),
+                                        accepted.clone(),
+                                    )
+                                    .unwrap();
+                                    tk2.proto().set_state_from_envelope(0, &restore_env);
+
+                                    // tries to start nomination with yValue, but picks
+                                    // xValue since it was already in the votes
+                                    assert!(!tk2.nominate(0, &values.y_value, false));
+
+                                    check_leaders(tk2, &[nodes[0].node_id().clone()]);
+
+                                    assert_eq!(tk2.driver().envelopes.len(), 0);
+
+                                    // other nodes vote for 'x'
+                                    tk2.proto().received_envelope(&nom1);
+                                    tk2.proto().received_envelope(&nom2);
+                                    assert_eq!(tk2.driver().envelopes.len(), 0);
+                                    // 'x' is accepted (quorum)
+                                    // but because the restored state already included
+                                    // 'x' in the accepted set, no new message is
+                                    // emitted
+                                    tk2.proto().received_envelope(&nom3);
+
+                                    tk2.driver()
+                                        .expected_candidates
+                                        .insert(values.x_value.clone());
+                                    tk2.driver().composite_value = Some(values.x_value.clone());
+
+                                    // other nodes emit 'x' as accepted
+                                    tk2.proto().received_envelope(&acc1);
+                                    tk2.proto().received_envelope(&acc2);
+                                    assert_eq!(tk2.driver().envelopes.len(), 0);
+
+                                    // this causes the node to update its composite
+                                    // value to x
+                                    tk2.proto().received_envelope(&acc3);
+                                };
+
+                                section!(
+                                    ballot_protocol_not_started,
+                                    "ballot protocol not started",
+                                    {
+                                        nomination_restore(&mut tk2);
+                                        // nomination ended up starting the ballot protocol
+                                        assert_eq!(tk2.driver().envelopes.len(), 1);
+
+                                        verify_prepare(
+                                            &tk2.driver().envelopes[2],
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            proto::SCPBallot {
+                                                counter: 1,
+                                                value: values.x_value.clone(),
+                                            },
+                                            None,
+                                            0,
+                                            0,
+                                            None,
+                                        );
+                                    }
+                                );
+
+                                section!(
+                                    ballot_protocol_started_k,
+                                    "ballot protocol started (on value k)",
+                                    {
+                                        let prepare_env = make_prepare(
+                                            &v0_secret_key,
+                                            qset_hash0,
+                                            0,
+                                            proto::SCPBallot {
+                                                counter: 1,
+                                                value: values.k_value.clone(),
+                                            },
+                                            None,
+                                            0,
+                                            0,
+                                            None,
+                                        )
+                                        .unwrap();
+                                        tk2.proto().set_state_from_envelope(0, &prepare_env);
+
+                                        nomination_restore(&mut tk2);
+                                        // nomination didn't do anything (already working on k)
+                                        assert_eq!(tk2.driver().envelopes.len(), 0);
+                                    }
+                                );
+                            });
+                        }
+                    );
+
+                    section!(
+                        switch_leader,
+                        "receive more messages, then v0 switches to a different leader",
+                        {
+                            let nom1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                vec![values.k_value.clone()],
+                                vec![],
+                            )
+                            .unwrap();
+                            let nom2 = make_nominate(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                vec![values.y_value.clone()],
+                                vec![],
+                            )
+                            .unwrap();
+
+                            // nothing more happens
+                            tk.proto().received_envelope(&nom1);
+                            tk.proto().received_envelope(&nom2);
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+
+                            // switch leader to v1
+                            let v1_node_id = nodes[1].node_id().clone();
+                            tk.driver().priority_lookup =
+                                Box::new(
+                                    move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 },
+                                );
+
+                            assert!(tk.nominate(0, &values.x_value, true));
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            let mut votes_xk = vec![values.x_value.clone(), values.k_value.clone()];
+                            votes_xk.sort();
+
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                votes_xk,
+                                vec![], // empty accepted
+                            );
+                        }
+                    );
+                    //HERE:2982
+                    section!(
+                        select_accepted_leader,
+                        "select accepted value from leader",
+                        {
+                            assert!(values.x_value < values.y_value);
+                            assert!(values.y_value < values.z_value);
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+
+                            let nom1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                vec![values.y_value.clone(), values.z_value.clone()],
+                                vec![values.y_value.clone()],
+                            )
+                            .unwrap();
+
+                            section!(receive_before_timeout, "receive accepted before timeout", {
+                                // nothing more happens, v0 is leader
+                                tk.proto().received_envelope(&nom1);
+                                assert_eq!(tk.driver().envelopes.len(), 1);
+
+                                // Test would continue with timeout logic
+                            });
+                        }
+                    );
+                });
+
+                section!(
+                    self_nominates_x_others_y,
+                    "self nominates 'x', others nominate y -> prepare y",
+                    {
+                        let my_votes = vec![values.x_value.clone()];
+                        let accepted = vec![];
+
+                        assert!(tk.nominate(0, &values.x_value, false));
+
+                        assert_eq!(tk.driver().envelopes.len(), 1);
+                        verify_nominate(
+                            &tk.driver().envelopes[0],
+                            &v0_secret_key,
+                            qset_hash0,
+                            0,
+                            my_votes.clone(),
+                            accepted.clone(),
+                        );
+
+                        let votes_y = vec![values.y_value.clone()];
+                        let accepted_y = vec![values.y_value.clone()];
+
+                        section!(others_vote_y, "others only vote for y", {
+                            let nom1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom2 = make_nominate(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom3 = make_nominate(
+                                &v3_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+                            let nom4 = make_nominate(
+                                &v4_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted.clone(),
+                            )
+                            .unwrap();
+
+                            // nothing happens yet
+                            tk.proto().received_envelope(&nom1);
+                            tk.proto().received_envelope(&nom2);
+                            tk.proto().received_envelope(&nom3);
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+
+                            // 'y' is accepted (quorum)
+                            tk.proto().received_envelope(&nom4);
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            let mut my_votes_xy = my_votes.clone();
+                            my_votes_xy.push(values.y_value.clone());
+                            my_votes_xy.sort();
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                my_votes_xy,
+                                accepted_y.clone(),
+                            );
+                        });
+
+                        section!(others_accepted_y, "others accepted y", {
+                            let acc1 = make_nominate(
+                                &v1_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted_y.clone(),
+                            )
+                            .unwrap();
+                            let acc2 = make_nominate(
+                                &v2_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted_y.clone(),
+                            )
+                            .unwrap();
+                            let acc3 = make_nominate(
+                                &v3_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted_y.clone(),
+                            )
+                            .unwrap();
+                            let _acc4 = make_nominate(
+                                &v4_secret_key,
+                                qset_hash.into_inner(),
+                                0,
+                                votes_y.clone(),
+                                accepted_y.clone(),
+                            )
+                            .unwrap();
+
+                            tk.proto().received_envelope(&acc1);
+                            assert_eq!(tk.driver().envelopes.len(), 1);
+
+                            // this causes 'y' to be accepted (v-blocking)
+                            tk.proto().received_envelope(&acc2);
+                            assert_eq!(tk.driver().envelopes.len(), 2);
+
+                            let mut my_votes_xy = my_votes.clone();
+                            my_votes_xy.push(values.y_value.clone());
+                            my_votes_xy.sort();
+                            verify_nominate(
+                                &tk.driver().envelopes[1],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                my_votes_xy,
+                                accepted_y.clone(),
+                            );
+
+                            // this causes the node to send a prepare message (quorum)
+                            tk.proto().received_envelope(&acc3);
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+
+                            verify_prepare(
+                                &tk.driver().envelopes[2],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                proto::SCPBallot {
+                                    counter: 1,
+                                    value: values.y_value.clone(),
+                                },
+                                None,
+                                0,
+                                0,
+                                None,
+                            );
+                        });
+                    }
+                );
+            });
+
+            section!(v1_top_node, "v1 is top node", {
+                // Test would implement v1 as leader scenarios
+                // This requires priority lookup and leader selection logic
+                let _empty_votes: Vec<proto::SCPValue> = vec![];
+
+                // Placeholder for v1 top node tests
+                // Implementation would require:
+                // - Priority lookup functions
+                // - Leader selection logic
+                // - Hash value calculator
+                // - Timeout management
+            });
+        };
+
+        for net_cfg in get_network_cfgs() {
+            test(&net_cfg);
+        }
+    }
 }

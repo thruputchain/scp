@@ -4937,4 +4937,396 @@ mod stellar_tests {
             test(&net_cfg);
         }
     }
+
+    #[shfix]
+    #[test]
+    fn ballot_protocol_core3() {
+        let test = |net_cfg: &NetworkConfig| {
+            let values = TestValues::default();
+            let nodes = TestNode::new_batch(3);
+
+            // core3 has an edge case where v-blocking and quorum can be the same
+            // v-blocking set size: 2
+            // threshold: 2 = 1 + self or 2 others
+            let mut q_set = SCPQuorumSet {
+                threshold: 2,
+                validators: VecM(vec![
+                    nodes[0].node_id().clone(),
+                    nodes[1].node_id().clone(),
+                    nodes[2].node_id().clone(),
+                ]),
+                inner_sets: VecM(vec![]),
+            };
+            normalize_qset(&mut q_set, None);
+            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+            let v0_secret_key = nodes[0].secret_key.clone();
+            let v1_secret_key = nodes[1].secret_key.clone();
+            let v2_secret_key = nodes[2].secret_key.clone();
+
+            net_cfg.apply_to(&mut tk);
+            tk.driver().store_quorum_set(&q_set);
+            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
+
+            assert!(values.x_value < values.y_value);
+            assert!(values.y_value < values.z_value);
+
+            let recv_quorum_checks_ex2 =
+                |tk: &mut TestKernel,
+                 gen_: &GenEnvelope,
+                 with_checks: bool,
+                 delayed_quorum: bool,
+                 check_upcoming: bool,
+                 min_quorum: bool| {
+                    let e1 = gen_(&v1_secret_key);
+                    let e2 = gen_(&v2_secret_key);
+
+                    tk.driver().bump_timer_offset();
+
+                    let i = tk.driver().envelopes.len() + 1;
+                    tk.proto().received_envelope(&e1);
+                    if with_checks && !delayed_quorum {
+                        assert_eq!(tk.driver().envelopes.len(), i);
+                    }
+                    if check_upcoming {
+                        assert!(tk.driver().has_ballot_timer_upcoming());
+                    }
+                    if !min_quorum {
+                        // nothing happens with an extra vote (unless we're in delayedQuorum)
+                        tk.proto().received_envelope(&e2);
+                        if with_checks {
+                            assert_eq!(tk.driver().envelopes.len(), i);
+                        }
+                    }
+                };
+
+            let recv_quorum_checks_ex =
+                |tk: &mut TestKernel,
+                 gen_: &GenEnvelope,
+                 with_checks: bool,
+                 delayed_quorum: bool,
+                 check_upcoming: bool| {
+                    recv_quorum_checks_ex2(
+                        tk,
+                        gen_,
+                        with_checks,
+                        delayed_quorum,
+                        check_upcoming,
+                        false,
+                    );
+                };
+
+            let recv_quorum_checks = |tk: &mut TestKernel,
+                                      gen_: &GenEnvelope,
+                                      with_checks: bool,
+                                      delayed_quorum: bool| {
+                recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, false);
+            };
+
+            // no timer is set
+            assert!(!tk.driver().has_ballot_timer());
+
+            let a_value = &values.z_value;
+            let b_value = &values.x_value;
+
+            let a1 = proto::SCPBallot {
+                counter: 1,
+                value: a_value.clone(),
+            };
+            let b1 = proto::SCPBallot {
+                counter: 1,
+                value: b_value.clone(),
+            };
+
+            let mut a2 = a1.clone();
+            a2.counter += 1;
+
+            let mut a3 = a2.clone();
+            a3.counter += 1;
+
+            let mut a4 = a3.clone();
+            a4.counter += 1;
+
+            let mut a5 = a4.clone();
+            a5.counter += 1;
+
+            let a_inf = proto::SCPBallot {
+                counter: u32::MAX,
+                value: a_value.clone(),
+            };
+            let b_inf = proto::SCPBallot {
+                counter: u32::MAX,
+                value: b_value.clone(),
+            };
+
+            let mut b2 = b1.clone();
+            b2.counter += 1;
+
+            let mut b3 = b2.clone();
+            b3.counter += 1;
+
+            section!(
+                prepared_b1_local_a,
+                "prepared B1 (quorum votes B1) local aValue",
+                {
+                    assert!(tk.bump_state(0, a_value));
+                    assert_eq!(tk.driver().envelopes.len(), 1);
+                    assert!(!tk.driver().has_ballot_timer());
+
+                    tk.driver().bump_timer_offset();
+                    recv_quorum_checks(
+                        &mut tk,
+                        &make_prepare_gen(qset_hash.into_inner(), b1.clone(), None, 0, 0, None),
+                        true,
+                        true,
+                    );
+                    assert_eq!(tk.driver().envelopes.len(), 2);
+                    verify_prepare(
+                        &tk.driver().envelopes[1],
+                        &v0_secret_key,
+                        qset_hash0,
+                        0,
+                        a1.clone(),
+                        Some(b1.clone()),
+                        0,
+                        0,
+                        None,
+                    );
+                    assert!(tk.driver().has_ballot_timer_upcoming());
+
+                    section!(quorum_prepared_b1, "quorum prepared B1", {
+                        tk.driver().bump_timer_offset();
+                        recv_quorum_checks(
+                            &mut tk,
+                            &make_prepare_gen(
+                                qset_hash.into_inner(),
+                                b1.clone(),
+                                Some(b1.clone()),
+                                0,
+                                0,
+                                None,
+                            ),
+                            false,
+                            false,
+                        );
+                        assert_eq!(tk.driver().envelopes.len(), 2);
+                        // nothing happens:
+                        // computed_h = B1 (2)
+                        //    does not actually update h as b > computed_h
+                        //    also skips (3)
+                        assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                        section!(quorum_bumps_a1, "quorum bumps to A1", {
+                            tk.driver().bump_timer_offset();
+                            recv_quorum_checks_ex2(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a1.clone(),
+                                    Some(b1.clone()),
+                                    0,
+                                    0,
+                                    None,
+                                ),
+                                false,
+                                false,
+                                false,
+                                true,
+                            );
+
+                            assert_eq!(tk.driver().envelopes.len(), 3);
+                            // still does not set h as b > computed_h
+                            verify_prepare(
+                                &tk.driver().envelopes[2],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                a1.clone(),
+                                Some(a1.clone()),
+                                0,
+                                0,
+                                Some(b1.clone()),
+                            );
+                            assert!(!tk.driver().has_ballot_timer_upcoming());
+
+                            tk.driver().bump_timer_offset();
+                            // quorum commits A1
+                            recv_quorum_checks_ex2(
+                                &mut tk,
+                                &make_prepare_gen(
+                                    qset_hash.into_inner(),
+                                    a2.clone(),
+                                    Some(a1.clone()),
+                                    1,
+                                    1,
+                                    Some(b1.clone()),
+                                ),
+                                false,
+                                false,
+                                false,
+                                true,
+                            );
+                            assert_eq!(tk.driver().envelopes.len(), 4);
+                            verify_confirm(
+                                &tk.driver().envelopes[3],
+                                &v0_secret_key,
+                                qset_hash0,
+                                0,
+                                2,
+                                a1.clone(),
+                                1,
+                                1,
+                            );
+                            assert!(!tk.driver().has_ballot_timer_upcoming());
+                        });
+                    });
+                }
+            );
+
+            section!(prepared_a1_timeout, "prepared A1 with timeout", {
+                // starts with bValue (smallest)
+                assert!(tk.bump_state(0, b_value));
+                assert_eq!(tk.driver().envelopes.len(), 1);
+
+                // setup
+                recv_quorum_checks(
+                    &mut tk,
+                    &make_prepare_gen(
+                        qset_hash.into_inner(),
+                        a1.clone(),
+                        Some(a1.clone()),
+                        0,
+                        1,
+                        None,
+                    ),
+                    false,
+                    false,
+                );
+                assert_eq!(tk.driver().envelopes.len(), 2);
+                verify_prepare(
+                    &tk.driver().envelopes[1],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    a1.clone(),
+                    Some(a1.clone()),
+                    1,
+                    1,
+                    None,
+                );
+
+                // now, receive bumped votes
+                recv_quorum_checks(
+                    &mut tk,
+                    &make_prepare_gen(
+                        qset_hash.into_inner(),
+                        a2.clone(),
+                        Some(b2.clone()),
+                        0,
+                        1,
+                        Some(a1.clone()),
+                    ),
+                    true,
+                    true,
+                );
+                assert_eq!(tk.driver().envelopes.len(), 3);
+                // p=B2, p'=A1 (1)
+                // computed_h = B2 (2)
+                //   does not update h as b < computed_h
+                // v-blocking ahead -> b = computed_h = B2 (9)
+                // h = B2 (2) (now possible)
+                // c = 0 (1)
+                verify_prepare(
+                    &tk.driver().envelopes[2],
+                    &v0_secret_key,
+                    qset_hash0,
+                    0,
+                    b2.clone(),
+                    Some(a2.clone()),
+                    0,
+                    2,
+                    Some(b2.clone()),
+                );
+            });
+
+            section!(node_without_self, "node without self - quorum timeout", {
+                // Create NodeNS node
+                let node_ns = TestNode::new(10); // NodeNS = 10th node
+                let mut tk_nns = TestKernel::new(node_ns.node_id().clone(), q_set.clone(), true);
+                tk_nns.driver().store_quorum_set(&q_set);
+                let qset_hash_node_ns = tk_nns.proto().local_proto().get_qset_hash().clone();
+
+                tk_nns.proto().received_envelope(
+                    &make_prepare(
+                        &v1_secret_key,
+                        qset_hash.into_inner(),
+                        0,
+                        a2.clone(),
+                        Some(b2.clone()),
+                        0,
+                        1,
+                        Some(a1.clone()),
+                    )
+                    .unwrap(),
+                );
+                tk_nns.proto().received_envelope(
+                    &make_prepare(
+                        &v2_secret_key,
+                        qset_hash.into_inner(),
+                        0,
+                        a1.clone(),
+                        Some(a1.clone()),
+                        1,
+                        1,
+                        None,
+                    )
+                    .unwrap(),
+                );
+
+                assert_eq!(tk_nns.driver().envelopes.len(), 1);
+                verify_prepare(
+                    &tk_nns.driver().envelopes[0],
+                    &node_ns.secret_key,
+                    qset_hash_node_ns,
+                    0,
+                    a1.clone(),
+                    Some(a1.clone()),
+                    1,
+                    1,
+                    None,
+                );
+
+                tk_nns.proto().received_envelope(
+                    &make_prepare(
+                        &v0_secret_key,
+                        qset_hash.into_inner(),
+                        0,
+                        a2.clone(),
+                        Some(b2.clone()),
+                        0,
+                        1,
+                        Some(a1.clone()),
+                    )
+                    .unwrap(),
+                );
+
+                assert_eq!(tk_nns.driver().envelopes.len(), 2);
+                verify_prepare(
+                    &tk_nns.driver().envelopes[1],
+                    &node_ns.secret_key,
+                    qset_hash_node_ns,
+                    0,
+                    b2.clone(),
+                    Some(a2.clone()),
+                    0,
+                    2,
+                    Some(b2.clone()),
+                );
+            });
+        };
+
+        for net_cfg in get_network_cfgs() {
+            test(&net_cfg);
+        }
+    }
 }

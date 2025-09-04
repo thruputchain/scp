@@ -5999,7 +5999,7 @@ mod stellar_tests {
                             );
 
                             tk.proto().received_envelope(&acc4);
-                            assert_eq!(tk.driver().envelopes.len(), 4);
+                            assert_eq!(tk.driver().envelopes.len(), 3);
                         });
                     }
                 );

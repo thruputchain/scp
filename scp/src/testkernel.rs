@@ -224,11 +224,11 @@ impl Driver for Rc<RefCell<TestDriver>> {
 
     fn get_node_weight(
         &self,
-        _node_id: &proto::SCPNodeID,
-        _qset: &proto::SCPQuorumSet,
-        _is_local_node: bool,
+        node_id: &proto::SCPNodeID,
+        qset: &proto::SCPQuorumSet,
+        is_local_node: bool,
     ) -> u64 {
-        panic!("not used")
+        get_node_weight(node_id, qset, is_local_node)
     }
 
     fn compute_hash_node(

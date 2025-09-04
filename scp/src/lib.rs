@@ -39,6 +39,9 @@ pub use nomination::*;
 pub mod ballot;
 pub use ballot::*;
 
+pub mod heuristic;
+pub use heuristic::*;
+
 pub mod util;
 pub use util::*;
 

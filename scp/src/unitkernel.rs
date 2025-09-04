@@ -18,7 +18,6 @@ impl UnitTestKernel {
         qset: proto::SCPQuorumSet,
         is_validator: bool,
     ) -> UnitTestKernel {
-        let node_id_clone = node_id.clone();
         let driver = Rc::new(RefCell::new(UnitTestDriver::new()));
         driver.borrow_mut().store_quorum_set(&qset);
         UnitTestKernel {
@@ -36,7 +35,7 @@ impl UnitTestKernel {
 
     pub fn get_latest_composite_candidate(
         &mut self,
-        slot_index: SlotIndex,
+        _slot_index: SlotIndex,
     ) -> Option<proto::SCPValue> {
         Some(xdr_common::BytesM(vec![]))
     }
@@ -115,18 +114,27 @@ impl Driver for Rc<RefCell<UnitTestDriver>> {
 
     fn compute_hash_node(
         &self,
-        _slot_index: proto::SCPSlotIndex,
-        _prev: &proto::SCPValue,
+        slot_index: proto::SCPSlotIndex,
+        prev: &proto::SCPValue,
         is_priority: bool,
-        _round_number: proto::SCPCount,
+        round_number: proto::SCPCount,
         node_id: &proto::SCPNodeID,
     ) -> u64 {
-        todo!();
-        // if is_priority {
-        //     (self.borrow().priority_lookup)(node_id)
-        // } else {
-        //     0
-        // }
+        // XXX: is mPriorityLookupForTesting relevant here?
+        hash_helper(
+            slot_index,
+            prev,
+            |v| {
+                v.push(BytesM(
+                    proto::marshal_xdr(if is_priority { &HASH_P } else { &HASH_N })
+                        .unwrap()
+                        .to_vec(),
+                ));
+                v.push(BytesM(proto::marshal_xdr(&round_number).unwrap().to_vec()));
+                v.push(BytesM(proto::marshal_xdr(node_id).unwrap().to_vec()));
+            },
+            |b| self.get_hash_of(b),
+        )
     }
 
     fn compute_value_hash(
@@ -176,13 +184,13 @@ impl Driver for Rc<RefCell<UnitTestDriver>> {
     fn start_timer(
         &self,
         _slot_index: SlotIndex,
-        timer: Timer,
-        timeout: Duration,
-        cb: DriverCallback,
+        _timer: Timer,
+        _timeout: Duration,
+        _cb: DriverCallback,
     ) {
     }
 
-    fn stop_timer(&self, _slot_index: SlotIndex, timer: Timer) {}
+    fn stop_timer(&self, _slot_index: SlotIndex, _timer: Timer) {}
 }
 
 impl Consensus for Rc<RefCell<UnitTestDriver>> {
@@ -199,13 +207,13 @@ impl Consensus for Rc<RefCell<UnitTestDriver>> {
         _slot_index: SCPSlotIndex,
         _value: &proto::SCPValue,
     ) -> Option<proto::SCPValue> {
-        todo!()
+        None
     }
 
     fn combine_candidates(
         &self,
         _slot_index: SCPSlotIndex,
-        candidates: &HashSet<proto::SCPValue>,
+        _candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue> {
         None
     }
@@ -214,7 +222,7 @@ impl Consensus for Rc<RefCell<UnitTestDriver>> {
 impl ConsensusCb for Rc<RefCell<UnitTestDriver>> {}
 
 impl ConsensusNotify for Rc<RefCell<UnitTestDriver>> {
-    fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {}
+    fn value_externalized(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
 
     fn started_ballot_proto(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
 
@@ -224,7 +232,7 @@ impl ConsensusNotify for Rc<RefCell<UnitTestDriver>> {
 
     fn accepted_commit(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
 
-    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {}
+    fn ballot_did_hear_from_quorum(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
 
     fn nominating_value(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
 

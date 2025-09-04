@@ -58,4 +58,7 @@ pub use testutil::*;
 mod qset_test;
 
 #[cfg(test)]
+mod unit_test;
+
+#[cfg(test)]
 mod stellar_test;

@@ -3,19 +3,23 @@ fn compute_weight(m: u64, total: u64, threshold: u64) -> u64 {
     // Since threshold <= total, calculating res=m*threshold/total will always
     // produce res <= m, and we do not need to handle the possibility of overflow.
     // We implement big division with rounding up manually
-    let numerator = m.saturating_mul(threshold);
-    let result = numerator / total;
-    // Round up if there's a remainder
-    if numerator % total != 0 {
-        result.saturating_add(1)
-    } else {
-        result
-    }
+    let (r, overflow) = unsigned_div_up(m, threshold, total);
+    assert!(!overflow);
+    r
+}
+
+fn unsigned_div_up(a: u64, b: u64, c: u64) -> (u64, bool) {
+    assert!(c > 0);
+    let a: u128 = a.into();
+    let b: u128 = b.into();
+    let c: u128 = c.into();
+    let x = (a * b + c - 1) / c;
+    (x as u64, x > u128::MAX)
 }
 
 /// Returns the weight of the node within the qset normalized between 0-u64::MAX.
 /// If `node_id` is the local node, then set `is_local_node` to `true`.
-/// 
+///
 /// If a validator is repeated multiple times its weight is only the weight of
 /// the first occurrence.
 pub fn get_node_weight(
@@ -48,4 +52,3 @@ pub fn get_node_weight(
 
     0
 }
-

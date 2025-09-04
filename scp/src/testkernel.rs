@@ -330,19 +330,7 @@ impl Consensus for Rc<RefCell<TestDriver>> {
     ) -> Option<proto::SCPValue> {
         let driver = self.borrow();
 
-        assert_eq!(
-            candidates.len(),
-            driver.expected_candidates.len(),
-            "candidates size mismatch"
-        );
-
-        for (candidate, expected) in candidates.iter().zip(driver.expected_candidates.iter()) {
-            assert_eq!(
-                candidate, expected,
-                "candidate value mismatch, candidate {}, expected {}",
-                candidate, expected
-            );
-        }
+        assert_eq!(candidates, &driver.expected_candidates);
 
         assert!(
             driver.composite_value.is_some(),

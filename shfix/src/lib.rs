@@ -62,17 +62,34 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
             Stmt::Macro(stmt_macro) => {
                 if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
                     let rw_section_block = rewrite_block(Some(&description), &section_block);
-                    rewritten.push(Rewritten {
-                        exclusive: lift_blocks_to_stmts(&id, stmt_macro, rw_section_block),
-                        fixed: lift_block_to_stmt(
-                            stmt_macro,
-                            Block {
-                                // empty block
-                                brace_token: section_block.brace_token.clone(),
-                                stmts: vec![],
-                            },
-                        ),
-                    });
+                    if rw_section_block.exclusive.is_empty() {
+                        rewritten.push(Rewritten {
+                            exclusive: vec![(
+                                vec![id.clone()],
+                                lift_block_to_stmt(stmt_macro, rw_section_block.fixed),
+                            )],
+                            fixed: lift_block_to_stmt(
+                                stmt_macro,
+                                Block {
+                                    // empty block
+                                    brace_token: section_block.brace_token.clone(),
+                                    stmts: vec![],
+                                },
+                            ),
+                        });
+                    } else {
+                        rewritten.push(Rewritten {
+                            exclusive: lift_blocks_to_stmts(&id, stmt_macro, rw_section_block),
+                            fixed: lift_block_to_stmt(
+                                stmt_macro,
+                                Block {
+                                    // empty block
+                                    brace_token: section_block.brace_token.clone(),
+                                    stmts: vec![],
+                                },
+                            ),
+                        });
+                    }
                 } else {
                     rewritten.push(Rewritten {
                         exclusive: vec![],
@@ -97,10 +114,6 @@ fn lift_blocks_to_stmts(
         path.extend(rw_path);
         rw_stmts.push((path, lift_block_to_stmt(stmt_macro, rw_block)));
     }
-    rw_stmts.push((
-        vec![id.clone()],
-        lift_block_to_stmt(stmt_macro, rewritten_block.fixed),
-    ));
     rw_stmts
 }
 
@@ -403,6 +416,54 @@ mod tests {
                         let x = 1;
                         section!(a, "section a", {
                             println!(x);
+                            section!(b, "section b", {
+                                println!(y);
+                            });
+                            section!(c, "section c", {
+                                println!(y);
+                            });
+                        });
+                        let y = 2;
+                    }
+                },
+                expected: quote! {
+                    #[test]
+                    fn root_a_c() {
+                        let x = 1;
+                        {
+                            println!("section a");
+                            println!(x);
+                            {};
+                            {
+                                println!("section c");
+                                println!(y);
+                            };
+                        };
+                        let y = 2;
+                    }
+                    #[test]
+                    fn root_a_b() {
+                        let x = 1;
+                        {
+                            println!("section a");
+                            println!(x);
+                            {
+                                println!("section b");
+                                println!(y);
+                            };
+                            {};
+                        };
+                        let y = 2;
+                    }
+                },
+            },
+            TestCase {
+                input: parse_quote! {
+                    #[test]
+                    fn root() {
+                        let x = 1;
+                        section!(a, "section a", {
+                            println!(x);
                         });
                         let y = move |x| {
                             let u = 0;
@@ -454,14 +515,16 @@ mod tests {
             let attr_args = TokenStream2::new();
             let result = shfix_impl(attr_args, quote! { #input });
 
-            // let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
-            // let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
+            println!("test #{}", i);
 
-            // let result_pretty = prettyplease::unparse(&result_file);
-            // let expected_pretty = prettyplease::unparse(&expected_file);
+            let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
+            let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
 
-            // println!("result:\n{}", result_pretty);
-            // println!("expected:\n{}", expected_pretty);
+            let result_pretty = prettyplease::unparse(&result_file);
+            let expected_pretty = prettyplease::unparse(&expected_file);
+
+            println!("result:\n{}", result_pretty);
+            println!("expected:\n{}", expected_pretty);
 
             assert_eq!(result.to_string(), expected.to_string(), "test {}", i);
         }

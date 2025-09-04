@@ -337,7 +337,11 @@ impl Consensus for Rc<RefCell<TestDriver>> {
         );
 
         for (candidate, expected) in candidates.iter().zip(driver.expected_candidates.iter()) {
-            assert_eq!(candidate, expected, "candidate value mismatch");
+            assert_eq!(
+                candidate, expected,
+                "candidate value mismatch, candidate {}, expected {}",
+                candidate, expected
+            );
         }
 
         assert!(

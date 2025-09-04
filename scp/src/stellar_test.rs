@@ -5581,7 +5581,7 @@ mod stellar_tests {
 
                                     // this updates the composite value to use next time
                                     // but does not prepare it
-                                    tk.proto().received_envelope(&acc3_2);
+                                    tk.proto().received_envelope(&acc3_2); //HERE
                                     assert_eq!(tk.driver().envelopes.len(), 4);
 
                                     assert_eq!(

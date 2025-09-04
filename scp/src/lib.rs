@@ -45,6 +45,9 @@ pub use heuristic::*;
 pub mod util;
 pub use util::*;
 
+pub mod unitkernel;
+pub use unitkernel::*;
+
 pub mod testkernel;
 pub use testkernel::*;
 

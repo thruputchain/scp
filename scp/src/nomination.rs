@@ -343,7 +343,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     #[instrument]
-    fn get_node_priority(&self, node_id: &proto::SCPNodeID, qset: &proto::SCPQuorumSet) -> u64 {
+    pub fn get_node_priority(&self, node_id: &proto::SCPNodeID, qset: &proto::SCPQuorumSet) -> u64 {
         let is_local = node_id == self.slot_proto().local_proto().get_node_id();
         let weight = self.driver().get_node_weight(node_id, qset, is_local);
 
@@ -853,5 +853,19 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
     pub fn get_last_message_send(&self) -> Option<proto::SCPEnvelope> {
         self.nomination().last_envelope.clone()
+    }
+}
+
+impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
+    pub fn dbg_set_previous_value(&mut self, v: &proto::SCPValue) {
+        self.nomination_mut().previous_value = Some(v.clone())
+    }
+
+    pub fn dbg_set_round_number(&mut self, r: proto::SCPCount) {
+        self.nomination_mut().round_number = r
+    }
+
+    pub fn dbg_get_round_leaders(&mut self) -> &HashSet<proto::SCPNodeID> {
+        &self.nomination().round_leaders
     }
 }

@@ -5524,7 +5524,6 @@ mod stellar_tests {
                                 {
                                     let mut votes2 = votes.clone();
                                     votes2.push(values.y_value.clone());
-                                    // votes2.sort(); //XXX: sorting not in c++
 
                                     let acc1_2 = make_nominate(
                                         &v1_secret_key,
@@ -5801,7 +5800,6 @@ mod stellar_tests {
                             });
 
                             let votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
-                            // votes_xy.sort(); // XXX: no sorting in c++
 
                             verify_nominate(
                                 &tk.driver().envelopes[1],
@@ -6016,12 +6014,12 @@ mod stellar_tests {
                 let votes_k = vec![values.k_value.clone()];
                 let empty_v: Vec<proto::SCPValue> = vec![];
 
-                let mut votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
+                let votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
 
                 let mut votes_yk = vec![values.y_value.clone(), values.k_value.clone()];
                 votes_yk.sort();
 
-                let mut votes_xk = vec![values.x_value.clone(), values.z_value.clone()];
+                let mut votes_xk = vec![values.x_value.clone(), values.k_value.clone()];
                 votes_xk.sort();
 
                 let mut values_hash = vec![
@@ -6031,9 +6029,8 @@ mod stellar_tests {
                 ];
                 values_hash.sort();
 
-                let values_hash_clone = values_hash.clone();
                 tk.driver().hash_value_calculator = Box::new(move |v: &proto::SCPValue| -> u64 {
-                    if let Some(pos) = values_hash_clone.iter().position(|val| val == v) {
+                    if let Some(pos) = values_hash.iter().position(|val| val == v) {
                         (pos + 1) as u64
                     } else {
                         panic!("value not found in hash values");

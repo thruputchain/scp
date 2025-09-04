@@ -4,7 +4,7 @@ mod unit_tests {
     use crate::testutil::*;
     use crate::*;
     use shfix::shfix;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::u32;
     use xdr_common::VecM;
 
@@ -163,6 +163,150 @@ mod unit_tests {
 
                 println!("got {:.2} {}", stats, label);
             }
+        });
+    }
+
+    #[shfix]
+    #[test]
+    fn nomination_two_nodes_win() {
+        let nb_rounds_for_stats = 9;
+        let nodes = TestNode::new_batch(7);
+        let node_ids: Vec<proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
+
+        let total_iter = 10000;
+
+        // maxRounds is the number of rounds to evaluate in a row
+        // the iteration is considered successful if validators could
+        // agree on what to nominate before maxRounds is reached
+        let nomination_leaders = |max_rounds: u32,
+                                  qset_node0: &proto::SCPQuorumSet,
+                                  qset_node1: &proto::SCPQuorumSet|
+         -> i32 {
+            let mut uk0 = UnitTestKernel::new(node_ids[0].clone(), qset_node0.clone(), true);
+            let mut uk1 = UnitTestKernel::new(node_ids[1].clone(), qset_node1.clone(), true);
+
+            let mut tot = 0;
+            for g in 0..total_iter {
+                let mut value = proto::SCPValue::default();
+                value.0.push(g as u8);
+
+                let mut proto0 = uk0.proto();
+                let mut slot0 = proto0.slot_proto_or_create(0);
+                let mut nom_proto0 = slot0.nomination_proto();
+                nom_proto0.dbg_set_previous_value(&value);
+
+                let mut proto1 = uk1.proto();
+                let mut slot1 = proto1.slot_proto_or_create(0);
+                let mut nom_proto1 = slot1.nomination_proto();
+                nom_proto1.dbg_set_previous_value(&value);
+
+                let mut res = true;
+                let mut v0_voted = false;
+                let mut v1_voted = false;
+                let mut r = 0;
+
+                loop {
+                    nom_proto0.dbg_set_round_number(r);
+                    nom_proto0.update_round_leaders();
+
+                    nom_proto1.dbg_set_round_number(r);
+                    nom_proto1.update_round_leaders();
+
+                    let l0 = nom_proto0.dbg_get_round_leaders();
+                    assert!(!l0.is_empty());
+                    let l1 = nom_proto1.dbg_get_round_leaders();
+                    assert!(!l1.is_empty());
+
+                    let update_voted = |node_id: &proto::SCPNodeID,
+                                        leaders: &HashSet<proto::SCPNodeID>,
+                                        voted: &mut bool| {
+                        if !*voted {
+                            *voted = leaders.contains(node_id);
+                        }
+                    };
+
+                    // checks if id voted (any past round, including this one)
+                    // AND id is a leader this round
+                    let find_node = |node_id: &proto::SCPNodeID,
+                                     id_voted: bool,
+                                     other_leaders: &HashSet<proto::SCPNodeID>|
+                     -> bool {
+                        id_voted && other_leaders.contains(node_id)
+                    };
+
+                    update_voted(&node_ids[0], &l0, &mut v0_voted);
+                    update_voted(&node_ids[1], &l1, &mut v1_voted);
+
+                    // either both vote for v0 or both vote for v1
+                    res = find_node(&node_ids[0], v0_voted, &l1);
+                    res = res || find_node(&node_ids[1], v1_voted, &l0);
+
+                    r += 1;
+                    if res || r >= max_rounds {
+                        break;
+                    }
+                }
+
+                if res {
+                    tot += 1;
+                }
+            }
+            tot
+        };
+
+        section!(flat_quorum, "flat quorum", {
+            // test using the same quorum on all nodes
+            let flat_test = |threshold: u32, total: usize| {
+                let qset = make_qset(&node_ids, threshold, total, 0);
+
+                for max_rounds in 1..=nb_rounds_for_stats {
+                    let tot = nomination_leaders(max_rounds, &qset, &qset);
+                    let stats = (tot as f64 * 100.0) / total_iter as f64;
+                    println!("win rate for {} : {:.2}", max_rounds, stats);
+                }
+            };
+
+            section!(three_out_of_five, "3 out of 5", {
+                flat_test(3, 5);
+            });
+
+            section!(two_out_of_three, "2 out of 3", {
+                flat_test(2, 3);
+            });
+        });
+
+        section!(hierarchy, "hierarchy", {
+            section!(same_qset, "same qSet", {
+                let mut qset = make_qset(&node_ids, 3, 4, 0);
+                let qset_inner = make_qset(&node_ids, 2, 3, 4);
+                qset.inner_sets.0.push(qset_inner);
+
+                for max_rounds in 1..=nb_rounds_for_stats {
+                    let tot = nomination_leaders(max_rounds, &qset, &qset);
+                    let stats = (tot as f64 * 100.0) / total_iter as f64;
+                    println!("win rate for {} : {:.2}", max_rounds, stats);
+                }
+            });
+
+            section!(v0_is_inner_node_for_v1, "v0 is inner node for v1", {
+                let mut qset0 = make_qset(&node_ids, 3, 4, 0);
+                let qset_inner0 = make_qset(&node_ids, 2, 3, 4);
+                qset0.inner_sets.0.push(qset_inner0);
+
+                // v1's qset: we move v0 into the inner set
+                let mut qset1 = qset0.clone();
+                assert_eq!(qset1.validators.0[0], node_ids[0]);
+                qset1.validators.0.swap(0, 0); // This is a no-op, but matches the C++ structure
+                // Actually move v0 to inner set
+                let v0_id = qset1.validators.0.remove(0);
+                qset1.inner_sets.0[0].validators.0.insert(0, v0_id);
+
+                for max_rounds in 1..=nb_rounds_for_stats {
+                    let tot = nomination_leaders(max_rounds, &qset0, &qset1);
+                    let stats = (tot as f64 * 100.0) / total_iter as f64;
+                    println!("win rate for {} : {:.2}", max_rounds, stats);
+                }
+            });
         });
     }
 }

@@ -118,6 +118,51 @@ mod unit_tests {
             wins
         };
 
-        // 274
+        section!(flat_quorum, "flat quorum", {
+            let flat_test = |threshold: u32, total: usize| {
+                let qset = make_qset(&node_ids, threshold, total, 0);
+
+                let wins = run_tests(&qset);
+
+                for (node_id, win_count) in &wins {
+                    let stats = (*win_count as f64 * 100.0) / total_rounds as f64;
+                    let is_local = node_id == &node_ids[0];
+                    println!("got {:.2}{}", stats, if is_local { " LOCAL" } else { "" });
+                }
+            };
+
+            section!(three_out_of_five, "3 out of 5", {
+                flat_test(3, 5);
+            });
+
+            section!(two_out_of_three, "2 out of 3", {
+                flat_test(2, 3);
+            });
+        });
+
+        section!(hierarchy, "hierarchy", {
+            let mut qset = make_qset(&node_ids, 3, 4, 0);
+
+            let qset_inner = make_qset(&node_ids, 2, 3, 4);
+            qset.inner_sets.0.push(qset_inner);
+
+            let wins = run_tests(&qset);
+
+            for (node_id, win_count) in &wins {
+                let stats = (*win_count as f64 * 100.0) / total_rounds as f64;
+                let is_outer = qset.validators.0.iter().any(|k| k == node_id);
+                let is_local = node_id == &node_ids[0];
+
+                let label = if is_local {
+                    "LOCAL"
+                } else if is_outer {
+                    "OUTER"
+                } else {
+                    "INNER"
+                };
+
+                println!("got {:.2} {}", stats, label);
+            }
+        });
     }
 }

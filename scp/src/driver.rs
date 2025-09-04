@@ -67,3 +67,8 @@ pub trait DriverCb {
     fn received_envelope(&mut self, env: &proto::SCPEnvelope);
     fn driver_calling_back(&mut self, cb: DriverCallback);
 }
+
+// values used to switch hash function between priority and neighborhood checks
+pub const HASH_N: u32 = 1;
+pub const HASH_P: u32 = 2;
+pub const HASH_K: u32 = 3;

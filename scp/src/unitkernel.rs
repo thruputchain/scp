@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::Duration;
+use xdr_common::*;
 
 pub type UnitTestH = Rc<RefCell<UnitTestDriver>>;
 
@@ -130,13 +131,21 @@ impl Driver for Rc<RefCell<UnitTestDriver>> {
 
     fn compute_value_hash(
         &self,
-        _slot_index: proto::SCPSlotIndex,
-        _prev: &proto::SCPValue,
-        _round_number: proto::SCPCount,
+        slot_index: proto::SCPSlotIndex,
+        prev: &proto::SCPValue,
+        round_number: proto::SCPCount,
         value: &proto::SCPValue,
     ) -> u64 {
-        todo!();
-        // (self.borrow().hash_value_calculator)(value)
+        hash_helper(
+            slot_index,
+            prev,
+            |v| {
+                v.push(BytesM(proto::marshal_xdr(&HASH_K).unwrap().to_vec()));
+                v.push(BytesM(proto::marshal_xdr(&round_number).unwrap().to_vec()));
+                v.push(BytesM(proto::marshal_xdr(value).unwrap().to_vec()));
+            },
+            |b| self.get_hash_of(b),
+        )
     }
 
     fn sign_envelope(&self, _: &mut proto::SCPEnvelope) {}

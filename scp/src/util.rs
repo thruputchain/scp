@@ -1,7 +1,47 @@
+use proto::{SCPHash, SCPSlotIndex, SCPValue};
+use xdr_common::BytesM;
+
 pub fn hex_abbrev(bytes: &[u8]) -> String {
     let k = bytes.len().min(3);
     bytes[..k]
         .iter()
         .map(|byte| format!("{:02x}", byte))
         .collect::<String>()
+}
+
+pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> proto::SCPHash
+where
+    F: Fn(&[u8]) -> proto::SCPHash,
+{
+    let mut concatenated = Vec::new();
+    for bytes_m in v {
+        let hash = get_hash_of(&bytes_m.0);
+        concatenated.extend_from_slice(&hash);
+    }
+    get_hash_of(&concatenated)
+}
+
+pub fn hash_helper<F>(
+    slot_index: SCPSlotIndex,
+    prev: &SCPValue,
+    extra: F,
+    get_hash_of: impl Fn(&[u8]) -> SCPHash,
+) -> u64
+where
+    F: FnOnce(&mut Vec<BytesM>),
+{
+    let mut vals = Vec::new();
+
+    vals.push(BytesM(proto::marshal_xdr(&slot_index).unwrap().to_vec()));
+    vals.push(BytesM(proto::marshal_xdr(prev).unwrap().to_vec()));
+
+    extra(&mut vals);
+
+    let hash = get_hash_of_vec(get_hash_of, &vals);
+
+    let mut res = 0u64;
+    for &byte in hash.iter().take(8) {
+        res = (res << 8) | (byte as u64);
+    }
+    res
 }

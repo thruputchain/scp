@@ -47,7 +47,6 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                 fixed: stmt.clone(),
             }),
             Stmt::Local(local) => {
-                //XXX:check
                 let rw_local = rewrite_local(local);
                 let unfolded_stmts = rw_local
                     .exclusive
@@ -247,7 +246,7 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> (Vec<(SectionPath, Vec<Stmt>)>, Ve
     } else {
         let last = stmts.last().unwrap();
 
-        let fixed_prefix = &grab_fixed(&stmts);
+        let fixed_prefix = grab_fixed(&stmts);
 
         // unfoldings with last stmt activated
         let mut unfolded = vec![];

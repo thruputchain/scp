@@ -10,7 +10,6 @@ mod stellar_tests {
 
     #[test]
     fn test_vblocking_and_quorum() {
-        let values = TestValues::default();
         let nodes = TestNode::new_batch(4);
 
         let qset = SCPQuorumSet {
@@ -235,6 +234,7 @@ mod stellar_tests {
     }
 
     #[derive(Clone)]
+    #[allow(non_snake_case)]
     struct NetworkConfig {
         NOMINATION_TIMEOUT_INITIAL_MILLISECONDS: u32,
         NOMINATION_TIMEOUT_INCREMENT_MILLISECONDS: u32,
@@ -302,11 +302,6 @@ mod stellar_tests {
             let v2_secret_key = nodes[2].secret_key.clone();
             let v3_secret_key = nodes[3].secret_key.clone();
             let v4_secret_key = nodes[4].secret_key.clone();
-            let v0_node_id = nodes[0].node_id();
-            let v1_node_id = nodes[1].node_id();
-            let v2_node_id = nodes[2].node_id();
-            let v3_node_id = nodes[3].node_id();
-            let v4_node_id = nodes[4].node_id();
             net_cfg.apply_to(&mut tk);
             //
             tk.driver().store_quorum_set(&q_set);
@@ -317,7 +312,7 @@ mod stellar_tests {
             assert!(values.y_value < values.z_value);
             assert!(values.z_value < values.zz_value);
 
-            let mut recv_v_blocking_checks =
+            let recv_v_blocking_checks =
                 |tk: &mut TestKernel, gen_: &GenEnvelope, with_checks: bool| {
                     let e1 = gen_(&v1_secret_key);
                     let e2 = gen_(&v2_secret_key);
@@ -337,10 +332,11 @@ mod stellar_tests {
                     }
                 };
 
-            let mut recv_v_blocking =
+            #[allow(unused_variables)]
+            let recv_v_blocking =
                 |tk: &mut TestKernel, gen_: &GenEnvelope| recv_v_blocking_checks(tk, gen_, true);
 
-            let mut recv_quorum_checks_ex =
+            let recv_quorum_checks_ex =
                 |tk: &mut TestKernel,
                  gen_: &GenEnvelope,
                  with_checks: bool,
@@ -373,23 +369,24 @@ mod stellar_tests {
                     }
                 };
 
-            let mut recv_quorum_checks =
-                |tk: &mut TestKernel,
-                 gen_: &GenEnvelope,
-                 with_checks: bool,
-                 delayed_quorum: bool| {
-                    recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, false)
-                };
+            #[allow(unused_variables)]
+            let recv_quorum_checks = |tk: &mut TestKernel,
+                                      gen_: &GenEnvelope,
+                                      with_checks: bool,
+                                      delayed_quorum: bool| {
+                recv_quorum_checks_ex(tk, gen_, with_checks, delayed_quorum, false)
+            };
 
-            let mut recv_quorum_ex =
-                |tk: &mut TestKernel, gen_: &GenEnvelope, check_upcoming: bool| {
-                    recv_quorum_checks_ex(tk, gen_, true, false, check_upcoming)
-                };
+            let recv_quorum_ex = |tk: &mut TestKernel, gen_: &GenEnvelope, check_upcoming: bool| {
+                recv_quorum_checks_ex(tk, gen_, true, false, check_upcoming)
+            };
 
-            let mut recv_quorum =
+            #[allow(unused_variables)]
+            let recv_quorum =
                 |tk: &mut TestKernel, gen_: &GenEnvelope| recv_quorum_ex(tk, gen_, false);
 
-            let mut nodes_all_pledge_to_commit = |tk: &mut TestKernel| {
+            #[allow(unused_variables)]
+            let nodes_all_pledge_to_commit = |tk: &mut TestKernel| {
                 let b = SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
@@ -614,10 +611,12 @@ mod stellar_tests {
                 let mut a5 = a4.clone();
                 a5.counter += 1;
 
+                #[allow(unused_variables)]
                 let a_inf = SCPBallot {
                     counter: u32::MAX,
                     value: a_value.clone(),
                 };
+                #[allow(unused_variables)]
                 let b_inf = SCPBallot {
                     counter: u32::MAX,
                     value: b_value.clone(),
@@ -2043,10 +2042,12 @@ mod stellar_tests {
                     counter: 1,
                     value: b_value.clone(),
                 };
+                #[allow(unused_variables)]
                 let mid1 = SCPBallot {
                     counter: 1,
                     value: mid_value.clone(),
                 };
+                #[allow(unused_variables)]
                 let big1 = SCPBallot {
                     counter: 1,
                     value: big_value.clone(),
@@ -2064,10 +2065,12 @@ mod stellar_tests {
                 let mut a5 = a4.clone();
                 a5.counter += 1;
 
+                #[allow(unused_variables)]
                 let a_inf = SCPBallot {
                     counter: u32::MAX,
                     value: a_value.clone(),
                 };
+                #[allow(unused_variables)]
                 let b_inf = SCPBallot {
                     counter: u32::MAX,
                     value: b_value.clone(),
@@ -3297,10 +3300,12 @@ mod stellar_tests {
                 let mut _a5 = a4.clone();
                 _a5.counter += 1;
 
+                #[allow(unused_variables)]
                 let a_inf = SCPBallot {
                     counter: u32::MAX,
                     value: a_value.clone(),
                 };
+                #[allow(unused_variables)]
                 let b_inf = SCPBallot {
                     counter: u32::MAX,
                     value: b_value.clone(),
@@ -4269,6 +4274,7 @@ mod stellar_tests {
                     6,
                 )
                 .unwrap();
+                #[allow(unused_variables)]
                 let confirm3 = make_confirm(
                     &v3_secret_key,
                     qset_hash.into_inner(),
@@ -4966,6 +4972,7 @@ mod stellar_tests {
 
             net_cfg.apply_to(&mut tk);
             tk.driver().store_quorum_set(&q_set);
+            #[allow(unused_variables)]
             let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
 
             assert!(values.x_value < values.y_value);
@@ -5016,6 +5023,7 @@ mod stellar_tests {
                     );
                 };
 
+            #[allow(unused_variables)]
             let recv_quorum_checks = |tk: &mut TestKernel,
                                       gen_: &GenEnvelope,
                                       with_checks: bool,
@@ -5050,10 +5058,12 @@ mod stellar_tests {
             let mut a5 = a4.clone();
             a5.counter += 1;
 
+            #[allow(unused_variables)]
             let a_inf = proto::SCPBallot {
                 counter: u32::MAX,
                 value: a_value.clone(),
             };
+            #[allow(unused_variables)]
             let b_inf = proto::SCPBallot {
                 counter: u32::MAX,
                 value: b_value.clone(),
@@ -5354,20 +5364,27 @@ mod stellar_tests {
             normalize_qset(&mut q_set, None);
             let qset_hash = proto::hash_xdr(&q_set).unwrap();
             let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+            #[allow(unused_variables)]
             let v0_secret_key = nodes[0].secret_key.clone();
+            #[allow(unused_variables)]
             let v1_secret_key = nodes[1].secret_key.clone();
+            #[allow(unused_variables)]
             let v2_secret_key = nodes[2].secret_key.clone();
+            #[allow(unused_variables)]
             let v3_secret_key = nodes[3].secret_key.clone();
+            #[allow(unused_variables)]
             let v4_secret_key = nodes[4].secret_key.clone();
 
             net_cfg.apply_to(&mut tk);
             tk.driver().store_quorum_set(&q_set);
+            #[allow(unused_variables)]
             let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
 
             assert!(values.x_value < values.y_value);
             assert!(values.y_value < values.z_value);
 
-            let mut check_leaders = |tk: &mut TestKernel, expected_leaders: &[proto::SCPNodeID]| {
+            #[allow(unused_variables)]
+            let check_leaders = |tk: &mut TestKernel, expected_leaders: &[proto::SCPNodeID]| {
                 let leaders = tk.get_nomination_leaders(0);
                 let expected_set: HashSet<_> = expected_leaders.iter().cloned().collect();
                 assert_eq!(leaders, expected_set);
@@ -6009,8 +6026,11 @@ mod stellar_tests {
                     Box::new(move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 });
 
                 // Prepare vote vectors for different combinations
+                #[allow(unused_variables)]
                 let votes_x = vec![values.x_value.clone()];
+                #[allow(unused_variables)]
                 let votes_y = vec![values.y_value.clone()];
+                #[allow(unused_variables)]
                 let votes_k = vec![values.k_value.clone()];
                 let empty_v: Vec<proto::SCPValue> = vec![];
 
@@ -6037,6 +6057,7 @@ mod stellar_tests {
                     }
                 });
 
+                #[allow(unused_variables)]
                 let nom1 = make_nominate(
                     &v1_secret_key,
                     qset_hash.into_inner(),
@@ -6045,6 +6066,7 @@ mod stellar_tests {
                     empty_v.clone(),
                 )
                 .unwrap();
+                #[allow(unused_variables)]
                 let nom2 = make_nominate(
                     &v2_secret_key,
                     qset_hash.into_inner(),

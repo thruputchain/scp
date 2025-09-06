@@ -2,10 +2,6 @@ use crate::*;
 use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
-fn public_from_secret(secret_key: &proto::SecretKey) -> proto::PublicKey {
-    derive_public_key(secret_key)
-}
-
 pub fn make_envelope(
     secret_key: &proto::SecretKey,
     slot_index: proto::SCPSlotIndex,

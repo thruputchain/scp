@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod unit_tests {
-    use crate::testkernel::*;
     use crate::testutil::*;
     use crate::*;
     use shfix::shfix;
@@ -200,6 +199,7 @@ mod unit_tests {
                 let mut nom_proto1 = slot1.nomination_proto();
                 nom_proto1.dbg_set_previous_value(&value);
 
+                #[allow(unused_assignments)]
                 let mut res = true;
                 let mut v0_voted = false;
                 let mut v1_voted = false;

@@ -8,7 +8,7 @@ fn change_extension(filename: &str, new_extension: &str) -> String {
 }
 
 fn main() {
-    let x_files = ["types.x", "scp.x", "scp_handle.x"];
+    let x_files = ["types.x", "scp.x", "scp_handle.x", "scp_control.x"];
 
     let x_dir = "x";
     let out_dir = "src";

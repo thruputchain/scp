@@ -341,8 +341,6 @@ impl Consensus for Rc<RefCell<TestDriver>> {
     }
 }
 
-impl ConsensusCb for Rc<RefCell<TestDriver>> {}
-
 impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
         let x = self

@@ -1,10 +1,10 @@
 [package]
-name = "scp"
+name = "scp_kernel"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "scp"
+name = "scp_kernel"
 path = "src/lib.rs"
 
 [[bin]]

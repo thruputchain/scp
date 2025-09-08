@@ -1,5 +1,8 @@
 use clap::Parser;
 
+mod server;
+use server::*;
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -13,5 +16,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    println!("Hello, world! {} {}", args.peer_addr, args.control_addr);
+    println!(
+        "peer_addr={} control_addr={}",
+        args.peer_addr, args.control_addr
+    );
 }

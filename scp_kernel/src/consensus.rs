@@ -9,7 +9,7 @@ pub enum ValidationLevel {
     FullyValid = 2, // definitively valid at this stage (validate_tentatively or validate_fully)
 }
 
-pub trait Consensus: ConsensusCb + ConsensusNotify + Clone + Debug {
+pub trait Consensus: ConsensusNotify + Clone + Debug {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
@@ -34,8 +34,6 @@ pub trait Consensus: ConsensusCb + ConsensusNotify + Clone + Debug {
         candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue>;
 }
-
-pub trait ConsensusCb {}
 
 pub trait ConsensusNotify {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue);

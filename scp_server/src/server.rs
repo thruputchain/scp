@@ -1,13 +1,34 @@
 use scp_kernel::*;
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use xdr_common::*;
 
-#[derive(Debug)]
 pub struct Server {
+    state: SharedState,
+    kernel: StellarKernel<SharedState, SharedState>,
+}
+
+impl Server {
+    pub fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Server {
+        let state = SharedState::new(&cfg, &secret_key);
+        Server {
+            state: state.clone(),
+            kernel: StellarKernel::new(
+                derive_node_id(&secret_key),
+                is_validator,
+                cfg.quorum_set,
+                state.clone(),
+                state.clone(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct State {
     max_timeout: Duration,
     initial_ballot_timeout: Duration,
     increment_ballot_timeout: Duration,
@@ -18,9 +39,9 @@ pub struct Server {
     quorum_sets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
 }
 
-impl Server {
-    pub fn new(cfg: proto::SCPConfig, secret_key: proto::SecretKey) -> Server {
-        Server {
+impl State {
+    pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> State {
+        State {
             max_timeout: Duration::from_millis(cfg.max_timeout_ms),
             initial_ballot_timeout: Duration::from_millis(cfg.initial_ballot_timeout_ms),
             increment_ballot_timeout: Duration::from_millis(cfg.increment_ballot_timeout_ms),
@@ -28,26 +49,30 @@ impl Server {
             increment_nomination_timeout: Duration::from_millis(
                 cfg.increment_nomination_timeout_ms,
             ),
-            secret_key,
+            secret_key: secret_key.clone(),
             quorum_sets: HashMap::new(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct AServer(pub Arc<RwLock<Server>>);
+pub struct SharedState(pub Rc<RefCell<State>>);
 
-impl AServer {
-    fn lock(&self) -> RwLockReadGuard<'_, Server> {
-        self.0.read().unwrap()
+impl SharedState {
+    pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> SharedState {
+        SharedState(Rc::new(RefCell::new(State::new(cfg, secret_key))))
     }
 
-    fn lock_mut(&mut self) -> RwLockWriteGuard<'_, Server> {
-        self.0.write().unwrap()
+    fn lock(&self) -> Ref<'_, State> {
+        self.0.borrow()
+    }
+
+    fn lock_mut(&mut self) -> RefMut<'_, State> {
+        self.0.borrow_mut()
     }
 }
 
-impl Consensus for AServer {
+impl Consensus for SharedState {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
@@ -81,7 +106,7 @@ impl Consensus for AServer {
     }
 }
 
-impl ConsensusNotify for AServer {
+impl ConsensusNotify for SharedState {
     fn value_externalized(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
     fn started_ballot_proto(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
     fn accepted_ballot_prepared(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
@@ -92,7 +117,7 @@ impl ConsensusNotify for AServer {
     fn updated_candidate_value(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
 }
 
-impl Driver for AServer {
+impl Driver for SharedState {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
         self.lock().quorum_sets.get(h).cloned()
     }

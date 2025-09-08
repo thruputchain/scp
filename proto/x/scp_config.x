@@ -6,6 +6,8 @@ struct SCPConfig {
 	unsigned hyper increment_ballot_timeout_ms;
 	unsigned hyper initial_nomination_timeout_ms;
 	unsigned hyper increment_nomination_timeout_ms;
+	
+	SCPQuorumSet quorum_set;
 };
 
 } // namespace hogd

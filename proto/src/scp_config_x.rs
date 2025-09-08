@@ -34,6 +34,7 @@ pub struct SCPConfig {
     pub increment_ballot_timeout_ms: u64,
     pub initial_nomination_timeout_ms: u64,
     pub increment_nomination_timeout_ms: u64,
+    pub quorum_set: SCPQuorumSet,
 }
 
 

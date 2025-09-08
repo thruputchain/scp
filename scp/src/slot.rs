@@ -41,7 +41,7 @@ impl SlotState {
 #[derive(Debug)]
 pub struct SlotProto<'a, C: Consensus, D: Driver> {
     pub cd: &'a ConsensusDriver<C, D>,
-    pub local_state: &'a mut LocalState,
+    pub local_state: &'a LocalState,
     pub slot_state: &'a mut SlotState,
 }
 
@@ -56,13 +56,6 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn local_proto(&self) -> LocalProto<'_, C, D> {
         LocalProto {
-            cd: self.cd,
-            local: self.local_state,
-        }
-    }
-
-    pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, C, D> {
-        LocalProtoMut {
             cd: self.cd,
             local: self.local_state,
         }

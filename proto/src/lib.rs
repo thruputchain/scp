@@ -20,6 +20,18 @@ pub use types_x::*;
 pub mod scp_x;
 pub use scp_x::*;
 
+#[rustfmt::skip]
+pub mod scp_config_x;
+pub use scp_config_x::*;
+
+#[rustfmt::skip]
+pub mod scp_control_x;
+pub use scp_control_x::*;
+
+#[rustfmt::skip]
+pub mod scp_handle_x;
+pub use scp_handle_x::*;
+
 #[cfg(test)]
 mod tests {
     use crate::types_x::*;

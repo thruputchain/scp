@@ -2,13 +2,13 @@ use crate::*;
 use std::fmt::Debug;
 use std::time::Duration;
 
-#[derive(PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub enum Timer {
     Nomination = 0,
     Ballot = 1,
 }
 
-#[derive(PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum DriverCallback {
     BallotTimerExpired {
         slot_index: SlotIndex,

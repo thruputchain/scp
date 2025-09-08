@@ -1,8 +1,7 @@
 use scp_kernel::*;
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use xdr_common::*;
 
@@ -37,6 +36,15 @@ pub struct State {
     //
     secret_key: proto::SecretKey,
     quorum_sets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
+    //
+    emitted_envelopes: VecDeque<proto::SCPEnvelope>,
+    switched_timers: VecDeque<TimerSwitch>,
+}
+
+#[derive(Debug)]
+enum TimerSwitch {
+    Start(SlotIndex, Timer, Duration, DriverCallback),
+    Stop(SlotIndex, Timer),
 }
 
 impl State {
@@ -51,6 +59,8 @@ impl State {
             ),
             secret_key: secret_key.clone(),
             quorum_sets: HashMap::new(),
+            emitted_envelopes: VecDeque::new(),
+            switched_timers: VecDeque::new(),
         }
     }
 }
@@ -67,7 +77,7 @@ impl SharedState {
         self.0.borrow()
     }
 
-    fn lock_mut(&mut self) -> RefMut<'_, State> {
+    fn lock_mut(&self) -> RefMut<'_, State> {
         self.0.borrow_mut()
     }
 }
@@ -206,10 +216,6 @@ impl Driver for SharedState {
         env.signature = sign_xdr(&self.lock().secret_key, &env.statement).unwrap()
     }
 
-    fn emit_envelope(&self, env: proto::SCPEnvelope) {
-        todo!()
-    }
-
     fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration {
         let (initial_timeout_ms, increment_ms) = if is_nomination {
             (
@@ -230,6 +236,10 @@ impl Driver for SharedState {
         Duration::from_millis(timeout_ms as u64)
     }
 
+    fn emit_envelope(&self, env: proto::SCPEnvelope) {
+        self.lock_mut().emitted_envelopes.push_back(env);
+    }
+
     fn start_timer(
         &self,
         slot_index: SlotIndex,
@@ -237,10 +247,14 @@ impl Driver for SharedState {
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        todo!()
+        self.lock_mut()
+            .switched_timers
+            .push_back(TimerSwitch::Start(slot_index, timer, timeout, cb));
     }
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        todo!()
+        self.lock_mut()
+            .switched_timers
+            .push_back(TimerSwitch::Stop(slot_index, timer));
     }
 }

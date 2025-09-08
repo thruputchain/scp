@@ -37,6 +37,10 @@ pub type SCPSlotIndex = u64;
 
 pub type SCPValue = BytesM;
 
+pub type SCPValues = VecM::<SCPValue>;
+
+pub type SCPOptValue = Option::<SCPValue>;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[derive()]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]

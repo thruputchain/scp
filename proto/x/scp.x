@@ -11,6 +11,8 @@ typedef unsigned int SCPCount;
 typedef unsigned hyper SCPSlotIndex;
 
 typedef opaque SCPValue<>;
+typedef SCPValue SCPValues<>;
+typedef SCPValue *SCPOptValue;
 
 struct SCPBallot {
 	SCPCount counter; // n

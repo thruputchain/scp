@@ -9,6 +9,29 @@ pub fn hex_abbrev(bytes: &[u8]) -> String {
         .collect::<String>()
 }
 
+pub fn hex_full(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<String>()
+}
+
+pub fn parse_node_id_from_hex(hex_str: &str) -> Result<proto::SCPNodeID, String> {
+    if hex_str.len() != 64 {
+        return Err(format!("Expected 64 hex characters for Ed25519 public key, got {}", hex_str.len()));
+    }
+
+    let mut bytes = [0u8; 32];
+    for i in 0..32 {
+        let hex_byte = &hex_str[i * 2..i * 2 + 2];
+        bytes[i] = u8::from_str_radix(hex_byte, 16)
+            .map_err(|_| format!("Invalid hex character in position {}", i * 2))?;
+    }
+
+    let ed25519_key = proto::Ed25519PublicKey::from(bytes);
+    Ok(proto::PublicKey::Ed25519 { ed25519: ed25519_key })
+}
+
 pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> proto::SCPHash
 where
     F: Fn(&[u8]) -> proto::SCPHash,

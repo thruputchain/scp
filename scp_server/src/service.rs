@@ -6,16 +6,16 @@ use std::time::Duration;
 use xdr_common::*;
 
 #[derive(Clone)]
-pub struct Server(Arc<RwLock<Kernel>>);
+pub struct Service(Arc<RwLock<Kernel>>);
 
-impl Server {
+impl Service {
     pub fn new(
         handle: SCP_Handle_SCP_Handle1_Client,
         cfg: proto::SCPConfig,
         secret_key: &proto::SecretKey,
         is_validator: bool,
-    ) -> Server {
-        Server(Arc::new(RwLock::new(Kernel::new(
+    ) -> Service {
+        Service(Arc::new(RwLock::new(Kernel::new(
             handle,
             cfg,
             secret_key,
@@ -33,7 +33,7 @@ impl Server {
 }
 
 #[async_trait]
-impl proto::SCP_Control_SCP_Control1 for Server {
+impl proto::SCP_Control_SCP_Control1 for Service {
     async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
@@ -44,36 +44,43 @@ impl proto::SCP_Control_SCP_Control1 for Server {
         value: SCPValue,
         prev_value: SCPValue,
     ) -> Result<bool, ::rpc_driver::ProgramError> {
-        Ok(self
+        let r = self
             .lock_mut()
             .kernel
             .proto()
-            .nominate(slot_index, &value, &prev_value))
+            .nominate(slot_index, &value, &prev_value);
+        todo!("process driver invocations");
+        Ok(r)
     }
 
     async fn scp_control_stop_nomination(
         &self,
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        Ok(self.lock_mut().kernel.proto().stop_nomination(slot_index))
+        self.lock_mut().kernel.proto().stop_nomination(slot_index);
+        todo!("process driver invocations");
+        Ok(())
     }
 
     async fn scp_control_update_local_quorum_set(
         &self,
         qset: SCPQuorumSet,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        Ok(self
-            .lock_mut()
+        self.lock_mut()
             .kernel
             .proto()
-            .update_local_quorum_set(&qset))
+            .update_local_quorum_set(&qset);
+        todo!("process driver invocations");
+        Ok(())
     }
 
     async fn scp_control_received_envelope(
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        Ok(self.lock_mut().kernel.proto().received_envelope(&env))
+        self.lock_mut().kernel.proto().received_envelope(&env);
+        todo!("process driver invocations");
+        Ok(())
     }
 }
 

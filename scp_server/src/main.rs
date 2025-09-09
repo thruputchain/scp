@@ -5,8 +5,8 @@ use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
 
-mod server;
-use server::*;
+mod service;
+use service::*;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "SCP Server - Stellar Consensus Protocol stand-alone server", long_about = None)]
@@ -75,7 +75,7 @@ async fn main() {
     let secret_key = proto::parse_secret_key_from_base64(&args.secret_key)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
-    let server = Server::new(handle_client, todo!("XXX"), &secret_key, args.is_validator);
+    let service = Service::new(handle_client, todo!("XXX"), &secret_key, args.is_validator);
 
     // control server
 
@@ -84,7 +84,7 @@ async fn main() {
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
-        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(server.clone())),
+        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service.clone())),
     ));
 
     let control_server = RpcServer::new(control_service_map, control_listener);

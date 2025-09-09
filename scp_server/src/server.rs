@@ -48,21 +48,25 @@ impl proto::SCP_Control_SCP_Control1 for Server {
         &self,
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(self.lock_mut().kernel.proto().stop_nomination(slot_index))
     }
 
     async fn scp_control_update_local_quorum_set(
         &self,
         qset: SCPQuorumSet,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(self
+            .lock_mut()
+            .kernel
+            .proto()
+            .update_local_quorum_set(&qset))
     }
 
     async fn scp_control_received_envelope(
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(self.lock_mut().kernel.proto().received_envelope(&env))
     }
 }
 

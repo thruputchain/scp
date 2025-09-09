@@ -7,6 +7,12 @@ edition = "2024"
 clap = { version = "4.5.47", features = ["derive"] }
 proto = { path = "../proto" }
 scp_kernel = { path = "../scp_kernel" }
+tokio = { version = "1.47.1", features = ["full"] }
+tracing = "0.1"
 
 [dependencies.xdr_common]
 git = "ssh://git@github.com/groundhogchain/xdr_common.git"
+
+[dependencies.rpc_driver]
+git = "ssh://git@github.com/groundhogchain/xdr_rpc.git"
+package = "rpc_driver"

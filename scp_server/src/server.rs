@@ -2,18 +2,31 @@ use scp_kernel::*;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use xdr_common::*;
 
-pub struct Server {
+pub struct Server(Arc<RwLock<Kernel>>);
+
+impl Server {
+    pub fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Server {
+        Server(Arc::new(RwLock::new(Kernel::new(
+            cfg,
+            secret_key,
+            is_validator,
+        ))))
+    }
+}
+
+pub struct Kernel {
     state: SharedState,
     kernel: StellarKernel<SharedState, SharedState>,
 }
 
-impl Server {
-    pub fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Server {
+impl Kernel {
+    fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Kernel {
         let state = SharedState::new(&cfg, &secret_key);
-        Server {
+        Kernel {
             state: state.clone(),
             kernel: StellarKernel::new(
                 derive_node_id(&secret_key),

@@ -7,10 +7,6 @@ edition = "2024"
 name = "scp_kernel"
 path = "src/lib.rs"
 
-[[bin]]
-name = "scp"
-path = "src/main.rs"
-
 [dependencies]
 proto = { path = "../proto" }
 shfix = { path = "../shfix" }

@@ -34,3 +34,6 @@ version = "0.10"
 
 [dependencies.groundhog_scp]
 git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
+
+[dependencies.base64]
+version = "0.22"

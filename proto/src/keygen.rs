@@ -36,3 +36,28 @@ pub fn derive_public_key(secret_key: &proto::SecretKey) -> proto::PublicKey {
 pub fn derive_node_id(sk: &proto::SecretKey) -> proto::SCPNodeID {
     derive_public_key(sk)
 }
+
+/// Parse a SecretKey from a Base64 standard encoded string of the 64-byte secret key
+pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<proto::SecretKey, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    if base64_str.is_empty() {
+        return Err("empty base64 string".to_string());
+    }
+
+    let decoded = STANDARD
+        .decode(base64_str)
+        .map_err(|e| format!("failed to decode base64: {}", e))?;
+
+    if decoded.len() != 64 {
+        return Err(format!("expected 64 bytes, got {}", decoded.len()));
+    }
+
+    let secret_key_bytes: [u8; 64] = decoded
+        .try_into()
+        .map_err(|_| "failed to convert to 64-byte array".to_string())?;
+
+    Ok(proto::SecretKey::Ed25519 {
+        ed25519: proto::Ed25519SecretKey::from(secret_key_bytes),
+    })
+}

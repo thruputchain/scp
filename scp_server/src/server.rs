@@ -5,11 +5,18 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use xdr_common::*;
 
+#[derive(Clone)]
 pub struct Server(Arc<RwLock<Kernel>>);
 
 impl Server {
-    pub fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Server {
+    pub fn new(
+        handle: SCP_Handle_SCP_Handle1_Client,
+        cfg: proto::SCPConfig,
+        secret_key: &proto::SecretKey,
+        is_validator: bool,
+    ) -> Server {
         Server(Arc::new(RwLock::new(Kernel::new(
+            handle,
             cfg,
             secret_key,
             is_validator,
@@ -71,14 +78,21 @@ impl proto::SCP_Control_SCP_Control1 for Server {
 }
 
 pub struct Kernel {
+    handle: SCP_Handle_SCP_Handle1_Client,
     state: SharedState,
     kernel: StellarKernel<SharedState, SharedState>,
 }
 
 impl Kernel {
-    fn new(cfg: proto::SCPConfig, secret_key: &proto::SecretKey, is_validator: bool) -> Kernel {
+    fn new(
+        handle: SCP_Handle_SCP_Handle1_Client,
+        cfg: proto::SCPConfig,
+        secret_key: &proto::SecretKey,
+        is_validator: bool,
+    ) -> Kernel {
         let state = SharedState::new(&cfg, &secret_key);
         Kernel {
+            handle: handle,
             state: state.clone(),
             kernel: StellarKernel::new(
                 derive_node_id(&secret_key),

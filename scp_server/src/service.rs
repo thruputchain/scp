@@ -3,6 +3,8 @@ use scp_kernel::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
+use tokio::sync::oneshot;
+use tokio::time::sleep;
 use xdr_common::*;
 
 #[derive(Clone)]
@@ -31,6 +33,42 @@ impl Service {
         self.0.write().unwrap()
     }
 
+    fn start_timer(
+        &self,
+        slot_index: SlotIndex,
+        timer: Timer,
+        timeout: Duration,
+        cb: DriverCallback,
+    ) {
+        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+
+        tokio::spawn({
+            let x = self.clone();
+            async move {
+                tokio::select! {
+                    _ = sleep(timeout) => {
+                        x.lock_mut().kernel.proto().driver_calling_back(cb);
+                    }
+                    _ = cancel_rx => {
+                    }
+                }
+            }
+        });
+
+        todo!("XXX")
+    }
+
+    fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
+        todo!()
+    }
+
+    fn spawn_flush_kernel_calls(&self) -> tokio::task::JoinHandle<()> {
+        let x = self.clone();
+        tokio::spawn(async move {
+            x.flush_kernel_calls();
+        })
+    }
+
     async fn flush_kernel_calls(&self) {
         let kernel = self.lock_mut();
         let mut state = kernel.state.lock_mut();
@@ -42,7 +80,14 @@ impl Service {
 
         // flush timer switches
         for switch in state.switched_timers.drain(..) {
-            todo!()
+            match switch {
+                TimerSwitch::Start(slot_index, timer, timeout, cb) => {
+                    self.start_timer(slot_index, timer, timeout, cb);
+                }
+                TimerSwitch::Stop(slot_index, timer) => {
+                    self.stop_timer(slot_index, timer);
+                }
+            }
         }
 
         // flush notifications
@@ -118,7 +163,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             .kernel
             .proto()
             .nominate(slot_index, &value, &prev_value);
-        self.flush_kernel_calls().await;
+        self.spawn_flush_kernel_calls().await.unwrap();
         Ok(r)
     }
 
@@ -127,7 +172,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.lock_mut().kernel.proto().stop_nomination(slot_index);
-        self.flush_kernel_calls().await;
+        self.spawn_flush_kernel_calls().await.unwrap();
         Ok(())
     }
 
@@ -139,7 +184,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             .kernel
             .proto()
             .update_local_quorum_set(&qset);
-        self.flush_kernel_calls().await;
+        self.spawn_flush_kernel_calls().await.unwrap();
         Ok(())
     }
 
@@ -148,7 +193,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.lock_mut().kernel.proto().received_envelope(&env);
-        self.flush_kernel_calls().await;
+        self.spawn_flush_kernel_calls().await.unwrap();
         Ok(())
     }
 }
@@ -195,6 +240,8 @@ pub struct State {
     emitted_envelopes: VecDeque<proto::SCPEnvelope>,
     switched_timers: VecDeque<TimerSwitch>,
     issued_notifications: VecDeque<Notification>,
+    //
+    armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
 }
 
 #[derive(Debug)]
@@ -218,6 +265,7 @@ impl State {
             emitted_envelopes: VecDeque::new(),
             switched_timers: VecDeque::new(),
             issued_notifications: VecDeque::new(),
+            armed_timers: HashMap::new(),
         }
     }
 }

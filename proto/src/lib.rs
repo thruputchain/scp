@@ -1,3 +1,5 @@
+pub use groundhog_scp::*;
+
 pub mod xdr;
 pub use xdr::*;
 
@@ -10,31 +12,9 @@ pub use sign::*;
 pub mod keygen;
 pub use keygen::*;
 
-// proto mods
-
-#[rustfmt::skip]
-pub mod types_x;
-pub use types_x::*;
-
-#[rustfmt::skip]
-pub mod scp_x;
-pub use scp_x::*;
-
-#[rustfmt::skip]
-pub mod scp_config_x;
-pub use scp_config_x::*;
-
-#[rustfmt::skip]
-pub mod scp_control_x;
-pub use scp_control_x::*;
-
-#[rustfmt::skip]
-pub mod scp_handle_x;
-pub use scp_handle_x::*;
-
 #[cfg(test)]
 mod tests {
-    use crate::types_x::*;
+    pub use groundhog_scp::*;
     use xdr_common::*;
     use xdrs::serialize_txs;
 

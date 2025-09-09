@@ -1,8 +1,7 @@
+use async_trait::async_trait;
 use scp_kernel::*;
-use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use xdr_common::*;
 
@@ -15,6 +14,55 @@ impl Server {
             secret_key,
             is_validator,
         ))))
+    }
+
+    fn lock(&self) -> RwLockReadGuard<'_, Kernel> {
+        self.0.read().unwrap()
+    }
+
+    fn lock_mut(&self) -> RwLockWriteGuard<'_, Kernel> {
+        self.0.write().unwrap()
+    }
+}
+
+#[async_trait]
+impl proto::SCP_Control_SCP_Control1 for Server {
+    async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
+        Ok(())
+    }
+
+    async fn scp_control_nominate(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: SCPValue,
+        prev_value: SCPValue,
+    ) -> Result<bool, ::rpc_driver::ProgramError> {
+        Ok(self
+            .lock_mut()
+            .kernel
+            .proto()
+            .nominate(slot_index, &value, &prev_value))
+    }
+
+    async fn scp_control_stop_nomination(
+        &self,
+        slot_index: SCPSlotIndex,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        todo!()
+    }
+
+    async fn scp_control_update_local_quorum_set(
+        &self,
+        qset: SCPQuorumSet,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        todo!()
+    }
+
+    async fn scp_control_received_envelope(
+        &self,
+        env: SCPEnvelope,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        todo!()
     }
 }
 
@@ -79,19 +127,19 @@ impl State {
 }
 
 #[derive(Debug, Clone)]
-pub struct SharedState(pub Rc<RefCell<State>>);
+pub struct SharedState(pub Arc<RwLock<State>>);
 
 impl SharedState {
     pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> SharedState {
-        SharedState(Rc::new(RefCell::new(State::new(cfg, secret_key))))
+        SharedState(Arc::new(RwLock::new(State::new(cfg, secret_key))))
     }
 
-    fn lock(&self) -> Ref<'_, State> {
-        self.0.borrow()
+    fn lock(&self) -> RwLockReadGuard<'_, State> {
+        self.0.read().unwrap()
     }
 
-    fn lock_mut(&self) -> RefMut<'_, State> {
-        self.0.borrow_mut()
+    fn lock_mut(&self) -> RwLockWriteGuard<'_, State> {
+        self.0.write().unwrap()
     }
 }
 

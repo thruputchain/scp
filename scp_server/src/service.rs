@@ -125,6 +125,7 @@ pub struct State {
     //
     emitted_envelopes: VecDeque<proto::SCPEnvelope>,
     switched_timers: VecDeque<TimerSwitch>,
+    issued_notifications: VecDeque<Notification>,
 }
 
 #[derive(Debug)]
@@ -147,6 +148,7 @@ impl State {
             quorum_sets: HashMap::new(),
             emitted_envelopes: VecDeque::new(),
             switched_timers: VecDeque::new(),
+            issued_notifications: VecDeque::new(),
         }
     }
 }
@@ -202,15 +204,78 @@ impl Consensus for SharedState {
     }
 }
 
+#[derive(Debug)]
+enum Notification {
+    ValueExternalized(SlotIndex, SCPValue),
+    StartedBallotProto(SlotIndex, SCPBallot),
+    AcceptedBallotPrepared(SlotIndex, SCPBallot),
+    ConfirmedBallotPrepared(SlotIndex, SCPBallot),
+    AcceptedCommit(SlotIndex, SCPBallot),
+    BallotDidHearFromQuorum(SlotIndex, SCPBallot),
+    NominatingValue(SlotIndex, SCPValue),
+    UpdatedCandidateValue(SlotIndex, SCPValue),
+}
+
 impl ConsensusNotify for SharedState {
-    fn value_externalized(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
-    fn started_ballot_proto(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
-    fn accepted_ballot_prepared(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
-    fn confirmed_ballot_prepared(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
-    fn accepted_commit(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
-    fn ballot_did_hear_from_quorum(&self, _slot_index: SlotIndex, _ballot: &proto::SCPBallot) {}
-    fn nominating_value(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
-    fn updated_candidate_value(&self, _slot_index: SlotIndex, _value: &proto::SCPValue) {}
+    fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::ValueExternalized(slot_index, value.clone()));
+    }
+
+    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::StartedBallotProto(slot_index, ballot.clone()));
+    }
+
+    fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::AcceptedBallotPrepared(
+                slot_index,
+                ballot.clone(),
+            ));
+    }
+
+    fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::ConfirmedBallotPrepared(
+                slot_index,
+                ballot.clone(),
+            ));
+    }
+
+    fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::AcceptedCommit(slot_index, ballot.clone()));
+    }
+
+    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::BallotDidHearFromQuorum(
+                slot_index,
+                ballot.clone(),
+            ));
+    }
+
+    fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::NominatingValue(slot_index, value.clone()));
+    }
+
+    fn updated_candidate_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        self.lock_mut()
+            .issued_notifications
+            .push_back(Notification::UpdatedCandidateValue(
+                slot_index,
+                value.clone(),
+            ));
+    }
 }
 
 impl Driver for SharedState {

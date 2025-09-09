@@ -1,3 +1,13 @@
 [workspace]
 resolver = "3"
 members = ["shfix", "proto", "scp_kernel", "scp_server"]
+
+[workspace.dependencies.groundhog_xdr]
+git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
+package = "groundhog_xdr"
+features = ["std", "xdrs"]
+
+[workspace.dependencies.groundhog_scp]
+git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
+package = "groundhog_scp"
+features = ["std", "xdrs"]

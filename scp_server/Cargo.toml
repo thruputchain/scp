@@ -10,6 +10,10 @@ scp_kernel = { path = "../scp_kernel" }
 tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1"
 
+# git dependencies with explicit package names
+groundhog_xdr = { workspace = true }
+groundhog_scp = { workspace = true }
+
 [dependencies.xdr_common]
 git = "ssh://git@github.com/groundhogchain/xdr_common.git"
 

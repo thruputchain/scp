@@ -30,6 +30,75 @@ impl Service {
     fn lock_mut(&self) -> RwLockWriteGuard<'_, Kernel> {
         self.0.write().unwrap()
     }
+
+    async fn flush_kernel_calls(&self) {
+        let kernel = self.lock_mut();
+        let mut state = kernel.state.lock_mut();
+
+        // flush emitted envelopes
+        for env in state.emitted_envelopes.drain(..) {
+            kernel.handle.scp_handle_emit_envelope(env).await;
+        }
+
+        // flush timer switches
+        for switch in state.switched_timers.drain(..) {
+            todo!()
+        }
+
+        // flush notifications
+        for notification in state.issued_notifications.drain(..) {
+            match notification {
+                Notification::ValueExternalized(slot_index, value) => {
+                    kernel
+                        .handle
+                        .scp_handle_value_externalized(slot_index, value)
+                        .await;
+                }
+                Notification::StartedBallotProto(slot_index, ballot) => {
+                    kernel
+                        .handle
+                        .scp_handle_started_ballot_proto(slot_index, ballot)
+                        .await;
+                }
+                Notification::AcceptedBallotPrepared(slot_index, ballot) => {
+                    kernel
+                        .handle
+                        .scp_handle_accepted_ballot_prepared(slot_index, ballot)
+                        .await;
+                }
+                Notification::ConfirmedBallotPrepared(slot_index, ballot) => {
+                    kernel
+                        .handle
+                        .scp_handle_confirmed_ballot_prepared(slot_index, ballot)
+                        .await;
+                }
+                Notification::AcceptedCommit(slot_index, ballot) => {
+                    kernel
+                        .handle
+                        .scp_handle_accepted_commit(slot_index, ballot)
+                        .await;
+                }
+                Notification::BallotDidHearFromQuorum(slot_index, ballot) => {
+                    kernel
+                        .handle
+                        .scp_handle_ballot_did_hear_from_quorum(slot_index, ballot)
+                        .await;
+                }
+                Notification::NominatingValue(slot_index, value) => {
+                    kernel
+                        .handle
+                        .scp_handle_nominating_value(slot_index, value)
+                        .await;
+                }
+                Notification::UpdatedCandidateValue(slot_index, value) => {
+                    kernel
+                        .handle
+                        .scp_handle_updated_candidate_value(slot_index, value)
+                        .await;
+                }
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -49,7 +118,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             .kernel
             .proto()
             .nominate(slot_index, &value, &prev_value);
-        todo!("process driver invocations");
+        self.flush_kernel_calls().await;
         Ok(r)
     }
 
@@ -58,7 +127,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.lock_mut().kernel.proto().stop_nomination(slot_index);
-        todo!("process driver invocations");
+        self.flush_kernel_calls().await;
         Ok(())
     }
 
@@ -70,7 +139,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             .kernel
             .proto()
             .update_local_quorum_set(&qset);
-        todo!("process driver invocations");
+        self.flush_kernel_calls().await;
         Ok(())
     }
 
@@ -79,7 +148,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.lock_mut().kernel.proto().received_envelope(&env);
-        todo!("process driver invocations");
+        self.flush_kernel_calls().await;
         Ok(())
     }
 }

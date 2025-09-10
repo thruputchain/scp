@@ -1,14 +1,23 @@
 use async_trait::async_trait;
 use scp_kernel::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot;
+
+use std::sync::RwLock as StdRwLock;
+use std::sync::RwLockReadGuard as StdRwLockReadGuard;
+use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
+
+use tokio::sync::RwLock as TokioRwLock;
+use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
+use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
+
 use tokio::time::sleep;
 use xdr_common::*;
 
 #[derive(Clone)]
-pub struct Service(Arc<RwLock<Kernel>>);
+pub struct Service(Arc<TokioRwLock<Kernel>>);
 
 impl Service {
     pub fn new(
@@ -17,7 +26,7 @@ impl Service {
         secret_key: &proto::SecretKey,
         is_validator: bool,
     ) -> Service {
-        Service(Arc::new(RwLock::new(Kernel::new(
+        Service(Arc::new(TokioRwLock::new(Kernel::new(
             handle,
             cfg,
             secret_key,
@@ -25,12 +34,12 @@ impl Service {
         ))))
     }
 
-    fn lock(&self) -> RwLockReadGuard<'_, Kernel> {
-        self.0.read().unwrap()
+    async fn lock(&self) -> TokioRwLockReadGuard<'_, Kernel> {
+        self.0.read().await
     }
 
-    fn lock_mut(&self) -> RwLockWriteGuard<'_, Kernel> {
-        self.0.write().unwrap()
+    async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, Kernel> {
+        self.0.write().await
     }
 
     fn start_timer(
@@ -47,7 +56,7 @@ impl Service {
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        x.lock_mut().kernel.proto().driver_calling_back(cb);
+                        x.lock_mut().await.kernel.proto().driver_calling_back(cb);
                     }
                     _ = cancel_rx => {
                     }
@@ -62,24 +71,34 @@ impl Service {
         todo!()
     }
 
-    fn spawn_flush_kernel_calls(&self) -> tokio::task::JoinHandle<()> {
-        let x = self.clone();
-        tokio::spawn(async move {
-            x.flush_kernel_calls();
-        })
-    }
-
     async fn flush_kernel_calls(&self) {
-        let kernel = self.lock_mut();
-        let mut state = kernel.state.lock_mut();
+        let kernel = self.lock_mut().await;
+        // let mut state = kernel.state.lock_mut();
+
+        let mut emitted_envelopes: Vec<SCPEnvelope> = kernel
+            .state
+            .lock_mut()
+            .emitted_envelopes
+            .drain(..)
+            .collect();
+
+        let mut switched_timers: Vec<TimerSwitch> =
+            kernel.state.lock_mut().switched_timers.drain(..).collect();
+
+        let mut issued_notifications: Vec<Notification> = kernel
+            .state
+            .lock_mut()
+            .issued_notifications
+            .drain(..)
+            .collect();
 
         // flush emitted envelopes
-        for env in state.emitted_envelopes.drain(..) {
-            kernel.handle.scp_handle_emit_envelope(env).await;
+        for env in emitted_envelopes.drain(..) {
+            kernel.handle.scp_handle_emit_envelope(env).await.unwrap();
         }
 
         // flush timer switches
-        for switch in state.switched_timers.drain(..) {
+        for switch in switched_timers.drain(..) {
             match switch {
                 TimerSwitch::Start(slot_index, timer, timeout, cb) => {
                     self.start_timer(slot_index, timer, timeout, cb);
@@ -91,55 +110,63 @@ impl Service {
         }
 
         // flush notifications
-        for notification in state.issued_notifications.drain(..) {
+        for notification in issued_notifications.drain(..) {
             match notification {
                 Notification::ValueExternalized(slot_index, value) => {
                     kernel
                         .handle
                         .scp_handle_value_externalized(slot_index, value)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::StartedBallotProto(slot_index, ballot) => {
                     kernel
                         .handle
                         .scp_handle_started_ballot_proto(slot_index, ballot)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::AcceptedBallotPrepared(slot_index, ballot) => {
                     kernel
                         .handle
                         .scp_handle_accepted_ballot_prepared(slot_index, ballot)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::ConfirmedBallotPrepared(slot_index, ballot) => {
                     kernel
                         .handle
                         .scp_handle_confirmed_ballot_prepared(slot_index, ballot)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::AcceptedCommit(slot_index, ballot) => {
                     kernel
                         .handle
                         .scp_handle_accepted_commit(slot_index, ballot)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::BallotDidHearFromQuorum(slot_index, ballot) => {
                     kernel
                         .handle
                         .scp_handle_ballot_did_hear_from_quorum(slot_index, ballot)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::NominatingValue(slot_index, value) => {
                     kernel
                         .handle
                         .scp_handle_nominating_value(slot_index, value)
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 Notification::UpdatedCandidateValue(slot_index, value) => {
                     kernel
                         .handle
                         .scp_handle_updated_candidate_value(slot_index, value)
-                        .await;
+                        .await
+                        .unwrap();
                 }
             }
         }
@@ -160,10 +187,11 @@ impl proto::SCP_Control_SCP_Control1 for Service {
     ) -> Result<bool, ::rpc_driver::ProgramError> {
         let r = self
             .lock_mut()
+            .await
             .kernel
             .proto()
             .nominate(slot_index, &value, &prev_value);
-        self.spawn_flush_kernel_calls().await.unwrap();
+        self.flush_kernel_calls().await;
         Ok(r)
     }
 
@@ -171,8 +199,12 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         &self,
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        self.lock_mut().kernel.proto().stop_nomination(slot_index);
-        self.spawn_flush_kernel_calls().await.unwrap();
+        self.lock_mut()
+            .await
+            .kernel
+            .proto()
+            .stop_nomination(slot_index);
+        self.flush_kernel_calls().await;
         Ok(())
     }
 
@@ -181,10 +213,11 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         qset: SCPQuorumSet,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.lock_mut()
+            .await
             .kernel
             .proto()
             .update_local_quorum_set(&qset);
-        self.spawn_flush_kernel_calls().await.unwrap();
+        self.flush_kernel_calls().await;
         Ok(())
     }
 
@@ -192,8 +225,8 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        self.lock_mut().kernel.proto().received_envelope(&env);
-        self.spawn_flush_kernel_calls().await.unwrap();
+        self.lock_mut().await.kernel.proto().received_envelope(&env);
+        self.flush_kernel_calls().await;
         Ok(())
     }
 }
@@ -271,18 +304,18 @@ impl State {
 }
 
 #[derive(Debug, Clone)]
-pub struct SharedState(pub Arc<RwLock<State>>);
+pub struct SharedState(pub Arc<StdRwLock<State>>);
 
 impl SharedState {
     pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> SharedState {
-        SharedState(Arc::new(RwLock::new(State::new(cfg, secret_key))))
+        SharedState(Arc::new(StdRwLock::new(State::new(cfg, secret_key))))
     }
 
-    fn lock(&self) -> RwLockReadGuard<'_, State> {
+    fn lock(&self) -> StdRwLockReadGuard<'_, State> {
         self.0.read().unwrap()
     }
 
-    fn lock_mut(&self) -> RwLockWriteGuard<'_, State> {
+    fn lock_mut(&self) -> StdRwLockWriteGuard<'_, State> {
         self.0.write().unwrap()
     }
 }

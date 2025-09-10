@@ -10,7 +10,6 @@ use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 
 use tokio::sync::RwLock as TokioRwLock;
-use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 
 use tokio::time::sleep;
@@ -32,10 +31,6 @@ impl Service {
             secret_key,
             is_validator,
         ))))
-    }
-
-    async fn lock(&self) -> TokioRwLockReadGuard<'_, Kernel> {
-        self.0.read().await
     }
 
     async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, Kernel> {

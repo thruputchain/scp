@@ -476,7 +476,7 @@ impl Consensus for SharedState {
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> ValidationLevel {
-        todo!()
+        self.get_cached_validation(slot_index, value).unwrap()
     }
 
     fn validate_nomination_value(
@@ -484,7 +484,7 @@ impl Consensus for SharedState {
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> ValidationLevel {
-        todo!()
+        self.get_cached_validation(slot_index, value).unwrap()
     }
 
     fn extract_valid_value(

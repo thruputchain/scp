@@ -247,7 +247,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
 }
 
 pub struct Kernel {
-    handle: SCP_Handle_SCP_Handle1_Client,
+    handle: Arc<SCP_Handle_SCP_Handle1_Client>,
     state: SharedState,
     kernel: StellarKernel<SharedState, SharedState>,
 }
@@ -259,7 +259,8 @@ impl Kernel {
         secret_key: &proto::SecretKey,
         is_validator: bool,
     ) -> Kernel {
-        let state = SharedState::new(&cfg, &secret_key);
+        let handle = Arc::new(handle);
+        let state = SharedState::new(handle.clone(), &cfg, &secret_key);
         Kernel {
             handle: handle,
             state: state.clone(),
@@ -274,7 +275,6 @@ impl Kernel {
     }
 }
 
-#[derive(Debug)]
 pub struct State {
     max_timeout: Duration,
     initial_ballot_timeout: Duration,
@@ -290,6 +290,34 @@ pub struct State {
     issued_notifications: VecDeque<Notification>,
     //
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
+    //
+    handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+}
+
+use std::fmt;
+
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("State")
+            .field("max_timeout", &self.max_timeout)
+            .field("initial_ballot_timeout", &self.initial_ballot_timeout)
+            .field("increment_ballot_timeout", &self.increment_ballot_timeout)
+            .field(
+                "initial_nomination_timeout",
+                &self.initial_nomination_timeout,
+            )
+            .field(
+                "increment_nomination_timeout",
+                &self.increment_nomination_timeout,
+            )
+            .field("secret_key", &self.secret_key)
+            .field("quorum_sets", &self.quorum_sets)
+            .field("emitted_envelopes", &self.emitted_envelopes)
+            .field("switched_timers", &self.switched_timers)
+            .field("issued_notifications", &self.issued_notifications)
+            .field("armed_timers", &self.armed_timers)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -299,7 +327,11 @@ enum TimerSwitch {
 }
 
 impl State {
-    pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> State {
+    pub fn new(
+        handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+        cfg: &proto::SCPConfig,
+        secret_key: &proto::SecretKey,
+    ) -> State {
         State {
             max_timeout: Duration::from_millis(cfg.max_timeout_ms),
             initial_ballot_timeout: Duration::from_millis(cfg.initial_ballot_timeout_ms),
@@ -314,6 +346,7 @@ impl State {
             switched_timers: VecDeque::new(),
             issued_notifications: VecDeque::new(),
             armed_timers: HashMap::new(),
+            handle,
         }
     }
 }
@@ -322,8 +355,14 @@ impl State {
 pub struct SharedState(pub Arc<StdRwLock<State>>);
 
 impl SharedState {
-    pub fn new(cfg: &proto::SCPConfig, secret_key: &proto::SecretKey) -> SharedState {
-        SharedState(Arc::new(StdRwLock::new(State::new(cfg, secret_key))))
+    pub fn new(
+        handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+        cfg: &proto::SCPConfig,
+        secret_key: &proto::SecretKey,
+    ) -> SharedState {
+        SharedState(Arc::new(StdRwLock::new(State::new(
+            handle, cfg, secret_key,
+        ))))
     }
 
     fn lock(&self) -> StdRwLockReadGuard<'_, State> {
@@ -357,7 +396,15 @@ impl Consensus for SharedState {
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> Option<proto::SCPValue> {
-        todo!()
+        let value = value.clone();
+        let x = self.clone();
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            x.lock()
+                .handle
+                .scp_handle_extract_valid_value(slot_index, value)
+                .await
+                .unwrap()
+        })
     }
 
     fn combine_candidates(
@@ -365,7 +412,15 @@ impl Consensus for SharedState {
         slot_index: SCPSlotIndex,
         candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue> {
-        todo!()
+        let candidates = VecM::<SCPValue>(candidates.iter().cloned().collect());
+        let x = self.clone();
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            x.lock()
+                .handle
+                .scp_handle_combine_candidates(slot_index, candidates)
+                .await
+                .unwrap()
+        })
     }
 }
 

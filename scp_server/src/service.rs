@@ -130,6 +130,7 @@ impl Service {
         for notification in issued_notifications.drain(..) {
             match notification {
                 Notification::ValueExternalized(slot_index, value) => {
+                    kernel.state.purge_cached_validations(slot_index);
                     kernel
                         .handle
                         .scp_handle_value_externalized(slot_index, value)
@@ -270,8 +271,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        //XXX: dos prevention: verify that values are worth validating
-        //XXX: purge cached verifications after slot completes
+        //XXX: dos prevention: verify that values are worth pre-validating
 
         let x = self.clone();
         tokio::spawn(async move {

@@ -2,7 +2,7 @@ use crate::*;
 use std::fmt::Debug;
 use std::time::Duration;
 
-#[derive(Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub enum Timer {
     Nomination = 0,
     Ballot = 1,

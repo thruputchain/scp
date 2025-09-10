@@ -44,13 +44,15 @@ impl Service {
 
     fn start_timer(
         &self,
+        kernel: &TokioRwLockWriteGuard<'_, Kernel>,
         slot_index: SlotIndex,
         timer: Timer,
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+        self.stop_timer(kernel, slot_index, timer);
 
+        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
         tokio::spawn({
             let x = self.clone();
             async move {
@@ -64,16 +66,32 @@ impl Service {
             }
         });
 
-        todo!("XXX")
+        let mut state = kernel.state.lock_mut();
+        let slot_timers = state
+            .armed_timers
+            .entry(slot_index)
+            .or_insert_with(HashMap::new);
+        if let Some(_) = slot_timers.insert(timer, cancel_tx) {
+            panic!("there should be no prior timer")
+        }
     }
 
-    fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        todo!()
+    fn stop_timer(
+        &self,
+        kernel: &TokioRwLockWriteGuard<'_, Kernel>,
+        slot_index: SlotIndex,
+        timer: Timer,
+    ) {
+        let mut state = kernel.state.lock_mut();
+        if let Some(slot_timers) = state.armed_timers.get_mut(&slot_index) {
+            if let Some(cancel_tx) = slot_timers.remove(&timer) {
+                let _ = cancel_tx.send(());
+            }
+        }
     }
 
     async fn flush_kernel_calls(&self) {
         let kernel = self.lock_mut().await;
-        // let mut state = kernel.state.lock_mut();
 
         let mut emitted_envelopes: Vec<SCPEnvelope> = kernel
             .state
@@ -101,10 +119,10 @@ impl Service {
         for switch in switched_timers.drain(..) {
             match switch {
                 TimerSwitch::Start(slot_index, timer, timeout, cb) => {
-                    self.start_timer(slot_index, timer, timeout, cb);
+                    self.start_timer(&kernel, slot_index, timer, timeout, cb);
                 }
                 TimerSwitch::Stop(slot_index, timer) => {
-                    self.stop_timer(slot_index, timer);
+                    self.stop_timer(&kernel, slot_index, timer);
                 }
             }
         }

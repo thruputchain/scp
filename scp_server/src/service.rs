@@ -279,7 +279,8 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             let (nom_values, ballot_values) =
                 StellarProto::<'_, SharedState, SharedState>::get_statement_values(&env.statement);
 
-            let state = &x.lock_mut().await.state;
+            let mut kernel = x.lock_mut().await;
+            let state = &kernel.state;
 
             let mut handles = Vec::new();
             for v in nom_values {
@@ -304,9 +305,10 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             }
             join_all(handles).await;
 
-            // XXX
-            // self.lock_mut().await.kernel.proto().received_envelope(&env);
-            // self.flush_kernel_calls().await;
+            // call received_envelope after validations are computed and cached
+            kernel.kernel.proto().received_envelope(&env);
+            drop(kernel);
+            x.flush_kernel_calls().await;
         });
 
         Ok(())

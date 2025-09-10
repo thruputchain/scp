@@ -1,9 +1,11 @@
 use async_trait::async_trait;
+use futures::future::join_all;
 use scp_kernel::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot;
+use tracing::info;
 
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
@@ -186,6 +188,34 @@ impl Service {
             }
         }
     }
+
+    async fn exec_validate_ballot_value(&self, slot_index: SCPSlotIndex, value: &proto::SCPValue) {
+        let kernel = self.lock_mut().await;
+        let p = kernel
+            .handle
+            .scp_handle_validate_ballot_value(slot_index, value.clone())
+            .await
+            .unwrap();
+        kernel
+            .state
+            .set_cached_validation(slot_index, value.clone(), to_validation_level(p));
+    }
+
+    async fn exec_validate_nomination_value(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: &proto::SCPValue,
+    ) {
+        let kernel = self.lock_mut().await;
+        let p = kernel
+            .handle
+            .scp_handle_validate_nomination_value(slot_index, value.clone())
+            .await
+            .unwrap();
+        kernel
+            .state
+            .set_cached_validation(slot_index, value.clone(), to_validation_level(p));
+    }
 }
 
 #[async_trait]
@@ -240,8 +270,45 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        self.lock_mut().await.kernel.proto().received_envelope(&env);
-        self.flush_kernel_calls().await;
+        //XXX: dos prevention: verify that values are worth validating
+        //XXX: purge cached verifications after slot completes
+
+        let x = self.clone();
+        tokio::spawn(async move {
+            let slot_index = env.statement.slot_index;
+            let (nom_values, ballot_values) =
+                StellarProto::<'_, SharedState, SharedState>::get_statement_values(&env.statement);
+
+            let state = &x.lock_mut().await.state;
+
+            let mut handles = Vec::new();
+            for v in nom_values {
+                if state.get_cached_validation(slot_index, &v).is_none() {
+                    handles.push(tokio::spawn({
+                        let svc = x.clone();
+                        async move {
+                            svc.exec_validate_nomination_value(slot_index, &v).await;
+                        }
+                    }));
+                }
+            }
+            for v in ballot_values {
+                if state.get_cached_validation(slot_index, &v).is_none() {
+                    handles.push(tokio::spawn({
+                        let svc = x.clone();
+                        async move {
+                            svc.exec_validate_ballot_value(slot_index, &v).await;
+                        }
+                    }));
+                }
+            }
+            join_all(handles).await;
+
+            // XXX
+            // self.lock_mut().await.kernel.proto().received_envelope(&env);
+            // self.flush_kernel_calls().await;
+        });
+
         Ok(())
     }
 }
@@ -290,6 +357,7 @@ pub struct State {
     issued_notifications: VecDeque<Notification>,
     //
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
+    validated_values: HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>,
     //
     handle: Arc<SCP_Handle_SCP_Handle1_Client>,
 }
@@ -346,6 +414,7 @@ impl State {
             switched_timers: VecDeque::new(),
             issued_notifications: VecDeque::new(),
             armed_timers: HashMap::new(),
+            validated_values: HashMap::new(),
             handle,
         }
     }
@@ -371,6 +440,31 @@ impl SharedState {
 
     fn lock_mut(&self) -> StdRwLockWriteGuard<'_, State> {
         self.0.write().unwrap()
+    }
+
+    fn set_cached_validation(&self, slot_index: SlotIndex, v: proto::SCPValue, l: ValidationLevel) {
+        let mut state = self.lock_mut();
+        let x = state
+            .validated_values
+            .entry(slot_index)
+            .or_insert_with(HashMap::new);
+        x.insert(v, l);
+    }
+
+    fn get_cached_validation(
+        &self,
+        slot_index: SlotIndex,
+        v: &proto::SCPValue,
+    ) -> Option<ValidationLevel> {
+        if let Some(x) = self.lock().validated_values.get(&slot_index) {
+            x.get(v).cloned()
+        } else {
+            None
+        }
+    }
+
+    fn purge_cached_validations(&self, slot_index: SlotIndex) {
+        self.lock_mut().validated_values.remove(&slot_index);
     }
 }
 
@@ -627,5 +721,13 @@ impl Driver for SharedState {
         self.lock_mut()
             .switched_timers
             .push_back(TimerSwitch::Stop(slot_index, timer));
+    }
+}
+
+fn to_validation_level(x: proto::SCPValidationLevel) -> ValidationLevel {
+    match x {
+        SCPValidationLevel::SCP_INVALID => ValidationLevel::Invalid,
+        SCPValidationLevel::SCP_MAYBE_VALID => ValidationLevel::MaybeValid,
+        SCPValidationLevel::SCP_FULLY_VALID => ValidationLevel::FullyValid,
     }
 }

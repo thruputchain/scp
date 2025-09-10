@@ -11,6 +11,7 @@ path = "src/main.rs"
 async-trait = "0.1"
 clap = { version = "4.5.47", features = ["derive"] }
 derivative = "2.2"
+futures = "0.3"
 proto = { path = "../proto" }
 scp_kernel = { path = "../scp_kernel" }
 tokio = { version = "1.47.1", features = ["full"] }

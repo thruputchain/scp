@@ -159,6 +159,13 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         self.local_proto().is_validator()
     }
 
+    /// returns (nom values, ballot values)
+    pub fn get_statement_values(
+        statement: &proto::SCPStatement,
+    ) -> (Vec<proto::SCPValue>, Vec<proto::SCPValue>) {
+        SlotProto::<'a, C, D>::get_statement_values(statement)
+    }
+
     pub fn get_highest_known_slot_index(&self) -> SlotIndex {
         self.state.known_slots.keys().max().cloned().unwrap_or(0)
     }

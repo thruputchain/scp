@@ -121,14 +121,18 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    pub fn get_statement_values(statement: &proto::SCPStatement) -> Vec<proto::SCPValue> {
+    /// returns (nom values, ballot values)
+    pub fn get_statement_values(
+        statement: &proto::SCPStatement,
+    ) -> (Vec<proto::SCPValue>, Vec<proto::SCPValue>) {
         match &statement.pledges {
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
-                NominationProto::<C, D>::get_statement_values(&statement)
-            }
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => (
+                NominationProto::<C, D>::get_statement_values(&statement),
+                vec![],
+            ),
             _ => {
                 let vals = BallotProto::<C, D>::get_statement_values(statement);
-                vals.into_iter().collect()
+                (vec![], vals.into_iter().collect())
             }
         }
     }

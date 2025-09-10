@@ -53,7 +53,9 @@ impl Service {
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        x.lock_mut().await.kernel.proto().driver_calling_back(cb);
+                        let kernel = &mut x.lock_mut().await;
+                        x.stop_timer(kernel, slot_index, timer);
+                        kernel.kernel.proto().driver_calling_back(cb);
                     }
                     _ = cancel_rx => {
                     }

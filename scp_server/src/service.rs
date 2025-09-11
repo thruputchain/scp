@@ -111,7 +111,7 @@ impl Service {
 
         // flush emitted envelopes
         for env in emitted_envelopes.drain(..) {
-            kernel.handle.scp_handle_emit_envelope(env).await.unwrap();
+            kernel.handle.scp_handle_emit_envelope(&env).await.unwrap();
         }
 
         // flush timer switches
@@ -133,56 +133,56 @@ impl Service {
                     kernel.state.purge_cached_validations(slot_index);
                     kernel
                         .handle
-                        .scp_handle_value_externalized(slot_index, value)
+                        .scp_handle_value_externalized(&slot_index, &value)
                         .await
                         .unwrap();
                 }
                 Notification::StartedBallotProto(slot_index, ballot) => {
                     kernel
                         .handle
-                        .scp_handle_started_ballot_proto(slot_index, ballot)
+                        .scp_handle_started_ballot_proto(&slot_index, &ballot)
                         .await
                         .unwrap();
                 }
                 Notification::AcceptedBallotPrepared(slot_index, ballot) => {
                     kernel
                         .handle
-                        .scp_handle_accepted_ballot_prepared(slot_index, ballot)
+                        .scp_handle_accepted_ballot_prepared(&slot_index, &ballot)
                         .await
                         .unwrap();
                 }
                 Notification::ConfirmedBallotPrepared(slot_index, ballot) => {
                     kernel
                         .handle
-                        .scp_handle_confirmed_ballot_prepared(slot_index, ballot)
+                        .scp_handle_confirmed_ballot_prepared(&slot_index, &ballot)
                         .await
                         .unwrap();
                 }
                 Notification::AcceptedCommit(slot_index, ballot) => {
                     kernel
                         .handle
-                        .scp_handle_accepted_commit(slot_index, ballot)
+                        .scp_handle_accepted_commit(&slot_index, &ballot)
                         .await
                         .unwrap();
                 }
                 Notification::BallotDidHearFromQuorum(slot_index, ballot) => {
                     kernel
                         .handle
-                        .scp_handle_ballot_did_hear_from_quorum(slot_index, ballot)
+                        .scp_handle_ballot_did_hear_from_quorum(&slot_index, &ballot)
                         .await
                         .unwrap();
                 }
                 Notification::NominatingValue(slot_index, value) => {
                     kernel
                         .handle
-                        .scp_handle_nominating_value(slot_index, value)
+                        .scp_handle_nominating_value(&slot_index, &value)
                         .await
                         .unwrap();
                 }
                 Notification::UpdatedCandidateValue(slot_index, value) => {
                     kernel
                         .handle
-                        .scp_handle_updated_candidate_value(slot_index, value)
+                        .scp_handle_updated_candidate_value(&slot_index, &value)
                         .await
                         .unwrap();
                 }
@@ -194,7 +194,7 @@ impl Service {
         let kernel = self.lock_mut().await;
         let p = kernel
             .handle
-            .scp_handle_validate_ballot_value(slot_index, value.clone())
+            .scp_handle_validate_ballot_value(&slot_index, value)
             .await
             .unwrap();
         kernel
@@ -210,7 +210,7 @@ impl Service {
         let kernel = self.lock_mut().await;
         let p = kernel
             .handle
-            .scp_handle_validate_nomination_value(slot_index, value.clone())
+            .scp_handle_validate_nomination_value(&slot_index, value)
             .await
             .unwrap();
         kernel
@@ -316,7 +316,7 @@ impl proto::SCP_Control_SCP_Control1 for Service {
 }
 
 pub struct Kernel {
-    handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+    handle: SCP_Handle_SCP_Handle1_Client,
     state: SharedState,
     kernel: StellarKernel<SharedState, SharedState>,
 }
@@ -328,7 +328,6 @@ impl Kernel {
         secret_key: &proto::SecretKey,
         is_validator: bool,
     ) -> Kernel {
-        let handle = Arc::new(handle);
         let state = SharedState::new(handle.clone(), &cfg, &secret_key);
         Kernel {
             handle: handle,
@@ -361,7 +360,7 @@ pub struct State {
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
     validated_values: HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>,
     //
-    handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+    handle: SCP_Handle_SCP_Handle1_Client,
 }
 
 use std::fmt;
@@ -398,7 +397,7 @@ enum TimerSwitch {
 
 impl State {
     pub fn new(
-        handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+        handle: SCP_Handle_SCP_Handle1_Client,
         cfg: &proto::SCPConfig,
         secret_key: &proto::SecretKey,
     ) -> State {
@@ -427,7 +426,7 @@ pub struct SharedState(pub Arc<StdRwLock<State>>);
 
 impl SharedState {
     pub fn new(
-        handle: Arc<SCP_Handle_SCP_Handle1_Client>,
+        handle: SCP_Handle_SCP_Handle1_Client,
         cfg: &proto::SCPConfig,
         secret_key: &proto::SecretKey,
     ) -> SharedState {
@@ -497,7 +496,7 @@ impl Consensus for SharedState {
         tokio::runtime::Runtime::new().unwrap().block_on(async {
             x.lock()
                 .handle
-                .scp_handle_extract_valid_value(slot_index, value)
+                .scp_handle_extract_valid_value(&slot_index, &value)
                 .await
                 .unwrap()
         })
@@ -513,7 +512,7 @@ impl Consensus for SharedState {
         tokio::runtime::Runtime::new().unwrap().block_on(async {
             x.lock()
                 .handle
-                .scp_handle_combine_candidates(slot_index, candidates)
+                .scp_handle_combine_candidates(&slot_index, &candidates)
                 .await
                 .unwrap()
         })

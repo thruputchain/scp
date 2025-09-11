@@ -231,6 +231,13 @@ impl proto::SCP_Control_SCP_Control1 for Service {
         value: SCPValue,
         prev_value: SCPValue,
     ) -> Result<bool, ::rpc_driver::ProgramError> {
+        // pre-register our nominations as fully valid;
+        // necessary because `nominate` calls `process_envelope` on its own envelopes internally
+        self.lock_mut().await.state.set_cached_validation(
+            slot_index,
+            value.clone(),
+            ValidationLevel::FullyValid,
+        );
         let r = self
             .lock_mut()
             .await
@@ -278,6 +285,12 @@ impl proto::SCP_Control_SCP_Control1 for Service {
             let slot_index = env.statement.slot_index;
             let (nom_values, ballot_values) =
                 StellarProto::<'_, SharedState, SharedState>::get_statement_values(&env.statement);
+
+            println!(
+                "pre-validating nom {} and ballot {}",
+                nom_values.len(),
+                ballot_values.len()
+            );
 
             let mut kernel = x.lock_mut().await;
             let state = &kernel.state;

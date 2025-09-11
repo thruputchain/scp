@@ -7,13 +7,14 @@ use std::sync::Arc;
 use tokio;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use xdr_common::VecM;
+use xdr_common::{BytesM, VecM};
 
 struct TestHandler {
     externalized: Vec<(SCPSlotIndex, SCPValue)>,
     emitted: Vec<SCPEnvelope>,
 }
 
+#[derive(Clone)]
 struct TestHandlerAsync(Arc<Mutex<TestHandler>>);
 
 impl TestHandlerAsync {
@@ -44,6 +45,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
+        println!("validate_ballot_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -52,6 +54,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
+        println!("validate_nomination_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -76,6 +79,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
+        println!("value_externalized");
         self.0.lock().await.externalized.push((slot_index, value));
         Ok(())
     }
@@ -144,22 +148,22 @@ async fn three() {
     let h1 = TestHandlerAsync::new();
     let h2 = TestHandlerAsync::new();
 
-    start_handle_server(":7770", h0).await;
-    start_handle_server(":7771", h1).await;
-    start_handle_server(":7772", h2).await;
+    let handler0_sockaddr = start_handle_server("0.0.0.0:7770", h0.clone()).await;
+    let handler1_sockaddr = start_handle_server("0.0.0.0:7771", h1.clone()).await;
+    let handler2_sockaddr = start_handle_server("0.0.0.0:7772", h2.clone()).await;
 
     // clients
-    let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
+    // let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
     let client0 = proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler0_sockaddr).await.unwrap(),
     );
 
-    let handler1_sockaddr: SocketAddr = "localhost:7771".parse().unwrap();
+    // let handler1_sockaddr: SocketAddr = "localhost:7771".parse().unwrap();
     let client1 = proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler1_sockaddr).await.unwrap(),
     );
 
-    let handler2_sockaddr: SocketAddr = "localhost:7772".parse().unwrap();
+    // let handler2_sockaddr: SocketAddr = "localhost:7772".parse().unwrap();
     let client2 = proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler2_sockaddr).await.unwrap(),
     );
@@ -193,13 +197,33 @@ async fn three() {
     let s1 = Service::new(client1, cfg.clone(), &sk1, true);
     let s2 = Service::new(client2, cfg.clone(), &sk2, true);
 
-    // control servers
-    // start_control_server(":6660", s0).await;
-    // start_control_server(":6661", s1).await;
-    // start_control_server(":6662", s2).await;
+    let nodes = vec![(s0.clone(), h0), (s1.clone(), h1), (s2.clone(), h2)];
 
     // experiment
-    // XXX
+    s0.scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![]))
+        .await
+        .unwrap();
+    s1.scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![]))
+        .await
+        .unwrap();
+    s2.scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![]))
+        .await
+        .unwrap();
+    flush_emits(&nodes).await;
+
+    //XXX
+}
+
+async fn flush_emits(nodes: &Vec<(Service, TestHandlerAsync)>) {
+    for (i, (_, h)) in nodes.iter().enumerate() {
+        for e in h.0.lock().await.emitted.drain(..) {
+            for (j, (s, _)) in nodes.iter().enumerate() {
+                if i != j {
+                    s.scp_control_received_envelope(e.clone()).await.unwrap();
+                }
+            }
+        }
+    }
 }
 
 async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(

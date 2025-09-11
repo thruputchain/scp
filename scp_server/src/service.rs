@@ -280,6 +280,8 @@ impl proto::SCP_Control_SCP_Control1 for Service {
     ) -> Result<(), ::rpc_driver::ProgramError> {
         //XXX: dos prevention: verify that values are worth pre-validating
 
+        println!("scp_control_received_envelope");
+
         let x = self.clone();
         tokio::spawn(async move {
             let slot_index = env.statement.slot_index;

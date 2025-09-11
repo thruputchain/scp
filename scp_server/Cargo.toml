@@ -16,6 +16,7 @@ proto = { path = "../proto" }
 scp_kernel = { path = "../scp_kernel" }
 tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # git dependencies with explicit package names
 groundhog_xdr = { workspace = true }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
+use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
 
 struct TestHandler {
@@ -42,8 +43,8 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
 
     async fn scp_handle_validate_ballot_value(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        _slot_index: SCPSlotIndex,
+        _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
         println!("validate_ballot_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
@@ -51,8 +52,8 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
 
     async fn scp_handle_validate_nomination_value(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        _slot_index: SCPSlotIndex,
+        _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
         println!("validate_nomination_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
@@ -60,15 +61,15 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
 
     async fn scp_handle_extract_valid_value(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        _slot_index: SCPSlotIndex,
+        value: SCPValue,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
-        Ok(Some(arg1))
+        Ok(Some(value))
     }
 
     async fn scp_handle_combine_candidates(
         &self,
-        arg0: SCPSlotIndex,
+        _slot_index: SCPSlotIndex,
         arg1: SCPValues,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
         Ok(Some(arg1.0[0].clone()))
@@ -79,63 +80,63 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        println!("value_externalized");
+        println!("value_externalized {}", value);
         self.0.lock().await.externalized.push((slot_index, value));
         Ok(())
     }
 
     async fn scp_handle_nominating_value(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        _slot_index: SCPSlotIndex,
+        _value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_updated_candidate_value(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        _slot_index: SCPSlotIndex,
+        _value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_started_ballot_proto(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPBallot,
+        _slot_index: SCPSlotIndex,
+        _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_accepted_ballot_prepared(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPBallot,
+        _slot_index: SCPSlotIndex,
+        _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_confirmed_ballot_prepared(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPBallot,
+        _slot_index: SCPSlotIndex,
+        _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_accepted_commit(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPBallot,
+        _slot_index: SCPSlotIndex,
+        _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_ballot_did_hear_from_quorum(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPBallot,
+        _slot_index: SCPSlotIndex,
+        _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
@@ -143,6 +144,11 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
 
 #[tokio::test]
 async fn three() {
+    // let _ = tracing_subscriber::fmt()
+    //     .with_max_level(tracing::metadata::LevelFilter::DEBUG)
+    //     .with_test_writer() // important: routes to test harness writer
+    //     .try_init();
+
     // handlers
     let h0 = TestHandlerAsync::new();
     let h1 = TestHandlerAsync::new();
@@ -200,28 +206,49 @@ async fn three() {
     let nodes = vec![(s0.clone(), h0), (s1.clone(), h1), (s2.clone(), h2)];
 
     // experiment
-    s0.scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![]))
+    let nom0 = s0
+        .scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![]))
         .await
         .unwrap();
-    s1.scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![]))
+    let nom1 = s1
+        .scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![]))
         .await
         .unwrap();
-    s2.scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![]))
+    let nom2 = s2
+        .scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![]))
         .await
         .unwrap();
+    println!("noms: {} {} {}", nom0, nom1, nom2);
     flush_emits(&nodes).await;
+
+    for _ in 0..4 {
+        println!("sleeping");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        flush_emits(&nodes).await;
+    }
 
     //XXX
 }
 
 async fn flush_emits(nodes: &Vec<(Service, TestHandlerAsync)>) {
-    for (i, (_, h)) in nodes.iter().enumerate() {
-        for e in h.0.lock().await.emitted.drain(..) {
-            for (j, (s, _)) in nodes.iter().enumerate() {
-                if i != j {
-                    s.scp_control_received_envelope(e.clone()).await.unwrap();
+    loop {
+        let mut delivered = false;
+        println!("flush loop");
+        for (i, (_, h)) in nodes.iter().enumerate() {
+            println!("draining node {}", i);
+            for e in h.0.lock().await.emitted.drain(..) {
+                println!("draining envelope");
+                // println!("draining envelope {:?}", e);
+                for (j, (s, _)) in nodes.iter().enumerate() {
+                    if i != j {
+                        s.scp_control_received_envelope(e.clone()).await.unwrap();
+                        delivered = true;
+                    }
                 }
             }
+        }
+        if !delivered {
+            break;
         }
     }
 }
@@ -243,6 +270,7 @@ async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
     sockaddr
 }
 
+#[allow(dead_code)]
 async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
     addr: &str,
     svc: S,

@@ -92,3 +92,6 @@ async fn main() {
 
     todo!("XXX")
 }
+
+#[cfg(test)]
+mod service_test;

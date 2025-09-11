@@ -3,23 +3,40 @@ use async_trait::async_trait;
 use core::net::SocketAddr;
 use proto::*;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
+use std::sync::Arc;
 use tokio;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use xdr_common::VecM;
 
-struct TestHandler {}
+struct TestHandler {
+    externalized: Vec<(SCPSlotIndex, SCPValue)>,
+    emitted: Vec<SCPEnvelope>,
+}
+
+struct TestHandlerAsync(Arc<Mutex<TestHandler>>);
+
+impl TestHandlerAsync {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(TestHandler {
+            externalized: vec![],
+            emitted: vec![],
+        })))
+    }
+}
 
 #[async_trait]
-impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
+impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
     async fn scp_handle_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_emit_envelope(
         &self,
-        arg0: SCPEnvelope,
+        env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        self.0.lock().await.emitted.push(env);
+        Ok(())
     }
 
     async fn scp_handle_validate_ballot_value(
@@ -27,7 +44,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
     async fn scp_handle_validate_nomination_value(
@@ -35,7 +52,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
     async fn scp_handle_extract_valid_value(
@@ -43,7 +60,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(Some(arg1))
     }
 
     async fn scp_handle_combine_candidates(
@@ -51,15 +68,16 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValues,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(Some(arg1.0[0].clone()))
     }
 
     async fn scp_handle_value_externalized(
         &self,
-        arg0: SCPSlotIndex,
-        arg1: SCPValue,
+        slot_index: SCPSlotIndex,
+        value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        self.0.lock().await.externalized.push((slot_index, value));
+        Ok(())
     }
 
     async fn scp_handle_nominating_value(
@@ -67,7 +85,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_updated_candidate_value(
@@ -75,7 +93,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_started_ballot_proto(
@@ -83,7 +101,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_accepted_ballot_prepared(
@@ -91,7 +109,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_confirmed_ballot_prepared(
@@ -99,7 +117,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_accepted_commit(
@@ -107,7 +125,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 
     async fn scp_handle_ballot_did_hear_from_quorum(
@@ -115,12 +133,21 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         arg0: SCPSlotIndex,
         arg1: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        todo!()
+        Ok(())
     }
 }
 
 #[tokio::test]
 async fn three() {
+    // handlers
+    let h0 = TestHandlerAsync::new();
+    let h1 = TestHandlerAsync::new();
+    let h2 = TestHandlerAsync::new();
+
+    start_handle_server(":7770", h0).await;
+    start_handle_server(":7771", h1).await;
+    start_handle_server(":7772", h2).await;
+
     // clients
     let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
     let client0 = proto::SCP_Handle_SCP_Handle1_Client::new(
@@ -170,18 +197,41 @@ async fn three() {
     // start_control_server(":6660", s0).await;
     // start_control_server(":6661", s1).await;
     // start_control_server(":6662", s2).await;
+
+    // experiment
+    // XXX
 }
 
-async fn start_control_server(addr: &str, svc: Service) -> SocketAddr {
-    let ctl_listener = TcpListener::bind(addr).await.unwrap();
-    let ctl_sockaddr = ctl_listener.local_addr().unwrap();
+async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
+    addr: &str,
+    svc: S,
+) -> SocketAddr {
+    let listener = TcpListener::bind(addr).await.unwrap();
+    let sockaddr = listener.local_addr().unwrap();
 
-    let mut ctl_service_map = ServiceMap::new();
-    ctl_service_map.add_service(Box::new(
+    let mut service_map = ServiceMap::new();
+    service_map.add_service(Box::new(
+        groundhog_scp::SCP_Handle_SCP_Handle1_Dispatcher::new(Box::new(svc)),
+    ));
+
+    RpcServer::new(service_map, listener).start().await;
+
+    sockaddr
+}
+
+async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
+    addr: &str,
+    svc: S,
+) -> SocketAddr {
+    let listener = TcpListener::bind(addr).await.unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+
+    let mut service_map = ServiceMap::new();
+    service_map.add_service(Box::new(
         groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
     ));
 
-    RpcServer::new(ctl_service_map, ctl_listener).start().await;
+    RpcServer::new(service_map, listener).start().await;
 
-    ctl_sockaddr
+    sockaddr
 }

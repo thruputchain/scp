@@ -477,7 +477,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
                             &st.pledges
                         {
-                            nom.votes.iter().any(|vote| vote == v)
+                            nom.votes.iter().any(|vote| {
+                                println!("vote==v {}", vote == v);
+                                vote == v
+                            })
                         } else {
                             false
                         }
@@ -491,6 +494,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         &accept_predicate,
                         &self.nomination().latest_nominations,
                     ) {
+                        println!("XXX");
                         let validation_level = self.validate_value(v);
                         if validation_level == ValidationLevel::FullyValid {
                             self.nomination_mut().accepted.insert(v.clone());
@@ -528,6 +532,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                             .stop_timer(self.slot_proto().index(), Timer::Nomination);
                     }
                 }
+
+                println!("modified {}, new_candidates {}", modified, new_candidates);
 
                 // Only take round leader votes if we're still looking for candidates
                 if self.nomination().candidates.is_empty()
@@ -682,7 +688,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 value,
                 prev_value,
             } => {
-                self.nominate(&value, &prev_value, true);
+                let x = self.nominate(&value, &prev_value, true);
+                println!("nominate -> {}", x);
             }
             _ => {}
         }

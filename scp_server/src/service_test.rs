@@ -1,11 +1,13 @@
 use crate::service::*;
 use async_trait::async_trait;
 use core::net::SocketAddr;
+use futures::future;
 use proto::*;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
 use std::sync::Arc;
 use tokio;
 use tokio::net::TcpListener;
+use tokio::signal;
 use tokio::sync::Mutex;
 use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
@@ -46,7 +48,6 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
-        println!("validate_ballot_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -55,7 +56,6 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
-        println!("validate_nomination_value");
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -70,8 +70,9 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
     async fn scp_handle_combine_candidates(
         &self,
         _slot_index: SCPSlotIndex,
-        arg1: SCPValues,
+        mut arg1: SCPValues,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
+        arg1.0.sort();
         Ok(Some(arg1.0[0].clone()))
     }
 
@@ -90,6 +91,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
+        println!("nominating_value {}", _value);
         Ok(())
     }
 
@@ -106,6 +108,7 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
+        println!("started_ballot_proto {:?}", _ballot);
         Ok(())
     }
 
@@ -142,12 +145,33 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
     }
 }
 
-#[tokio::test]
-async fn three() {
+use console_subscriber::ConsoleLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+fn instrument_test() {
     // let _ = tracing_subscriber::fmt()
     //     .with_max_level(tracing::metadata::LevelFilter::DEBUG)
     //     .with_test_writer() // important: routes to test harness writer
+    //     .with_file(true)
+    //     .with_line_number(true)
+    //     .with_target(false)
+    //     .event_format(tracing_subscriber::fmt::format())
+    //     .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
     //     .try_init();
+
+    // console_subscriber::init();
+    // tokio::spawn(async {
+    //     use tokio::signal::unix::{SignalKind, signal};
+    //     let mut sigusr1 = signal(SignalKind::user_defined1()).unwrap();
+    //     while sigusr1.recv().await.is_some() {
+    //         tokio::runtime::Handle::current().dump().await;
+    //     }
+    // });
+}
+
+#[tokio::test]
+async fn three() {
+    instrument_test();
 
     // handlers
     let h0 = TestHandlerAsync::new();
@@ -186,7 +210,7 @@ async fn three() {
         proto::derive_public_key(&sk2),
     ]);
     let cfg = proto::SCPConfig {
-        max_timeout_ms: (30 * 60) * 1000,
+        max_timeout_ms: 1000,
         initial_ballot_timeout_ms: 750,
         increment_ballot_timeout_ms: 750,
         initial_nomination_timeout_ms: 750,
@@ -207,38 +231,38 @@ async fn three() {
 
     // experiment
     let nom0 = s0
-        .scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![]))
+        .scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![9]))
         .await
         .unwrap();
     let nom1 = s1
-        .scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![]))
+        .scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![9]))
         .await
         .unwrap();
     let nom2 = s2
-        .scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![]))
+        .scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![9]))
         .await
         .unwrap();
     println!("noms: {} {} {}", nom0, nom1, nom2);
     flush_emits(&nodes).await;
 
-    for _ in 0..4 {
-        println!("sleeping");
+    // for _ in 0..3 {
+    loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         flush_emits(&nodes).await;
     }
 
-    //XXX
+    future::pending::<()>().await;
+    // tokio::signal::ctrl_c().await.unwrap();
 }
 
 async fn flush_emits(nodes: &Vec<(Service, TestHandlerAsync)>) {
     loop {
         let mut delivered = false;
-        println!("flush loop");
+        // println!("FLUSH");
         for (i, (_, h)) in nodes.iter().enumerate() {
-            println!("draining node {}", i);
+            // println!("draining node {}", i);
             for e in h.0.lock().await.emitted.drain(..) {
-                println!("draining envelope");
-                // println!("draining envelope {:?}", e);
+                // println!("draining envelope");
                 for (j, (s, _)) in nodes.iter().enumerate() {
                     if i != j {
                         s.scp_control_received_envelope(e.clone()).await.unwrap();

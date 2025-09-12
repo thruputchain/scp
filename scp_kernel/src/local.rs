@@ -215,15 +215,15 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     }
 
     /// Check if filtered envelopes form a quorum
-    pub fn is_quorum<QFun, Filter>(
+    pub fn is_quorum<GetStmtQSet, FilterStmts>(
         qset: &proto::SCPQuorumSet,
         envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
-        qfun: &QFun,
-        filter: &Filter,
+        get_stmt_qset: &GetStmtQSet,
+        filter: &FilterStmts,
     ) -> bool
     where
-        QFun: Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
-        Filter: Fn(&proto::SCPStatement) -> bool,
+        GetStmtQSet: Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
+        FilterStmts: Fn(&proto::SCPStatement) -> bool,
     {
         // Start with nodes that pass the filter
         let mut p_nodes: Vec<proto::SCPNodeID> = envelopes
@@ -245,7 +245,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
             let mut f_nodes = Vec::new();
             for node_id in &p_nodes {
                 let envelope = envelopes.get(node_id).unwrap();
-                if let Some(node_qset) = qfun(&envelope.statement) {
+                if let Some(node_qset) = get_stmt_qset(&envelope.statement) {
                     if Self::is_quorum_slice_internal(&node_qset, &p_nodes) {
                         f_nodes.push(node_id.clone());
                     }

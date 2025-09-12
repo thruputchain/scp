@@ -370,7 +370,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             self.get_quorum_set_from_statement(st)
         };
 
-        LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, &ratify_filter)
+        let r = LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, &ratify_filter);
+        println!("QQQ {}", r);
+        r
     }
 
     pub fn federated_ratify<F>(

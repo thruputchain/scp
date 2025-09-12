@@ -55,11 +55,15 @@ impl Service {
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        let kernel = &mut x.lock_mut().await;
-                        x.stop_timer(kernel, slot_index, timer);
-                        kernel.kernel.proto().driver_calling_back(cb);
+                        let mut kernel = x.lock_mut().await;
+                        x.stop_timer(&kernel, slot_index, timer);
+                        println!("firing timeout {:?}", cb);
+                        kernel.kernel.proto().driver_calling_back(cb.clone());
+                        drop(kernel);
+                        x.flush_kernel_calls().await;
                     }
                     _ = cancel_rx => {
+                        println!("timeout cancelled {:?}", cb);
                     }
                 }
             }
@@ -280,21 +284,13 @@ impl proto::SCP_Control_SCP_Control1 for Service {
     ) -> Result<(), ::rpc_driver::ProgramError> {
         //XXX: dos prevention: verify that values are worth pre-validating
 
-        println!("scp_control_received_envelope");
-
         let x = self.clone();
         tokio::spawn(async move {
             let slot_index = env.statement.slot_index;
             let (nom_values, ballot_values) =
                 StellarProto::<'_, SharedState, SharedState>::get_statement_values(&env.statement);
 
-            println!(
-                "pre-validating nom {} and ballot {}",
-                nom_values.len(),
-                ballot_values.len()
-            );
-
-            let mut kernel = x.lock_mut().await;
+            let kernel = x.lock_mut().await;
             let state = &kernel.state;
 
             let mut handles = Vec::new();
@@ -318,11 +314,11 @@ impl proto::SCP_Control_SCP_Control1 for Service {
                     }));
                 }
             }
+            drop(kernel);
             join_all(handles).await;
 
             // call received_envelope after validations are computed and cached
-            kernel.kernel.proto().received_envelope(&env);
-            drop(kernel);
+            x.lock_mut().await.kernel.proto().received_envelope(&env);
             x.flush_kernel_calls().await;
         });
 

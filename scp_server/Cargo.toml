@@ -15,6 +15,7 @@ futures = "0.3"
 proto = { path = "../proto" }
 scp_kernel = { path = "../scp_kernel" }
 tokio = { version = "1.47.1", features = ["full"] }
+console-subscriber = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 

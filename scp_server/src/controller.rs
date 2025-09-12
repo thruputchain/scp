@@ -158,9 +158,44 @@ impl ControlKernel {
     }
 
     pub fn start(&self) -> std::thread::JoinHandle<()> {
-        thread::spawn(|| {
+        let x = self.clone();
+        thread::spawn(move || {
             loop {
-                // let req = self.lock().rx_request.blocking_recv().unwrap();
+                let req = x.lock_mut().rx_request.blocking_recv().unwrap();
+                match req {
+                    ControlRequest::Nominate(slot_index, value, prev_value) => {
+                        let r =
+                            x.lock_mut()
+                                .kernel
+                                .proto()
+                                .nominate(slot_index, &value, &prev_value);
+                        x.lock()
+                            .tx_reply
+                            .blocking_send(ControlReply::Nominate(r))
+                            .unwrap()
+                    }
+                    ControlRequest::StopNomination(slot_index) => {
+                        x.lock_mut().kernel.proto().stop_nomination(slot_index);
+                        x.lock()
+                            .tx_reply
+                            .blocking_send(ControlReply::StopNomination())
+                            .unwrap()
+                    }
+                    ControlRequest::UpdateLocalQuorumSet(qset) => {
+                        x.lock_mut().kernel.proto().update_local_quorum_set(&qset);
+                        x.lock()
+                            .tx_reply
+                            .blocking_send(ControlReply::UpdateLocalQuorumSet())
+                            .unwrap()
+                    }
+                    ControlRequest::ReceivedEnvelope(env) => {
+                        x.lock_mut().kernel.proto().received_envelope(&env);
+                        x.lock()
+                            .tx_reply
+                            .blocking_send(ControlReply::ReceivedEnvelope())
+                            .unwrap()
+                    }
+                }
             }
         })
     }

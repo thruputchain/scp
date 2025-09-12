@@ -477,10 +477,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
                             &st.pledges
                         {
-                            nom.votes.iter().any(|vote| {
-                                println!("vote==v {}", vote == v);
-                                vote == v
-                            })
+                            nom.votes.iter().any(|vote| vote == v)
                         } else {
                             false
                         }

@@ -362,7 +362,6 @@ pub struct State {
     increment_nomination_timeout: Duration,
     //
     secret_key: proto::SecretKey,
-    quorum_sets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
     //
     emitted_envelopes: VecDeque<proto::SCPEnvelope>,
     switched_timers: VecDeque<TimerSwitch>,
@@ -391,7 +390,6 @@ impl fmt::Debug for State {
                 &self.increment_nomination_timeout,
             )
             .field("secret_key", &self.secret_key)
-            .field("quorum_sets", &self.quorum_sets)
             .field("emitted_envelopes", &self.emitted_envelopes)
             .field("switched_timers", &self.switched_timers)
             .field("issued_notifications", &self.issued_notifications)
@@ -421,7 +419,6 @@ impl State {
                 cfg.increment_nomination_timeout_ms,
             ),
             secret_key: secret_key.clone(),
-            quorum_sets: HashMap::new(),
             emitted_envelopes: VecDeque::new(),
             switched_timers: VecDeque::new(),
             issued_notifications: VecDeque::new(),
@@ -606,7 +603,15 @@ impl ConsensusNotify for SharedState {
 
 impl Driver for SharedState {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
-        self.lock().quorum_sets.get(h).cloned()
+        let h = h.clone();
+        let x = self.clone();
+        std::thread::spawn(move || {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(async { x.lock().handle.scp_handle_get_quorum_set(&h).await.unwrap() })
+        })
+        .join()
+        .unwrap()
     }
 
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String {

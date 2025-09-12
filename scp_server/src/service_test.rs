@@ -4,6 +4,7 @@ use core::net::SocketAddr;
 use futures::future;
 use proto::*;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio;
 use tokio::net::TcpListener;
@@ -13,6 +14,7 @@ use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
 
 struct TestHandler {
+    quorum_sets: HashMap<SCPHash, SCPQuorumSet>,
     externalized: Vec<(SCPSlotIndex, SCPValue)>,
     emitted: Vec<SCPEnvelope>,
 }
@@ -23,9 +25,18 @@ struct TestHandlerAsync(Arc<Mutex<TestHandler>>);
 impl TestHandlerAsync {
     pub fn new() -> Self {
         Self(Arc::new(Mutex::new(TestHandler {
+            quorum_sets: HashMap::new(),
             externalized: vec![],
             emitted: vec![],
         })))
+    }
+
+    async fn add_qset(&self, q: SCPQuorumSet) {
+        self.0
+            .lock()
+            .await
+            .quorum_sets
+            .insert(proto::hash_xdr_scp(&q).unwrap(), q);
     }
 }
 
@@ -33,6 +44,13 @@ impl TestHandlerAsync {
 impl proto::SCP_Handle_SCP_Handle1 for TestHandlerAsync {
     async fn scp_handle_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
+    }
+
+    async fn scp_handle_get_quorum_set(
+        &self,
+        h: SCPHash,
+    ) -> Result<Option<SCPQuorumSet>, ::rpc_driver::ProgramError> {
+        Ok(self.0.lock().await.quorum_sets.get(&h).cloned())
     }
 
     async fn scp_handle_emit_envelope(
@@ -209,18 +227,22 @@ async fn three() {
         proto::derive_public_key(&sk1),
         proto::derive_public_key(&sk2),
     ]);
-    let cfg = proto::SCPConfig {
+    let qset = SCPQuorumSet {
+        threshold: 2,
+        validators: vs.clone(),
+        inner_sets: Default::default(),
+    };
+    let cfg = SCPConfig {
         max_timeout_ms: 1000,
         initial_ballot_timeout_ms: 750,
         increment_ballot_timeout_ms: 750,
         initial_nomination_timeout_ms: 750,
         increment_nomination_timeout_ms: 750,
-        quorum_set: proto::SCPQuorumSet {
-            threshold: 2,
-            validators: vs.clone(),
-            inner_sets: Default::default(),
-        },
+        quorum_set: qset.clone(),
     };
+    h0.add_qset(qset.clone()).await;
+    h1.add_qset(qset.clone()).await;
+    h2.add_qset(qset.clone()).await;
 
     // services
     let s0 = Service::new(client0, cfg.clone(), &sk0, true);

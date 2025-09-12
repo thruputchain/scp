@@ -9,6 +9,7 @@ mod service;
 use service::*;
 
 mod controller;
+mod handler;
 mod system;
 
 #[derive(Parser, Debug)]

@@ -1,49 +1,50 @@
 use async_trait::async_trait;
 use scp_kernel::*;
 use std::sync::Arc;
+use std::sync::RwLock as StdRwLock;
+use std::sync::RwLockReadGuard as StdRwLockReadGuard;
+use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc::{Receiver, Sender};
 use xdr_common::*;
 
-// rpc --async--> controller service --async----sync--> kernel service
+pub struct ControlService(Arc<TokioRwLock<ControlServiceState>>);
 
-struct ControllerService(Arc<TokioRwLock<ControllerBridge>>);
-
-struct ControllerBridge {
+struct ControlServiceState {
     pub tx_request: Sender<ControlRequest>,
     pub rx_reply: Receiver<ControlReply>,
 }
 
-impl ControllerService {
-    fn new(
+impl ControlService {
+    pub fn new(
         tx_request: Sender<ControlRequest>,
         rx_reply: Receiver<ControlReply>,
-    ) -> ControllerService {
-        ControllerService(Arc::new(TokioRwLock::new(ControllerBridge {
+    ) -> ControlService {
+        ControlService(Arc::new(TokioRwLock::new(ControlServiceState {
             tx_request,
             rx_reply,
         })))
     }
 
-    async fn lock(&self) -> TokioRwLockReadGuard<'_, ControllerBridge> {
+    async fn lock(&self) -> TokioRwLockReadGuard<'_, ControlServiceState> {
         self.0.read().await
     }
 
-    async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, ControllerBridge> {
+    async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, ControlServiceState> {
         self.0.write().await
     }
 }
 
-enum ControlRequest {
+pub enum ControlRequest {
     Nominate(SCPSlotIndex, SCPValue, SCPValue),
     StopNomination(SCPSlotIndex),
     UpdateLocalQuorumSet(SCPQuorumSet),
     ReceivedEnvelope(SCPEnvelope),
 }
 
-enum ControlReply {
+pub enum ControlReply {
     Nominate(bool),
     StopNomination(),
     UpdateLocalQuorumSet(),
@@ -51,7 +52,7 @@ enum ControlReply {
 }
 
 #[async_trait]
-impl proto::SCP_Control_SCP_Control1 for ControllerService {
+impl proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
@@ -122,3 +123,13 @@ impl proto::SCP_Control_SCP_Control1 for ControllerService {
         }
     }
 }
+
+use crate::handler::*;
+
+pub struct ControlKernel(Arc<StdRwLock<ControlKernelState>>);
+
+struct ControlKernelState {
+    kernel: StellarKernel<HandleKernel, HandleKernel>,
+}
+
+// impl ControlKernel

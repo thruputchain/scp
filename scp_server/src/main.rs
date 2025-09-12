@@ -8,6 +8,9 @@ use tracing::info;
 mod service;
 use service::*;
 
+mod controller;
+mod system;
+
 #[derive(Parser, Debug)]
 #[command(version, about = "SCP Server - Stellar Consensus Protocol stand-alone server", long_about = None)]
 struct Args {

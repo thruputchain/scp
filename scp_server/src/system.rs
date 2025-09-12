@@ -1,4 +1,6 @@
-//  rpc --a--> ControlService --a--s--> ControlKernel --s--> kernel --s--> HandleKernel --s--a--> HandleClient --a--> rpc
+//  rpc --a--> √ControlService --a--s--> ControlKernel --s-->
+//    kernel --s-->
+//      √HandleKernel --s--a--> √HandleClient --a--> rpc
 
 use async_trait::async_trait;
 use futures::future::join_all;

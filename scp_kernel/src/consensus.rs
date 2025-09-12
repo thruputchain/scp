@@ -2,7 +2,7 @@ use crate::*;
 use std::collections::HashSet;
 use std::fmt::Debug;
 
-#[derive(Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ValidationLevel {
     Invalid = 0,    // definitively invalid
     MaybeValid = 1, // unable to fully decide at this stage; value is possibly valid

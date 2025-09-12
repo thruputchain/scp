@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
+use std::thread;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
@@ -126,10 +127,41 @@ impl proto::SCP_Control_SCP_Control1 for ControlService {
 
 use crate::handler::*;
 
+#[derive(Clone)]
 pub struct ControlKernel(Arc<StdRwLock<ControlKernelState>>);
 
 struct ControlKernelState {
+    rx_request: Receiver<ControlRequest>,
+    tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
 }
 
-// impl ControlKernel
+impl ControlKernel {
+    pub fn new(
+        rx_request: Receiver<ControlRequest>,
+        tx_reply: Sender<ControlReply>,
+        kernel: StellarKernel<HandleKernel, HandleKernel>,
+    ) -> ControlKernel {
+        ControlKernel(Arc::new(StdRwLock::new(ControlKernelState {
+            rx_request,
+            tx_reply,
+            kernel,
+        })))
+    }
+
+    fn lock(&self) -> StdRwLockReadGuard<'_, ControlKernelState> {
+        self.0.read().unwrap()
+    }
+
+    fn lock_mut(&self) -> StdRwLockWriteGuard<'_, ControlKernelState> {
+        self.0.write().unwrap()
+    }
+
+    pub fn start(&self) -> std::thread::JoinHandle<()> {
+        thread::spawn(|| {
+            loop {
+                // let req = self.lock().rx_request.blocking_recv().unwrap();
+            }
+        })
+    }
+}

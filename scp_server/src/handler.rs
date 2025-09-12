@@ -1,14 +1,18 @@
 use scp_kernel::*;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot;
+use tokio::time::sleep;
 use xdr_common::*;
 
 pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
@@ -289,7 +293,6 @@ pub enum HandleReply {
 #[derive(Debug, Clone)]
 pub struct HandleKernel(Arc<StdRwLock<HandleKernelState>>);
 
-#[derive(Debug)]
 struct HandleKernelState {
     pub tx_handle_request: Sender<HandleRequest>,
     pub rx_handle_reply: Receiver<HandleReply>,
@@ -303,7 +306,33 @@ struct HandleKernelState {
     secret_key: proto::SecretKey,
     //
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
-    validated_values: HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>,
+    validated_values: HashMap<SlotIndex, HashMap<SCPValue, SCPValidationLevel>>,
+    //
+    driver_calling_back: Option<Box<dyn Fn(DriverCallback) + Send + Sync>>,
+}
+
+impl fmt::Debug for HandleKernelState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HandleKernelState")
+            .field("tx_handle_request", &self.tx_handle_request)
+            .field("rx_handle_reply", &self.rx_handle_reply)
+            .field("max_timeout", &self.max_timeout)
+            .field("initial_ballot_timeout", &self.initial_ballot_timeout)
+            .field("increment_ballot_timeout", &self.increment_ballot_timeout)
+            .field(
+                "initial_nomination_timeout",
+                &self.initial_nomination_timeout,
+            )
+            .field(
+                "increment_nomination_timeout",
+                &self.increment_nomination_timeout,
+            )
+            .field("secret_key", &self.secret_key)
+            .field("armed_timers", &self.armed_timers)
+            .field("validated_values", &self.validated_values)
+            // skipping driver_calling_back
+            .finish()
+    }
 }
 
 impl HandleKernel {
@@ -326,7 +355,12 @@ impl HandleKernel {
             secret_key: secret_key.clone(),
             armed_timers: HashMap::new(),
             validated_values: HashMap::new(),
+            driver_calling_back: None,
         })))
+    }
+
+    pub fn set_driver_calling_back(&self, dcb: Box<dyn Fn(DriverCallback) + Send + Sync>) {
+        self.lock_mut().driver_calling_back = Some(dcb);
     }
 
     fn lock(&self) -> StdRwLockReadGuard<'_, HandleKernelState> {
@@ -679,15 +713,50 @@ impl Driver for HandleKernel {
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        self.lock_mut()
-            .switched_timers
-            .push_back(TimerSwitch::Start(slot_index, timer, timeout, cb));
+        self.stop_timer(slot_index, timer);
+
+        let rt = Runtime::new().unwrap();
+
+        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+        tokio::spawn({
+            let x = self.clone();
+            async move {
+                tokio::select! {
+                    _ = sleep(timeout) => {
+                        rt.spawn_blocking(move || {
+                            x.stop_timer(slot_index, timer);
+                            println!("firing timeout {:?}", cb);
+                            if let Some(dcb) = &x.lock().driver_calling_back {
+                                dcb(cb);
+                            } else {
+                                panic!("bug");
+                            }
+                        });
+                    }
+                    _ = cancel_rx => {
+                        println!("timeout cancelled {:?}", cb);
+                    }
+                }
+            }
+        });
+
+        let mut lock = self.lock_mut();
+        let slot_timers = lock
+            .armed_timers
+            .entry(slot_index)
+            .or_insert_with(HashMap::new);
+        if let Some(_) = slot_timers.insert(timer, cancel_tx) {
+            panic!("there should be no prior timer")
+        }
     }
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        self.lock_mut()
-            .switched_timers
-            .push_back(TimerSwitch::Stop(slot_index, timer));
+        let mut lock = self.lock_mut();
+        if let Some(slot_timers) = lock.armed_timers.get_mut(&slot_index) {
+            if let Some(cancel_tx) = slot_timers.remove(&timer) {
+                let _ = cancel_tx.send(());
+            }
+        }
     }
 }
 

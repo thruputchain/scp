@@ -9,9 +9,10 @@ use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
 use xdr_common::*;
 
+#[derive(Clone)]
 pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
 
 struct HandleClientState {
@@ -34,210 +35,217 @@ impl HandleClient {
     }
 
     pub async fn start(&self) {
-        loop {
-            let req = self.lock_mut().await.rx_request.recv().await.unwrap();
-            match req {
-                HandleRequest::EmitEnvelope(env) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_emit_envelope(&env)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::EmitEnvelope())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::ValidateBallotValue(slot_index, value) => {
-                    let r = self
-                        .lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_validate_ballot_value(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::ValidateBallotValue(r))
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::ValidateNominationValue(slot_index, value) => {
-                    let r = self
-                        .lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_validate_nomination_value(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::ValidateNominationValue(r))
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::ExtractValidValue(slot_index, value) => {
-                    let r = self
-                        .lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_extract_valid_value(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::ExtractValidValue(r))
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::CombineCandidates(slot_index, values) => {
-                    let r = self
-                        .lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_combine_candidates(&slot_index, &values)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::CombineCandidates(r))
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::GetQuorumSet(hash) => {
-                    let r = self
-                        .lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_get_quorum_set(&hash)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::GetQuorumSet(r))
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::ValueExternalized(slot_index, value) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_value_externalized(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::ValueExternalized())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::StartedBallotProto(slot_index, ballot) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_started_ballot_proto(&slot_index, &ballot)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::StartedBallotProto())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::AcceptedBallotPrepared(slot_index, ballot) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_accepted_ballot_prepared(&slot_index, &ballot)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::AcceptedBallotPrepared())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::ConfirmedBallotPrepared(slot_index, ballot) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_confirmed_ballot_prepared(&slot_index, &ballot)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::ConfirmedBallotPrepared())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::AcceptedCommit(slot_index, ballot) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_accepted_commit(&slot_index, &ballot)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::AcceptedCommit())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::BallotDidHearFromQuorum(slot_index, ballot) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_ballot_did_hear_from_quorum(&slot_index, &ballot)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::BallotDidHearFromQuorum())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::NominatingValue(slot_index, value) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_nominating_value(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::NominatingValue())
-                        .await
-                        .unwrap();
-                }
-                HandleRequest::UpdatedCandidateValue(slot_index, value) => {
-                    self.lock()
-                        .await
-                        .scp_handle
-                        .scp_handle_updated_candidate_value(&slot_index, &value)
-                        .await
-                        .unwrap();
-                    self.lock()
-                        .await
-                        .tx_reply
-                        .send(HandleReply::UpdatedCandidateValue())
-                        .await
-                        .unwrap();
-                }
+        let twin = self.clone();
+        tokio::spawn(async move {
+            loop {
+                let req = twin.lock_mut().await.rx_request.recv().await.unwrap();
+                twin.handle_request(req);
+            }
+        });
+    }
+
+    async fn handle_request(&self, req: HandleRequest) {
+        match req {
+            HandleRequest::EmitEnvelope(env) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_emit_envelope(&env)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::EmitEnvelope())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::ValidateBallotValue(slot_index, value) => {
+                let r = self
+                    .lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_validate_ballot_value(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::ValidateBallotValue(r))
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::ValidateNominationValue(slot_index, value) => {
+                let r = self
+                    .lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_validate_nomination_value(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::ValidateNominationValue(r))
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::ExtractValidValue(slot_index, value) => {
+                let r = self
+                    .lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_extract_valid_value(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::ExtractValidValue(r))
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::CombineCandidates(slot_index, values) => {
+                let r = self
+                    .lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_combine_candidates(&slot_index, &values)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::CombineCandidates(r))
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::GetQuorumSet(hash) => {
+                let r = self
+                    .lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_get_quorum_set(&hash)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::GetQuorumSet(r))
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::ValueExternalized(slot_index, value) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_value_externalized(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::ValueExternalized())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::StartedBallotProto(slot_index, ballot) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_started_ballot_proto(&slot_index, &ballot)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::StartedBallotProto())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::AcceptedBallotPrepared(slot_index, ballot) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_accepted_ballot_prepared(&slot_index, &ballot)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::AcceptedBallotPrepared())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::ConfirmedBallotPrepared(slot_index, ballot) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_confirmed_ballot_prepared(&slot_index, &ballot)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::ConfirmedBallotPrepared())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::AcceptedCommit(slot_index, ballot) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_accepted_commit(&slot_index, &ballot)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::AcceptedCommit())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::BallotDidHearFromQuorum(slot_index, ballot) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_ballot_did_hear_from_quorum(&slot_index, &ballot)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::BallotDidHearFromQuorum())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::NominatingValue(slot_index, value) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_nominating_value(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::NominatingValue())
+                    .await
+                    .unwrap();
+            }
+            HandleRequest::UpdatedCandidateValue(slot_index, value) => {
+                self.lock()
+                    .await
+                    .scp_handle
+                    .scp_handle_updated_candidate_value(&slot_index, &value)
+                    .await
+                    .unwrap();
+                self.lock()
+                    .await
+                    .tx_reply
+                    .send(HandleReply::UpdatedCandidateValue())
+                    .await
+                    .unwrap();
             }
         }
     }
@@ -304,7 +312,7 @@ struct HandleKernelState {
     //
     validated_values: HashMap<SlotIndex, HashMap<SCPValue, SCPValidationLevel>>,
     //
-    tx_switch_timer: Sender<SwitchTimer>,
+    tx_switch_timer: UnboundedSender<SwitchTimer>,
 }
 
 impl fmt::Debug for HandleKernelState {
@@ -339,7 +347,7 @@ impl HandleKernel {
     pub fn new(
         tx_handle_request: Sender<HandleRequest>,
         rx_handle_reply: Receiver<HandleReply>,
-        tx_switch_timer: Sender<SwitchTimer>,
+        tx_switch_timer: UnboundedSender<SwitchTimer>,
         cfg: &proto::SCPConfig,
         secret_key: &proto::SecretKey,
     ) -> HandleKernel {
@@ -713,49 +721,13 @@ impl Driver for HandleKernel {
     ) {
         self.lock()
             .tx_switch_timer
-            .blocking_send(SwitchTimer::StartTimer(slot_index, timer, timeout, cb));
-
-        // self.stop_timer(slot_index, timer);
-
-        // let rt = Runtime::new().unwrap();
-
-        // let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-        // tokio::spawn({
-        //     let x = self.clone();
-        //     async move {
-        //         tokio::select! {
-        //             _ = sleep(timeout) => {
-        //                 rt.spawn_blocking(move || {
-        //                     x.stop_timer(slot_index, timer);
-        //                     println!("firing timeout {:?}", cb);
-        //                     if let Some(dcb) = &x.lock().driver_calling_back {
-        //                         dcb(cb);
-        //                     } else {
-        //                         panic!("bug");
-        //                     }
-        //                 });
-        //             }
-        //             _ = cancel_rx => {
-        //                 println!("timeout cancelled {:?}", cb);
-        //             }
-        //         }
-        //     }
-        // });
-
-        // let mut lock = self.lock_mut();
-        // let slot_timers = lock
-        //     .armed_timers
-        //     .entry(slot_index)
-        //     .or_insert_with(HashMap::new);
-        // if let Some(_) = slot_timers.insert(timer, cancel_tx) {
-        //     panic!("there should be no prior timer")
-        // }
+            .send(SwitchTimer::StartTimer(slot_index, timer, timeout, cb));
     }
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
         self.lock()
             .tx_switch_timer
-            .blocking_send(SwitchTimer::StopTimer(slot_index, timer));
+            .send(SwitchTimer::StopTimer(slot_index, timer));
     }
 }
 

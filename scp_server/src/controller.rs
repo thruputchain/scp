@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
-use tokio::sync::mpsc::{Receiver, Sender, error::TryRecvError};
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 use xdr_common::*;
@@ -139,7 +139,7 @@ struct ControlKernelState {
     rx_request: Receiver<ControlRequest>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
-    rx_switch_timer: Receiver<SwitchTimer>,
+    rx_switch_timer: UnboundedReceiver<SwitchTimer>,
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
 }
 
@@ -147,7 +147,7 @@ impl ControlKernel {
     pub fn new(
         rx_request: Receiver<ControlRequest>,
         tx_reply: Sender<ControlReply>,
-        rx_switch_timer: Receiver<SwitchTimer>,
+        rx_switch_timer: UnboundedReceiver<SwitchTimer>,
         kernel: StellarKernel<HandleKernel, HandleKernel>,
     ) -> ControlKernel {
         ControlKernel(Arc::new(StdRwLock::new(ControlKernelState {

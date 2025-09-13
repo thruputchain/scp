@@ -7,7 +7,6 @@ use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::thread;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
@@ -142,13 +141,22 @@ struct ControlKernelState {
     handler: HandleKernel,
     rx_switch_timer: UnboundedReceiver<SwitchTimer>,
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
+    tx_validate_envelope: Sender<ValidateEnvelope>,
+    rx_envelope_validated: Receiver<EnvelopeValidated>,
 }
+
+pub type ValidatedValues = HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>;
+
+pub struct ValidateEnvelope(SCPEnvelope);
+pub struct EnvelopeValidated(SCPEnvelope, ValidatedValues);
 
 impl ControlKernel {
     pub fn new(
         rx_request: Receiver<ControlRequest>,
         tx_reply: Sender<ControlReply>,
         rx_switch_timer: UnboundedReceiver<SwitchTimer>,
+        tx_validate_envelope: Sender<ValidateEnvelope>,
+        rx_envelope_validated: Receiver<EnvelopeValidated>,
         kernel: StellarKernel<HandleKernel, HandleKernel>,
         handler: HandleKernel,
     ) -> ControlKernel {
@@ -159,6 +167,8 @@ impl ControlKernel {
             handler,
             rx_switch_timer,
             armed_timers: HashMap::new(),
+            tx_validate_envelope,
+            rx_envelope_validated,
         })))
     }
 
@@ -200,15 +210,13 @@ impl ControlKernel {
     ) {
         self.stop_timer(slot_index, timer);
 
-        let rt = Runtime::new().unwrap();
-
         let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
         tokio::spawn({
             let x = self.clone();
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        rt.spawn_blocking(move || {
+                        tokio::task::spawn_blocking(move || {
                             x.stop_timer(slot_index, timer);
                             println!("firing timeout {:?}", cb);
                             x.lock_mut().kernel.proto().driver_calling_back(cb);
@@ -276,13 +284,18 @@ impl ControlKernel {
                             .unwrap()
                     }
                     ControlRequest::ReceivedEnvelope(env) => {
-                        //XXX: pre-fetch values; then deliver envelope
-                        x.lock_mut().kernel.proto().received_envelope(&env);
-                        x.flush_timer_switches();
+                        // XXX: ask kernel if the envelope should be validated
                         x.lock()
-                            .tx_reply
-                            .blocking_send(ControlReply::ReceivedEnvelope())
-                            .unwrap()
+                            .tx_validate_envelope
+                            .blocking_send(ValidateEnvelope(env))
+                            .unwrap();
+
+                        // x.lock_mut().kernel.proto().received_envelope(&env);
+                        // x.flush_timer_switches();
+                        // x.lock()
+                        //     .tx_reply
+                        //     .blocking_send(ControlReply::ReceivedEnvelope())
+                        //     .unwrap()
                     }
                 }
             }

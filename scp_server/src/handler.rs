@@ -1,3 +1,4 @@
+use crate::controller::*;
 use scp_kernel::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -18,6 +19,8 @@ pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
 struct HandleClientState {
     pub rx_request: Receiver<HandleRequest>,
     pub tx_reply: Sender<HandleReply>,
+    pub rx_validate_envelope: Receiver<ValidateEnvelope>,
+    pub tx_envelope_validated: Sender<EnvelopeValidated>,
     pub scp_handle: SCP_Handle_SCP_Handle1_Client,
 }
 
@@ -25,12 +28,16 @@ impl HandleClient {
     pub fn new(
         rx_request: Receiver<HandleRequest>,
         tx_reply: Sender<HandleReply>,
+        rx_validate_envelope: Receiver<ValidateEnvelope>,
+        tx_envelope_validated: Sender<EnvelopeValidated>,
         scp_handle: SCP_Handle_SCP_Handle1_Client,
     ) -> HandleClient {
         HandleClient(Arc::new(TokioRwLock::new(HandleClientState {
             rx_request,
             tx_reply,
             scp_handle,
+            rx_validate_envelope,
+            tx_envelope_validated,
         })))
     }
 
@@ -310,7 +317,7 @@ struct HandleKernelState {
     //
     secret_key: proto::SecretKey,
     //
-    validated_values: HashMap<SlotIndex, HashMap<SCPValue, SCPValidationLevel>>,
+    validated_values: ValidatedValues,
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
 }
@@ -374,6 +381,31 @@ impl HandleKernel {
     fn lock_mut(&self) -> StdRwLockWriteGuard<'_, HandleKernelState> {
         self.0.write().unwrap()
     }
+
+    fn set_cached_validation(&self, slot_index: SlotIndex, v: proto::SCPValue, l: ValidationLevel) {
+        let mut state = self.lock_mut();
+        let x = state
+            .validated_values
+            .entry(slot_index)
+            .or_insert_with(HashMap::new);
+        x.insert(v, l);
+    }
+
+    fn get_cached_validation(
+        &self,
+        slot_index: SlotIndex,
+        v: &proto::SCPValue,
+    ) -> Option<ValidationLevel> {
+        if let Some(x) = self.lock().validated_values.get(&slot_index) {
+            x.get(v).cloned()
+        } else {
+            None
+        }
+    }
+
+    fn purge_cached_validations(&self, slot_index: SlotIndex) {
+        self.lock_mut().validated_values.remove(&slot_index);
+    }
 }
 
 impl Consensus for HandleKernel {
@@ -382,22 +414,7 @@ impl Consensus for HandleKernel {
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> ValidationLevel {
-        // XXX: use cache
-
-        self.lock()
-            .tx_handle_request
-            .blocking_send(HandleRequest::ValidateBallotValue(
-                slot_index,
-                value.clone(),
-            ))
-            .unwrap();
-        if let HandleReply::ValidateBallotValue(r) =
-            self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
-        {
-            to_validation_level(r)
-        } else {
-            panic!("bug")
-        }
+        self.get_cached_validation(slot_index, value).unwrap()
     }
 
     fn validate_nomination_value(
@@ -405,20 +422,7 @@ impl Consensus for HandleKernel {
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> ValidationLevel {
-        self.lock()
-            .tx_handle_request
-            .blocking_send(HandleRequest::ValidateNominationValue(
-                slot_index,
-                value.clone(),
-            ))
-            .unwrap();
-        if let HandleReply::ValidateNominationValue(r) =
-            self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
-        {
-            to_validation_level(r)
-        } else {
-            panic!("bug")
-        }
+        self.get_cached_validation(slot_index, value).unwrap()
     }
 
     fn extract_valid_value(

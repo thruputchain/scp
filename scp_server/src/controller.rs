@@ -139,6 +139,7 @@ struct ControlKernelState {
     rx_request: Receiver<ControlRequest>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
+    handler: HandleKernel,
     rx_switch_timer: UnboundedReceiver<SwitchTimer>,
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
 }
@@ -149,11 +150,13 @@ impl ControlKernel {
         tx_reply: Sender<ControlReply>,
         rx_switch_timer: UnboundedReceiver<SwitchTimer>,
         kernel: StellarKernel<HandleKernel, HandleKernel>,
+        handler: HandleKernel,
     ) -> ControlKernel {
         ControlKernel(Arc::new(StdRwLock::new(ControlKernelState {
             rx_request,
             tx_reply,
             kernel,
+            handler,
             rx_switch_timer,
             armed_timers: HashMap::new(),
         })))
@@ -273,6 +276,7 @@ impl ControlKernel {
                             .unwrap()
                     }
                     ControlRequest::ReceivedEnvelope(env) => {
+                        //XXX: pre-fetch values; then deliver envelope
                         x.lock_mut().kernel.proto().received_envelope(&env);
                         x.flush_timer_switches();
                         x.lock()

@@ -376,14 +376,14 @@ impl HandleKernel {
     }
 }
 
-//XXX: validation caching
-
 impl Consensus for HandleKernel {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
         value: &proto::SCPValue,
     ) -> ValidationLevel {
+        // XXX: use cache
+
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ValidateBallotValue(

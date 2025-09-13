@@ -62,6 +62,7 @@ async fn start_service(
         tx_control_reply,
         rx_switch_timer,
         kernel,
+        handle_kernel,
     );
 
     let control_service = ControlService::new(tx_control_request, rx_control_reply);

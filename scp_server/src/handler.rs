@@ -6,13 +6,10 @@ use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
-use tokio::time::sleep;
 use xdr_common::*;
 
 pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
@@ -305,10 +302,9 @@ struct HandleKernelState {
     //
     secret_key: proto::SecretKey,
     //
-    armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
     validated_values: HashMap<SlotIndex, HashMap<SCPValue, SCPValidationLevel>>,
     //
-    driver_calling_back: Option<Box<dyn Fn(DriverCallback) + Send + Sync>>,
+    tx_switch_timer: Sender<SwitchTimer>,
 }
 
 impl fmt::Debug for HandleKernelState {
@@ -328,17 +324,22 @@ impl fmt::Debug for HandleKernelState {
                 &self.increment_nomination_timeout,
             )
             .field("secret_key", &self.secret_key)
-            .field("armed_timers", &self.armed_timers)
             .field("validated_values", &self.validated_values)
             // skipping driver_calling_back
             .finish()
     }
 }
 
+pub enum SwitchTimer {
+    StartTimer(SlotIndex, Timer, Duration, DriverCallback),
+    StopTimer(SlotIndex, Timer),
+}
+
 impl HandleKernel {
     pub fn new(
         tx_handle_request: Sender<HandleRequest>,
         rx_handle_reply: Receiver<HandleReply>,
+        tx_switch_timer: Sender<SwitchTimer>,
         cfg: &proto::SCPConfig,
         secret_key: &proto::SecretKey,
     ) -> HandleKernel {
@@ -353,14 +354,9 @@ impl HandleKernel {
                 cfg.increment_nomination_timeout_ms,
             ),
             secret_key: secret_key.clone(),
-            armed_timers: HashMap::new(),
             validated_values: HashMap::new(),
-            driver_calling_back: None,
+            tx_switch_timer,
         })))
-    }
-
-    pub fn set_driver_calling_back(&self, dcb: Box<dyn Fn(DriverCallback) + Send + Sync>) {
-        self.lock_mut().driver_calling_back = Some(dcb);
     }
 
     fn lock(&self) -> StdRwLockReadGuard<'_, HandleKernelState> {
@@ -371,6 +367,8 @@ impl HandleKernel {
         self.0.write().unwrap()
     }
 }
+
+//XXX: validation caching
 
 impl Consensus for HandleKernel {
     fn validate_ballot_value(
@@ -713,50 +711,51 @@ impl Driver for HandleKernel {
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        self.stop_timer(slot_index, timer);
+        self.lock()
+            .tx_switch_timer
+            .blocking_send(SwitchTimer::StartTimer(slot_index, timer, timeout, cb));
 
-        let rt = Runtime::new().unwrap();
+        // self.stop_timer(slot_index, timer);
 
-        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-        tokio::spawn({
-            let x = self.clone();
-            async move {
-                tokio::select! {
-                    _ = sleep(timeout) => {
-                        rt.spawn_blocking(move || {
-                            x.stop_timer(slot_index, timer);
-                            println!("firing timeout {:?}", cb);
-                            if let Some(dcb) = &x.lock().driver_calling_back {
-                                dcb(cb);
-                            } else {
-                                panic!("bug");
-                            }
-                        });
-                    }
-                    _ = cancel_rx => {
-                        println!("timeout cancelled {:?}", cb);
-                    }
-                }
-            }
-        });
+        // let rt = Runtime::new().unwrap();
 
-        let mut lock = self.lock_mut();
-        let slot_timers = lock
-            .armed_timers
-            .entry(slot_index)
-            .or_insert_with(HashMap::new);
-        if let Some(_) = slot_timers.insert(timer, cancel_tx) {
-            panic!("there should be no prior timer")
-        }
+        // let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+        // tokio::spawn({
+        //     let x = self.clone();
+        //     async move {
+        //         tokio::select! {
+        //             _ = sleep(timeout) => {
+        //                 rt.spawn_blocking(move || {
+        //                     x.stop_timer(slot_index, timer);
+        //                     println!("firing timeout {:?}", cb);
+        //                     if let Some(dcb) = &x.lock().driver_calling_back {
+        //                         dcb(cb);
+        //                     } else {
+        //                         panic!("bug");
+        //                     }
+        //                 });
+        //             }
+        //             _ = cancel_rx => {
+        //                 println!("timeout cancelled {:?}", cb);
+        //             }
+        //         }
+        //     }
+        // });
+
+        // let mut lock = self.lock_mut();
+        // let slot_timers = lock
+        //     .armed_timers
+        //     .entry(slot_index)
+        //     .or_insert_with(HashMap::new);
+        // if let Some(_) = slot_timers.insert(timer, cancel_tx) {
+        //     panic!("there should be no prior timer")
+        // }
     }
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        let mut lock = self.lock_mut();
-        if let Some(slot_timers) = lock.armed_timers.get_mut(&slot_index) {
-            if let Some(cancel_tx) = slot_timers.remove(&timer) {
-                let _ = cancel_tx.send(());
-            }
-        }
+        self.lock()
+            .tx_switch_timer
+            .blocking_send(SwitchTimer::StopTimer(slot_index, timer));
     }
 }
 

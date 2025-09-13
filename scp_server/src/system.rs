@@ -1,6 +1,6 @@
-//  rpc --a--> √ControlService --a--s--> ControlKernel --s-->
-//    kernel --s-->
-//      √HandleKernel --s--a--> √HandleClient --a--> rpc
+//  rpc --> [ async ControlService ] ==>
+//      [ sync ControlKernel --> sync kernel  --> HandleKernel ] ==>
+//          [ async HandleClient ] --> rpc
 
 use async_trait::async_trait;
 use futures::future::join_all;
@@ -27,31 +27,24 @@ use xdr_common::*;
 use crate::controller::*;
 use crate::handler::*;
 
-#[derive(Debug, Clone)]
-struct DriverService(Arc<StdRwLock<DriverBridge>>);
+pub async fn launch(
+    handle: SCP_Handle_SCP_Handle1_Client,
+    cfg: proto::SCPConfig,
+    secret_key: &proto::SecretKey,
+    is_validator: bool,
+) {
+    let (tx_handle_request, mut rx_handle_request) = mpsc::channel::<HandleRequest>(1);
+    let (tx_handle_reply, mut rx_handle_reply) = mpsc::channel::<HandleReply>(1);
+    let handle_kernel = HandleKernel::new(tx_handle_request, rx_handle_reply, &cfg, secret_key);
+    let handle_client = HandleClient::new(rx_handle_request, tx_handle_reply, handle);
 
-#[derive(Debug)]
-struct DriverBridge {
-    // controller
-    pub rx_control_request: Receiver<ControlRequest>,
-    pub tx_control_reply: Sender<ControlReply>,
-    // handler
-    pub tx_handle_request: Sender<HandleRequest>,
-    pub rx_handle_reply: Receiver<HandleReply>,
-}
+    let kernel = StellarKernel::<HandleKernel, HandleKernel>::new(
+        derive_public_key(secret_key),
+        is_validator,
+        cfg.quorum_set,
+        handle_kernel.clone(),
+        handle_kernel.clone(),
+    );
 
-impl DriverService {
-    pub fn new(
-        rx_control_request: Receiver<ControlRequest>,
-        tx_control_reply: Sender<ControlReply>,
-        tx_handle_request: Sender<HandleRequest>,
-        rx_handle_reply: Receiver<HandleReply>,
-    ) -> DriverService {
-        DriverService(Arc::new(StdRwLock::new(DriverBridge {
-            rx_control_request,
-            tx_control_reply,
-            tx_handle_request,
-            rx_handle_reply,
-        })))
-    }
+    XXX
 }

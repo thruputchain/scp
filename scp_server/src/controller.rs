@@ -1,14 +1,19 @@
 use async_trait::async_trait;
 use scp_kernel::*;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::thread;
+use std::time::Duration;
+use tokio::runtime::Runtime;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, error::TryRecvError};
+use tokio::sync::oneshot;
+use tokio::time::sleep;
 use xdr_common::*;
 
 pub struct ControlService(Arc<TokioRwLock<ControlServiceState>>);
@@ -134,18 +139,23 @@ struct ControlKernelState {
     rx_request: Receiver<ControlRequest>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
+    rx_switch_timer: Receiver<SwitchTimer>,
+    armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
 }
 
 impl ControlKernel {
     pub fn new(
         rx_request: Receiver<ControlRequest>,
         tx_reply: Sender<ControlReply>,
+        rx_switch_timer: Receiver<SwitchTimer>,
         kernel: StellarKernel<HandleKernel, HandleKernel>,
     ) -> ControlKernel {
         ControlKernel(Arc::new(StdRwLock::new(ControlKernelState {
             rx_request,
             tx_reply,
             kernel,
+            rx_switch_timer,
+            armed_timers: HashMap::new(),
         })))
     }
 
@@ -157,15 +167,75 @@ impl ControlKernel {
         self.0.write().unwrap()
     }
 
-    pub fn get_driver_calling_back(&self) -> Box<dyn Fn(DriverCallback) + Send + Sync> {
-        let x = self.clone();
-        Box::new(move |cb| {
-            x.driver_calling_back(cb);
-        })
+    fn flush_timer_switches(&self) {
+        loop {
+            if let Some(v) = match self.lock_mut().rx_switch_timer.try_recv() {
+                Ok(v) => Some(v),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Disconnected) => panic!("bug"),
+            } {
+                match v {
+                    SwitchTimer::StartTimer(slot_index, timer, timeout, cb) => {
+                        self.start_timer(slot_index, timer, timeout, cb);
+                    }
+                    SwitchTimer::StopTimer(slot_index, timer) => {
+                        self.stop_timer(slot_index, timer);
+                    }
+                }
+            } else {
+                break;
+            }
+        }
     }
 
-    fn driver_calling_back(&self, cb: DriverCallback) {
-        self.lock_mut().kernel.proto().driver_calling_back(cb)
+    fn start_timer(
+        &self,
+        slot_index: SlotIndex,
+        timer: Timer,
+        timeout: Duration,
+        cb: DriverCallback,
+    ) {
+        self.stop_timer(slot_index, timer);
+
+        let rt = Runtime::new().unwrap();
+
+        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+        tokio::spawn({
+            let x = self.clone();
+            async move {
+                tokio::select! {
+                    _ = sleep(timeout) => {
+                        rt.spawn_blocking(move || {
+                            x.stop_timer(slot_index, timer);
+                            println!("firing timeout {:?}", cb);
+                            x.lock_mut().kernel.proto().driver_calling_back(cb);
+                            x.flush_timer_switches();
+                        });
+                    }
+                    _ = cancel_rx => {
+                        println!("timeout cancelled {:?}", cb);
+                    }
+                }
+            }
+        });
+
+        let mut lock = self.lock_mut();
+        let slot_timers = lock
+            .armed_timers
+            .entry(slot_index)
+            .or_insert_with(HashMap::new);
+        if let Some(_) = slot_timers.insert(timer, cancel_tx) {
+            panic!("there should be no prior timer")
+        }
+    }
+
+    fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
+        let mut lock = self.lock_mut();
+        if let Some(slot_timers) = lock.armed_timers.get_mut(&slot_index) {
+            if let Some(cancel_tx) = slot_timers.remove(&timer) {
+                let _ = cancel_tx.send(());
+            }
+        }
     }
 
     pub fn start(&self) -> std::thread::JoinHandle<()> {
@@ -180,6 +250,7 @@ impl ControlKernel {
                                 .kernel
                                 .proto()
                                 .nominate(slot_index, &value, &prev_value);
+                        x.flush_timer_switches();
                         x.lock()
                             .tx_reply
                             .blocking_send(ControlReply::Nominate(r))
@@ -187,6 +258,7 @@ impl ControlKernel {
                     }
                     ControlRequest::StopNomination(slot_index) => {
                         x.lock_mut().kernel.proto().stop_nomination(slot_index);
+                        x.flush_timer_switches();
                         x.lock()
                             .tx_reply
                             .blocking_send(ControlReply::StopNomination())
@@ -194,6 +266,7 @@ impl ControlKernel {
                     }
                     ControlRequest::UpdateLocalQuorumSet(qset) => {
                         x.lock_mut().kernel.proto().update_local_quorum_set(&qset);
+                        x.flush_timer_switches();
                         x.lock()
                             .tx_reply
                             .blocking_send(ControlReply::UpdateLocalQuorumSet())
@@ -201,6 +274,7 @@ impl ControlKernel {
                     }
                     ControlRequest::ReceivedEnvelope(env) => {
                         x.lock_mut().kernel.proto().received_envelope(&env);
+                        x.flush_timer_switches();
                         x.lock()
                             .tx_reply
                             .blocking_send(ControlReply::ReceivedEnvelope())

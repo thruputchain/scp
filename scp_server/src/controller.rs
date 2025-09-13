@@ -157,6 +157,17 @@ impl ControlKernel {
         self.0.write().unwrap()
     }
 
+    pub fn get_driver_calling_back(&self) -> Box<dyn Fn(DriverCallback) + Send + Sync> {
+        let x = self.clone();
+        Box::new(move |cb| {
+            x.driver_calling_back(cb);
+        })
+    }
+
+    fn driver_calling_back(&self, cb: DriverCallback) {
+        self.lock_mut().kernel.proto().driver_calling_back(cb)
+    }
+
     pub fn start(&self) -> std::thread::JoinHandle<()> {
         let x = self.clone();
         thread::spawn(move || {

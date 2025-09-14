@@ -107,16 +107,25 @@ impl ValidateClient {
 
 // HandleClient
 
-#[derive(Clone)]
-pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
-
-struct HandleClientState {
+pub struct HandleClient {
     rx_request: Receiver<HandleRequest>,
     tx_reply: Sender<HandleReply>,
     scp_handle: SCP_Handle_SCP_Handle1_Client,
 }
 
-impl HandleClientState {
+impl HandleClient {
+    pub fn new(
+        rx_request: Receiver<HandleRequest>,
+        tx_reply: Sender<HandleReply>,
+        scp_handle: SCP_Handle_SCP_Handle1_Client,
+    ) -> HandleClient {
+        HandleClient {
+            rx_request,
+            tx_reply,
+            scp_handle,
+        }
+    }
+
     async fn handle_request(&self, req: HandleRequest) {
         match req {
             HandleRequest::EmitEnvelope(env) => {
@@ -266,38 +275,14 @@ impl HandleClientState {
             }
         }
     }
-}
 
-impl HandleClient {
-    pub fn new(
-        rx_request: Receiver<HandleRequest>,
-        tx_reply: Sender<HandleReply>,
-        scp_handle: SCP_Handle_SCP_Handle1_Client,
-    ) -> HandleClient {
-        HandleClient(Arc::new(TokioRwLock::new(HandleClientState {
-            rx_request,
-            tx_reply,
-            scp_handle,
-        })))
-    }
-
-    pub async fn start(&self) {
-        let self_proc = self.clone();
+    pub async fn start(mut self) {
         tokio::spawn(async move {
-            let mut lock = self_proc.lock_mut().await;
             loop {
-                let req = lock.rx_request.recv().await.unwrap();
-                lock.handle_request(req);
+                let req = self.rx_request.recv().await.unwrap();
+                self.handle_request(req);
             }
         });
-    }
-
-    async fn lock(&self) -> TokioRwLockReadGuard<'_, HandleClientState> {
-        self.0.read().await
-    }
-
-    async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, HandleClientState> {
-        self.0.write().await
     }
 }
 

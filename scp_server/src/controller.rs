@@ -159,7 +159,7 @@ pub enum ControlSignal {
 }
 
 struct ControlKernel {
-    rx_request_or_validated: Receiver<ControlSignal>,
+    rx_signal: Receiver<ControlSignal>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
     handler: HandleKernel,
@@ -180,9 +180,10 @@ impl ControlKernel {
         handler: HandleKernel,
     ) -> ControlKernel {
         let (tx_timer_expired, rx_timer_expired) = mpsc::channel::<TimerExpired>(1);
-        let rx_request_or_validated = Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired).await;
+        let rx_request_or_validated =
+            Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired).await;
         ControlKernel {
-            rx_request_or_validated,
+            rx_signal: rx_request_or_validated,
             tx_reply,
             kernel,
             handler,
@@ -245,21 +246,15 @@ impl ControlKernel {
         timeout: Duration,
         cb: DriverCallback,
     ) {
-        XXX // need a timer_expired channel
         self.stop_timer(slot_index, timer);
 
         let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
         tokio::spawn({
-            let x = self.clone();
+            let tx_timer_expired = self.tx_timer_expired.clone();
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        tokio::task::spawn_blocking(move || {
-                            x.stop_timer(slot_index, timer);
-                            println!("firing timeout {:?}", cb);
-                            x.lock_mut().kernel.proto().driver_calling_back(cb);
-                            x.flush_timer_switches();
-                        });
+                        tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, timeout, cb});
                     }
                     _ = cancel_rx => {
                         println!("timeout cancelled {:?}", cb);
@@ -285,91 +280,103 @@ impl ControlKernel {
         }
     }
 
-    fn handle_request(&self) {}
-
-    pub fn start(self) -> std::thread::JoinHandle<()> {
+    pub fn start(mut self) -> std::thread::JoinHandle<()> {
         thread::spawn(move || {
             loop {
-                let req = self.rx_request.blocking_recv().unwrap();
-                match req {
-                    ControlRequest::Nominate(slot_index, value, prev_value) => {
-                        let r =
-                            self
-                                .kernel
-                                .proto()
-                                .nominate(slot_index, &value, &prev_value);
-                        self.flush_timer_switches();
-                        self
-                            .tx_reply
-                            .blocking_send(ControlReply::Nominate(r))
-                            .unwrap()
+                let msg = self.rx_signal.blocking_recv().unwrap();
+                match msg {
+                    ControlSignal::TimerExpired(x) => {
+                        self.handle_timer_expired(x);
                     }
-                    ControlRequest::StopNomination(slot_index) => {
-                        x.lock_mut().kernel.proto().stop_nomination(slot_index);
-                        x.flush_timer_switches();
-                        x.lock()
-                            .tx_reply
-                            .blocking_send(ControlReply::StopNomination())
-                            .unwrap()
+                    ControlSignal::ControlRequest(x) => {
+                        self.handle_request(x);
                     }
-                    ControlRequest::UpdateLocalQuorumSet(qset) => {
-                        x.lock_mut().kernel.proto().update_local_quorum_set(&qset);
-                        x.flush_timer_switches();
-                        x.lock()
-                            .tx_reply
-                            .blocking_send(ControlReply::UpdateLocalQuorumSet())
-                            .unwrap()
-                    }
-                    ControlRequest::ReceivedEnvelope(env) => {
-                        // XXX: ask kernel if the envelope values should be validated
-
-                        let slot_index = env.statement.slot_index;
-                        let (nom_values, ballot_values) =
-                            StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
-                                &env.statement,
-                            );
-
-                        // filter non-cached values
-                        let validate_nomination_values = nom_values
-                            .into_iter()
-                            .filter(|value| {
-                                ck.handler
-                                    .get_cached_validation(slot_index, value)
-                                    .is_none()
-                            })
-                            .collect::<Vec<_>>();
-                        let validate_ballot_values = ballot_values
-                            .into_iter()
-                            .filter(|value| {
-                                ck.handler
-                                    .get_cached_validation(slot_index, value)
-                                    .is_none()
-                            })
-                            .collect::<Vec<_>>();
-
-                        // skip validate_envelope if no values to validate
-                        if validate_nomination_values.is_empty()
-                            && validate_ballot_values.is_empty()
-                        {
-                            x.lock_mut().kernel.proto().received_envelope(&env);
-                            x.flush_timer_switches();
-                        } else {
-                            x.lock()
-                                .tx_validate_envelope
-                                .blocking_send(ValidateEnvelope {
-                                    env,
-                                    validate_nomination_values,
-                                    validate_ballot_values,
-                                })
-                                .unwrap();
-                        }
-                        x.lock()
-                            .tx_reply
-                            .blocking_send(ControlReply::ReceivedEnvelope())
-                            .unwrap()
+                    ControlSignal::EnvelopeValidated(x) => {
+                        todo!()
                     }
                 }
+                //
             }
         })
+    }
+
+    fn handle_timer_expired(&mut self, x: TimerExpired) {
+        println!("timer expired {:?}", x.cb);
+        self.stop_timer(x.slot_index, x.timer);
+        self.kernel.proto().driver_calling_back(x.cb);
+        self.flush_timer_switches();
+    }
+
+    fn handle_request(&mut self, req: ControlRequest) {
+        match req {
+            ControlRequest::Nominate(slot_index, value, prev_value) => {
+                let r = self
+                    .kernel
+                    .proto()
+                    .nominate(slot_index, &value, &prev_value);
+                self.flush_timer_switches();
+                self.tx_reply
+                    .blocking_send(ControlReply::Nominate(r))
+                    .unwrap()
+            }
+            ControlRequest::StopNomination(slot_index) => {
+                self.kernel.proto().stop_nomination(slot_index);
+                self.flush_timer_switches();
+                self.tx_reply
+                    .blocking_send(ControlReply::StopNomination())
+                    .unwrap()
+            }
+            ControlRequest::UpdateLocalQuorumSet(qset) => {
+                self.kernel.proto().update_local_quorum_set(&qset);
+                self.flush_timer_switches();
+                self.tx_reply
+                    .blocking_send(ControlReply::UpdateLocalQuorumSet())
+                    .unwrap()
+            }
+            ControlRequest::ReceivedEnvelope(env) => {
+                // XXX: ask kernel if the envelope values should be validated
+
+                let slot_index = env.statement.slot_index;
+                let (nom_values, ballot_values) =
+                    StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
+                        &env.statement,
+                    );
+
+                // filter non-cached values
+                let validate_nomination_values = nom_values
+                    .into_iter()
+                    .filter(|value| {
+                        self.handler
+                            .get_cached_validation(slot_index, value)
+                            .is_none()
+                    })
+                    .collect::<Vec<_>>();
+                let validate_ballot_values = ballot_values
+                    .into_iter()
+                    .filter(|value| {
+                        self.handler
+                            .get_cached_validation(slot_index, value)
+                            .is_none()
+                    })
+                    .collect::<Vec<_>>();
+
+                // skip validate_envelope if no values to validate
+                if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {
+                    self.kernel.proto().received_envelope(&env);
+                    self.flush_timer_switches();
+                } else {
+                    self.tx_validate_envelope
+                        .blocking_send(ValidateEnvelope {
+                            env,
+                            validate_nomination_values,
+                            validate_ballot_values,
+                        })
+                        .unwrap();
+                }
+                self.tx_reply
+                    .blocking_send(ControlReply::ReceivedEnvelope())
+                    .unwrap()
+            }
+        }
     }
 }

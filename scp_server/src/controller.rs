@@ -142,7 +142,7 @@ pub struct ValidateEnvelope {
 
 pub struct EnvelopeValidated {
     pub env: SCPEnvelope,
-    pub validated_values: ValidatedValues,
+    pub validated_values: Vec<(SlotIndex, SCPValue, ValidationLevel)>,
 }
 
 pub struct TimerExpired {
@@ -158,7 +158,7 @@ pub enum ControlSignal {
     TimerExpired(TimerExpired),
 }
 
-struct ControlKernel {
+pub struct ControlKernel {
     rx_signal: Receiver<ControlSignal>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
@@ -166,7 +166,7 @@ struct ControlKernel {
     rx_switch_timer: UnboundedReceiver<SwitchTimer>,
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
     tx_validate_envelope: Sender<ValidateEnvelope>,
-    tx_timer_expired: Arc<TokioRwLock<Sender<TimerExpired>>>, // used by timer threads
+    tx_timer_expired: Arc<TokioRwLock<Sender<TimerExpired>>>,
 }
 
 impl ControlKernel {
@@ -292,16 +292,22 @@ impl ControlKernel {
                         self.handle_request(x);
                     }
                     ControlSignal::EnvelopeValidated(x) => {
-                        todo!()
+                        self.handle_envelope_validated(x);
                     }
                 }
-                //
             }
         })
     }
 
+    fn handle_envelope_validated(&mut self, x: EnvelopeValidated) {
+        for (slot_index, value, level) in x.validated_values.into_iter() {
+            self.handler.set_cached_validation(slot_index, value, level);
+        }
+        self.kernel.proto().received_envelope(&x.env);
+        self.flush_timer_switches();
+    }
+
     fn handle_timer_expired(&mut self, x: TimerExpired) {
-        println!("timer expired {:?}", x.cb);
         self.stop_timer(x.slot_index, x.timer);
         self.kernel.proto().driver_calling_back(x.cb);
         self.flush_timer_switches();

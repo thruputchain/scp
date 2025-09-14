@@ -17,7 +17,7 @@ use xdr_common::*;
 // ValidateClient
 
 #[derive(Clone)]
-struct ValidateClient {
+pub struct ValidateClient {
     rx_validate_envelope: Arc<TokioRwLock<Receiver<ValidateEnvelope>>>,
     tx_envelope_validated: Arc<TokioRwLock<Sender<EnvelopeValidated>>>,
     client: SCP_Handle_SCP_Handle1_Client,
@@ -85,14 +85,14 @@ impl ValidateClient {
                 }
             }));
         }
-        let join = join_all(handles).await.into_iter().map(|r| r.unwrap());
-        let mut validated_values = ValidatedValues::new();
-        for (slot_index, value, validation_level) in join {
-            validated_values
-                .entry(slot_index)
-                .or_insert_with(HashMap::new)
-                .insert(value, to_validation_level(validation_level));
-        }
+        let validated_values: Vec<_> = join_all(handles)
+            .await
+            .into_iter()
+            .map(|r| {
+                let (slot_index, value, svl) = r.unwrap();
+                (slot_index, value, to_validation_level(svl))
+            })
+            .collect();
 
         // send reply on backchannel
         self.tx_envelope_validated
@@ -113,8 +113,6 @@ pub struct HandleClient(Arc<TokioRwLock<HandleClientState>>);
 struct HandleClientState {
     rx_request: Receiver<HandleRequest>,
     tx_reply: Sender<HandleReply>,
-    rx_validate_envelope: Receiver<ValidateEnvelope>,
-    tx_envelope_validated: Sender<EnvelopeValidated>,
     scp_handle: SCP_Handle_SCP_Handle1_Client,
 }
 
@@ -274,16 +272,12 @@ impl HandleClient {
     pub fn new(
         rx_request: Receiver<HandleRequest>,
         tx_reply: Sender<HandleReply>,
-        rx_validate_envelope: Receiver<ValidateEnvelope>,
-        tx_envelope_validated: Sender<EnvelopeValidated>,
         scp_handle: SCP_Handle_SCP_Handle1_Client,
     ) -> HandleClient {
         HandleClient(Arc::new(TokioRwLock::new(HandleClientState {
             rx_request,
             tx_reply,
             scp_handle,
-            rx_validate_envelope,
-            tx_envelope_validated,
         })))
     }
 

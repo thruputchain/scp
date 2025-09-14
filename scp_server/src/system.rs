@@ -32,8 +32,11 @@ async fn start_service(
 ) -> ControlService {
     // construct
 
+    // ControlKernel <--switch_timer-- HandleKernel
     let (tx_switch_timer, rx_switch_timer) = mpsc::unbounded_channel::<SwitchTimer>();
 
+    // HandleKernel --handle_request--> HandleClient
+    // HandleKernel <--handle_reply-- HandleClient
     let (tx_handle_request, rx_handle_request) = mpsc::channel::<HandleRequest>(1);
     let (tx_handle_reply, rx_handle_reply) = mpsc::channel::<HandleReply>(1);
 
@@ -44,7 +47,22 @@ async fn start_service(
         &cfg,
         secret_key,
     );
-    let handle_client = HandleClient::new(rx_handle_request, tx_handle_reply, handle_rpc_client);
+    let handle_client = HandleClient::new(
+        rx_handle_request,
+        tx_handle_reply,
+        handle_rpc_client.clone(),
+    );
+
+    // ControlKernel --validate_envelope--> ValidateClient
+    // ControlKernel <--envelope_validated-- ValidateClient
+    let (tx_validate_envelope, rx_validate_envelope) = mpsc::channel::<ValidateEnvelope>(1);
+    let (tx_envelope_validated, rx_envelope_validated) = mpsc::channel::<EnvelopeValidated>(1);
+
+    let validate_client = ValidateClient::new(
+        rx_validate_envelope,
+        tx_envelope_validated,
+        handle_rpc_client,
+    );
 
     let kernel = StellarKernel::<HandleKernel, HandleKernel>::new(
         derive_public_key(secret_key),
@@ -61,6 +79,8 @@ async fn start_service(
         rx_control_request,
         tx_control_reply,
         rx_switch_timer,
+        tx_validate_envelope,
+        rx_envelope_validated,
         kernel,
         handle_kernel,
     )
@@ -71,6 +91,7 @@ async fn start_service(
     // start
 
     handle_client.start().await;
+    validate_client.start().await;
     control_kernel.start();
 
     control_service

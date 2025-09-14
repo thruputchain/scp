@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use scp_kernel::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
@@ -10,6 +10,7 @@ use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
 use tokio::sync::oneshot;
 use tokio::time::sleep;
@@ -131,27 +132,45 @@ impl proto::SCP_Control_SCP_Control1 for ControlService {
 
 use crate::handler::*;
 
-#[derive(Clone)]
-pub struct ControlKernel(Arc<StdRwLock<ControlKernelState>>);
+pub type ValidatedValues = HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>;
 
-struct ControlKernelState {
-    rx_request: Receiver<ControlRequest>,
+pub struct ValidateEnvelope {
+    pub env: SCPEnvelope,
+    pub validate_nomination_values: Vec<SCPValue>,
+    pub validate_ballot_values: Vec<SCPValue>,
+}
+
+pub struct EnvelopeValidated {
+    pub env: SCPEnvelope,
+    pub validated_values: ValidatedValues,
+}
+
+pub struct TimerExpired {
+    slot_index: SlotIndex,
+    timer: Timer,
+    timeout: Duration,
+    cb: DriverCallback,
+}
+
+pub enum ControlSignal {
+    ControlRequest(ControlRequest),
+    EnvelopeValidated(EnvelopeValidated),
+    TimerExpired(TimerExpired),
+}
+
+struct ControlKernel {
+    rx_request_or_validated: Receiver<ControlSignal>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
     handler: HandleKernel,
     rx_switch_timer: UnboundedReceiver<SwitchTimer>,
     armed_timers: HashMap<SlotIndex, HashMap<Timer, oneshot::Sender<()>>>,
     tx_validate_envelope: Sender<ValidateEnvelope>,
-    rx_envelope_validated: Receiver<EnvelopeValidated>,
+    tx_timer_expired: Arc<TokioRwLock<Sender<TimerExpired>>>, // used by timer threads
 }
 
-pub type ValidatedValues = HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>;
-
-pub struct ValidateEnvelope(SCPEnvelope);
-pub struct EnvelopeValidated(SCPEnvelope, ValidatedValues);
-
 impl ControlKernel {
-    pub fn new(
+    pub async fn new(
         rx_request: Receiver<ControlRequest>,
         tx_reply: Sender<ControlReply>,
         rx_switch_timer: UnboundedReceiver<SwitchTimer>,
@@ -160,29 +179,47 @@ impl ControlKernel {
         kernel: StellarKernel<HandleKernel, HandleKernel>,
         handler: HandleKernel,
     ) -> ControlKernel {
-        ControlKernel(Arc::new(StdRwLock::new(ControlKernelState {
-            rx_request,
+        let (tx_timer_expired, rx_timer_expired) = mpsc::channel::<TimerExpired>(1);
+        let rx_request_or_validated = Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired).await;
+        ControlKernel {
+            rx_request_or_validated,
             tx_reply,
             kernel,
             handler,
             rx_switch_timer,
             armed_timers: HashMap::new(),
             tx_validate_envelope,
-            rx_envelope_validated,
-        })))
+            tx_timer_expired: Arc::new(TokioRwLock::new(tx_timer_expired)),
+        }
     }
 
-    fn lock(&self) -> StdRwLockReadGuard<'_, ControlKernelState> {
-        self.0.read().unwrap()
+    pub async fn merge_rx(
+        mut rx_request: Receiver<ControlRequest>,
+        mut rx_envelope_validated: Receiver<EnvelopeValidated>,
+        mut rx_timer_expired: Receiver<TimerExpired>,
+    ) -> Receiver<ControlSignal> {
+        let (tx, rx) = mpsc::channel::<ControlSignal>(1);
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    msg = rx_request.recv() => {
+                        tx.send(ControlSignal::ControlRequest(msg.unwrap()));
+                    },
+                    msg = rx_envelope_validated.recv() => {
+                        tx.send(ControlSignal::EnvelopeValidated(msg.unwrap()));
+                    }
+                    msg = rx_timer_expired.recv() => {
+                        tx.send(ControlSignal::TimerExpired(msg.unwrap()));
+                    }
+                }
+            }
+        });
+        rx
     }
 
-    fn lock_mut(&self) -> StdRwLockWriteGuard<'_, ControlKernelState> {
-        self.0.write().unwrap()
-    }
-
-    fn flush_timer_switches(&self) {
+    fn flush_timer_switches(&mut self) {
         loop {
-            if let Some(v) = match self.lock_mut().rx_switch_timer.try_recv() {
+            if let Some(v) = match self.rx_switch_timer.try_recv() {
                 Ok(v) => Some(v),
                 Err(TryRecvError::Empty) => None,
                 Err(TryRecvError::Disconnected) => panic!("bug"),
@@ -202,12 +239,13 @@ impl ControlKernel {
     }
 
     fn start_timer(
-        &self,
+        &mut self,
         slot_index: SlotIndex,
         timer: Timer,
         timeout: Duration,
         cb: DriverCallback,
     ) {
+        XXX // need a timer_expired channel
         self.stop_timer(slot_index, timer);
 
         let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
@@ -230,8 +268,7 @@ impl ControlKernel {
             }
         });
 
-        let mut lock = self.lock_mut();
-        let slot_timers = lock
+        let slot_timers = self
             .armed_timers
             .entry(slot_index)
             .or_insert_with(HashMap::new);
@@ -240,29 +277,29 @@ impl ControlKernel {
         }
     }
 
-    fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
-        let mut lock = self.lock_mut();
-        if let Some(slot_timers) = lock.armed_timers.get_mut(&slot_index) {
+    fn stop_timer(&mut self, slot_index: SlotIndex, timer: Timer) {
+        if let Some(slot_timers) = self.armed_timers.get_mut(&slot_index) {
             if let Some(cancel_tx) = slot_timers.remove(&timer) {
                 let _ = cancel_tx.send(());
             }
         }
     }
 
-    pub fn start(&self) -> std::thread::JoinHandle<()> {
-        let x = self.clone();
+    fn handle_request(&self) {}
+
+    pub fn start(self) -> std::thread::JoinHandle<()> {
         thread::spawn(move || {
             loop {
-                let req = x.lock_mut().rx_request.blocking_recv().unwrap();
+                let req = self.rx_request.blocking_recv().unwrap();
                 match req {
                     ControlRequest::Nominate(slot_index, value, prev_value) => {
                         let r =
-                            x.lock_mut()
+                            self
                                 .kernel
                                 .proto()
                                 .nominate(slot_index, &value, &prev_value);
-                        x.flush_timer_switches();
-                        x.lock()
+                        self.flush_timer_switches();
+                        self
                             .tx_reply
                             .blocking_send(ControlReply::Nominate(r))
                             .unwrap()
@@ -284,18 +321,52 @@ impl ControlKernel {
                             .unwrap()
                     }
                     ControlRequest::ReceivedEnvelope(env) => {
-                        // XXX: ask kernel if the envelope should be validated
-                        x.lock()
-                            .tx_validate_envelope
-                            .blocking_send(ValidateEnvelope(env))
-                            .unwrap();
+                        // XXX: ask kernel if the envelope values should be validated
 
-                        // x.lock_mut().kernel.proto().received_envelope(&env);
-                        // x.flush_timer_switches();
-                        // x.lock()
-                        //     .tx_reply
-                        //     .blocking_send(ControlReply::ReceivedEnvelope())
-                        //     .unwrap()
+                        let slot_index = env.statement.slot_index;
+                        let (nom_values, ballot_values) =
+                            StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
+                                &env.statement,
+                            );
+
+                        // filter non-cached values
+                        let validate_nomination_values = nom_values
+                            .into_iter()
+                            .filter(|value| {
+                                ck.handler
+                                    .get_cached_validation(slot_index, value)
+                                    .is_none()
+                            })
+                            .collect::<Vec<_>>();
+                        let validate_ballot_values = ballot_values
+                            .into_iter()
+                            .filter(|value| {
+                                ck.handler
+                                    .get_cached_validation(slot_index, value)
+                                    .is_none()
+                            })
+                            .collect::<Vec<_>>();
+
+                        // skip validate_envelope if no values to validate
+                        if validate_nomination_values.is_empty()
+                            && validate_ballot_values.is_empty()
+                        {
+                            x.lock_mut().kernel.proto().received_envelope(&env);
+                            x.flush_timer_switches();
+                        } else {
+                            x.lock()
+                                .tx_validate_envelope
+                                .blocking_send(ValidateEnvelope {
+                                    env,
+                                    validate_nomination_values,
+                                    validate_ballot_values,
+                                })
+                                .unwrap();
+                        }
+                        x.lock()
+                            .tx_reply
+                            .blocking_send(ControlReply::ReceivedEnvelope())
+                            .unwrap()
                     }
                 }
             }

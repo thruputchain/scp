@@ -204,13 +204,13 @@ impl ControlKernel {
             loop {
                 tokio::select! {
                     msg = rx_request.recv() => {
-                        tx.send(ControlSignal::ControlRequest(msg.unwrap()));
+                        tx.send(ControlSignal::ControlRequest(msg.unwrap())).await.unwrap();
                     },
                     msg = rx_envelope_validated.recv() => {
-                        tx.send(ControlSignal::EnvelopeValidated(msg.unwrap()));
+                        tx.send(ControlSignal::EnvelopeValidated(msg.unwrap())).await.unwrap();
                     }
                     msg = rx_timer_expired.recv() => {
-                        tx.send(ControlSignal::TimerExpired(msg.unwrap()));
+                        tx.send(ControlSignal::TimerExpired(msg.unwrap())).await.unwrap();
                     }
                 }
             }
@@ -254,7 +254,7 @@ impl ControlKernel {
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, timeout, cb});
+                        tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, timeout, cb}).await.unwrap();
                     }
                     _ = cancel_rx => {
                         println!("timeout cancelled {:?}", cb);

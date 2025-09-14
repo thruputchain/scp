@@ -9,8 +9,6 @@ use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
-use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
-use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
 use xdr_common::*;
 
@@ -101,7 +99,9 @@ impl ValidateClient {
             .send(EnvelopeValidated {
                 env: req.env,
                 validated_values,
-            });
+            })
+            .await
+            .unwrap();
     }
 }
 
@@ -280,7 +280,7 @@ impl HandleClient {
         tokio::spawn(async move {
             loop {
                 let req = self.rx_request.recv().await.unwrap();
-                self.handle_request(req);
+                self.handle_request(req).await;
             }
         });
     }
@@ -492,6 +492,7 @@ impl Consensus for HandleKernel {
 
 impl ConsensusNotify for HandleKernel {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        self.purge_cached_validations(slot_index);
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ValueExternalized(slot_index, value.clone()))

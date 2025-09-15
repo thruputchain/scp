@@ -511,8 +511,6 @@ impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
         let env_state = self
             .slot_proto_or_create(slot_index)
             .process_envelope(env, false);
-
-        println!("processed_envelope -> {:?}", env_state);
     }
 
     fn driver_calling_back(&mut self, cb: DriverCallback) {

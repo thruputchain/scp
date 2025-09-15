@@ -76,6 +76,7 @@ pub async fn start_service(
     let (tx_control_reply, rx_control_reply) = mpsc::channel::<ControlReply>(1);
 
     let control_kernel = ControlKernel::new(
+        tokio::runtime::Handle::current(),
         rx_control_request,
         tx_control_reply,
         rx_switch_timer,

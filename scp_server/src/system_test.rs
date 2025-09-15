@@ -135,7 +135,6 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        println!("started_ballot_proto {:?}", _ballot);
         Ok(())
     }
 
@@ -176,7 +175,7 @@ use crate::controller::*;
 use crate::system::*;
 
 #[tokio::test]
-async fn three() {
+async fn five() {
     // handlers
 
     let h0 = TestHandler::new();
@@ -257,10 +256,11 @@ async fn three() {
     // for _ in 0..3 {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        println!("waking");
         flush_emits(&nodes).await;
     }
 
-    future::pending::<()>().await;
+    // future::pending::<()>().await;
 }
 
 async fn flush_emits(nodes: &Vec<(ControlService, TestHandler)>) {

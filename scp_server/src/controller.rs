@@ -159,6 +159,7 @@ pub enum ControlSignal {
 }
 
 pub struct ControlKernel {
+    tokio_handle: tokio::runtime::Handle,
     rx_signal: Receiver<ControlSignal>,
     tx_reply: Sender<ControlReply>,
     kernel: StellarKernel<HandleKernel, HandleKernel>,
@@ -171,6 +172,7 @@ pub struct ControlKernel {
 
 impl ControlKernel {
     pub async fn new(
+        tokio_handle: tokio::runtime::Handle,
         rx_request: Receiver<ControlRequest>,
         tx_reply: Sender<ControlReply>,
         rx_switch_timer: UnboundedReceiver<SwitchTimer>,
@@ -183,6 +185,7 @@ impl ControlKernel {
         let rx_request_or_validated =
             Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired).await;
         ControlKernel {
+            tokio_handle,
             rx_signal: rx_request_or_validated,
             tx_reply,
             kernel,
@@ -249,7 +252,8 @@ impl ControlKernel {
         self.stop_timer(slot_index, timer);
 
         let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-        tokio::spawn({
+
+        self.tokio_handle.spawn({
             let tx_timer_expired = self.tx_timer_expired.clone();
             async move {
                 tokio::select! {
@@ -257,7 +261,6 @@ impl ControlKernel {
                         tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, timeout, cb}).await.unwrap();
                     }
                     _ = cancel_rx => {
-                        println!("timeout cancelled {:?}", cb);
                     }
                 }
             }
@@ -316,6 +319,13 @@ impl ControlKernel {
     fn handle_request(&mut self, req: ControlRequest) {
         match req {
             ControlRequest::Nominate(slot_index, value, prev_value) => {
+                // pre-register our nominations as fully valid;
+                // necessary because `nominate` calls `process_envelope` on its own envelopes internally
+                self.handler.set_cached_validation(
+                    slot_index,
+                    value.clone(),
+                    ValidationLevel::FullyValid,
+                );
                 let r = self
                     .kernel
                     .proto()

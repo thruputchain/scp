@@ -1,9 +1,12 @@
 use clap::{ArgAction, Parser};
 use core::net::SocketAddr;
+use futures::future;
+use proto::*;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
 use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
+use xdr_common::*;
 
 mod system;
 use system::*;
@@ -64,6 +67,21 @@ async fn main() {
         args.control_addr, args.handle_addr
     );
 
+    // XXX: parse config
+    let qset = SCPQuorumSet {
+        threshold: 0,
+        validators: Default::default(),
+        inner_sets: Default::default(),
+    };
+    let cfg = SCPConfig {
+        max_timeout_ms: 1000,
+        initial_ballot_timeout_ms: 750,
+        increment_ballot_timeout_ms: 750,
+        initial_nomination_timeout_ms: 750,
+        increment_nomination_timeout_ms: 750,
+        quorum_set: qset.clone(),
+    };
+
     // handle client
 
     let handle_socket_addr: SocketAddr = args.handle_addr.parse().unwrap();
@@ -73,27 +91,25 @@ async fn main() {
 
     // create server
 
-    // Parse secret key if provided, otherwise use default
     assert!(!args.secret_key.is_empty(), "no secret key provided");
     let secret_key = proto::parse_secret_key_from_base64(&args.secret_key)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
-    let service = Service::new(handle_client, todo!("XXX"), &secret_key, args.is_validator);
+    let service = start_service(handle_client, cfg, &secret_key, args.is_validator).await;
 
     // control server
 
     let control_listener = TcpListener::bind(args.control_addr).await.unwrap();
-    let control_addr = control_listener.local_addr().unwrap();
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
-        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service.clone())),
+        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
     ));
 
     let control_server = RpcServer::new(control_service_map, control_listener);
     control_server.start().await;
 
-    todo!("XXX")
+    future::pending::<()>().await;
 }
 
 #[cfg(test)]

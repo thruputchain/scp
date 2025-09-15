@@ -500,13 +500,13 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
 impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
     fn received_envelope(&mut self, env: &proto::SCPEnvelope) {
-        println!(
-            "{}<--{}",
-            self.cd
-                .driver
-                .to_str_key(self.local_proto().get_node_id(), false),
-            self.cd.envelope_to_str(env, false)
-        );
+        // println!(
+        //     "{}<--{}",
+        //     self.cd
+        //         .driver
+        //         .to_str_key(self.local_proto().get_node_id(), false),
+        //     self.cd.envelope_to_str(env, false)
+        // );
         let slot_index = env.statement.slot_index;
         let _ = self
             .slot_proto_or_create(slot_index)

@@ -181,43 +181,43 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         values
     }
 
+    fn check_valid(
+        ballot_proto: &mut BallotProto<'a, 'b, C, D>,
+        statement: &proto::SCPStatement,
+        ours: bool,
+        env: &proto::SCPEnvelope,
+    ) -> EnvelopeState {
+        if !ballot_proto.is_statement_sane(statement, ours) {
+            if ours {
+                error!(env = ?env, "not sane statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false));
+            }
+            return EnvelopeState::Invalid;
+        }
+        if !ballot_proto.is_newer_node_statement(&statement.node_id, statement) {
+            if ours {
+                error!(env = ?env, "stale statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false))
+            } else {
+                trace!(
+                    slot_index = ballot_proto.slot_proto().index(),
+                    "stale statement, skipping"
+                )
+            }
+            return EnvelopeState::Invalid;
+        }
+        EnvelopeState::Valid
+    }
+
     #[instrument]
     pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert!(env.statement.slot_index == self.slot_proto().index());
 
         let statement = &env.statement;
 
-        fn check_valid<'a, 'b, C: Consensus, D: Driver>(
-            ballot_proto: &mut BallotProto<'a, 'b, C, D>,
-            statement: &proto::SCPStatement,
-            ours: bool,
-            env: &proto::SCPEnvelope,
-        ) -> EnvelopeState {
-            if !ballot_proto.is_statement_sane(statement, ours) {
-                if ours {
-                    error!(env = ?env, "not sane statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false));
-                }
-                return EnvelopeState::Invalid;
-            }
-            if !ballot_proto.is_newer_node_statement(&statement.node_id, statement) {
-                if ours {
-                    error!(env = ?env, "stale statement from self, skipping   e: {}", ballot_proto.0.cd.envelope_to_str(env, false))
-                } else {
-                    trace!(
-                        slot_index = ballot_proto.slot_proto().index(),
-                        "stale statement, skipping"
-                    )
-                }
-                return EnvelopeState::Invalid;
-            }
-            EnvelopeState::Valid
-        }
-
-        if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
+        if let EnvelopeState::Invalid = Self::check_valid(self, statement, ours, env) {
             return EnvelopeState::Invalid;
         }
 
-        let validation_result = self.validate_values(statement); //XXX: must be async
+        let validation_result = self.validate_values(statement);
         match validation_result {
             ValidationLevel::Invalid => {
                 if ours {
@@ -231,7 +231,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         // check if validity has changed since the call into the app
-        if let EnvelopeState::Invalid = check_valid(self, statement, ours, env) {
+        if let EnvelopeState::Invalid = Self::check_valid(self, statement, ours, env) {
             return EnvelopeState::Invalid;
         }
 
@@ -240,7 +240,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 self.slot_proto_mut().set_fully_validated(false);
             }
             self.record_envelope(env);
-            self.advance_slot(statement); //XXX:async?
+            self.advance_slot(statement);
             return EnvelopeState::Valid;
         }
 

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use futures::future;
 use proto::*;
 use rpc_driver::connect_client;
 use std::collections::HashMap;
@@ -46,6 +45,10 @@ impl TestHandler {
             .await
             .quorum_sets
             .insert(proto::hash_xdr_scp(&q).unwrap(), q);
+    }
+
+    async fn num_externalized(&self) -> usize {
+        self.0.lock().await.externalized.len()
     }
 }
 
@@ -251,14 +254,17 @@ async fn five() {
         .unwrap();
     println!("noms: {} {} {}", nom0, nom1, nom2);
 
-    let nodes = vec![(s0, h0), (s1, h1), (s2, h2)];
+    let nodes = vec![(s0, h0.clone()), (s1, h1.clone()), (s2, h2.clone())];
 
-    // for _ in 0..3 {
-    loop {
+    for _ in 0..2 {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         println!("waking");
         flush_emits(&nodes).await;
     }
+
+    assert_eq!(h0.num_externalized().await, 1);
+    assert_eq!(h1.num_externalized().await, 1);
+    assert_eq!(h2.num_externalized().await, 1);
 
     // future::pending::<()>().await;
 }

@@ -2,13 +2,9 @@ use async_trait::async_trait;
 use scp_kernel::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::RwLock as StdRwLock;
-use std::sync::RwLockReadGuard as StdRwLockReadGuard;
-use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::thread;
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
-use tokio::sync::RwLockReadGuard as TokioRwLockReadGuard;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
@@ -32,10 +28,6 @@ impl ControlService {
             tx_request,
             rx_reply,
         })))
-    }
-
-    async fn lock(&self) -> TokioRwLockReadGuard<'_, ControlServiceState> {
-        self.0.read().await
     }
 
     async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, ControlServiceState> {
@@ -148,7 +140,6 @@ pub struct EnvelopeValidated {
 pub struct TimerExpired {
     slot_index: SlotIndex,
     timer: Timer,
-    timeout: Duration,
     cb: DriverCallback,
 }
 
@@ -258,7 +249,7 @@ impl ControlKernel {
             async move {
                 tokio::select! {
                     _ = sleep(timeout) => {
-                        tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, timeout, cb}).await.unwrap();
+                        tx_timer_expired.write().await.send(TimerExpired{slot_index, timer, cb}).await.unwrap();
                     }
                     _ = cancel_rx => {
                     }

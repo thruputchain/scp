@@ -682,7 +682,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 value,
                 prev_value,
             } => {
-                let x = self.nominate(&value, &prev_value, true);
+                let _ = self.nominate(&value, &prev_value, true);
             }
             _ => {}
         }

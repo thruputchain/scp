@@ -11,6 +11,7 @@ use tokio;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
+#[allow(dead_code)]
 pub async fn start_server(
     handler_sockaddr: SocketAddr,
     bind_controller_sockaddr: SocketAddr,
@@ -115,6 +116,7 @@ async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
     sockaddr
 }
 
+#[allow(dead_code)]
 pub async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
     addr: &str,
     svc: S,

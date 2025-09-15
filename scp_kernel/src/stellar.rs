@@ -508,7 +508,7 @@ impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
             self.cd.envelope_to_str(env, false)
         );
         let slot_index = env.statement.slot_index;
-        let env_state = self
+        let _ = self
             .slot_proto_or_create(slot_index)
             .process_envelope(env, false);
     }

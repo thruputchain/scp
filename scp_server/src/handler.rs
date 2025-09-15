@@ -138,28 +138,28 @@ impl HandleClient {
                     .await
                     .unwrap();
             }
-            HandleRequest::ValidateBallotValue(slot_index, value) => {
-                let r = self
-                    .scp_handle
-                    .scp_handle_validate_ballot_value(&slot_index, &value)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::ValidateBallotValue(r))
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::ValidateNominationValue(slot_index, value) => {
-                let r = self
-                    .scp_handle
-                    .scp_handle_validate_nomination_value(&slot_index, &value)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::ValidateNominationValue(r))
-                    .await
-                    .unwrap();
-            }
+            // HandleRequest::ValidateBallotValue(slot_index, value) => {
+            //     let r = self
+            //         .scp_handle
+            //         .scp_handle_validate_ballot_value(&slot_index, &value)
+            //         .await
+            //         .unwrap();
+            //     self.tx_reply
+            //         .send(HandleReply::ValidateBallotValue(r))
+            //         .await
+            //         .unwrap();
+            // }
+            // HandleRequest::ValidateNominationValue(slot_index, value) => {
+            //     let r = self
+            //         .scp_handle
+            //         .scp_handle_validate_nomination_value(&slot_index, &value)
+            //         .await
+            //         .unwrap();
+            //     self.tx_reply
+            //         .send(HandleReply::ValidateNominationValue(r))
+            //         .await
+            //         .unwrap();
+            // }
             HandleRequest::ExtractValidValue(slot_index, value) => {
                 let r = self
                     .scp_handle
@@ -288,8 +288,9 @@ impl HandleClient {
 
 pub enum HandleRequest {
     EmitEnvelope(SCPEnvelope),
-    ValidateBallotValue(SCPSlotIndex, SCPValue),
-    ValidateNominationValue(SCPSlotIndex, SCPValue),
+    // validations are handled by the ValidateClient path
+    // ValidateBallotValue(SCPSlotIndex, SCPValue),
+    // ValidateNominationValue(SCPSlotIndex, SCPValue),
     ExtractValidValue(SCPSlotIndex, SCPValue),
     CombineCandidates(SCPSlotIndex, SCPValues),
     GetQuorumSet(SCPHash),
@@ -306,8 +307,9 @@ pub enum HandleRequest {
 
 pub enum HandleReply {
     EmitEnvelope(),
-    ValidateBallotValue(SCPValidationLevel),
-    ValidateNominationValue(SCPValidationLevel),
+    // validations are handled by the ValidateClient path
+    // ValidateBallotValue(SCPValidationLevel),
+    // ValidateNominationValue(SCPValidationLevel),
     ExtractValidValue(SCPOptValue),
     CombineCandidates(SCPOptValue),
     GetQuorumSet(SCPOptQuorumSet),
@@ -753,13 +755,15 @@ impl Driver for HandleKernel {
     ) {
         self.lock()
             .tx_switch_timer
-            .send(SwitchTimer::StartTimer(slot_index, timer, timeout, cb));
+            .send(SwitchTimer::StartTimer(slot_index, timer, timeout, cb))
+            .unwrap();
     }
 
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer) {
         self.lock()
             .tx_switch_timer
-            .send(SwitchTimer::StopTimer(slot_index, timer));
+            .send(SwitchTimer::StopTimer(slot_index, timer))
+            .unwrap();
     }
 }
 

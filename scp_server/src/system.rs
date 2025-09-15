@@ -24,7 +24,7 @@ pub async fn start_server(
     start_control_server(&bind_controller_sockaddr, control_service).await
 }
 
-async fn start_service(
+pub async fn start_service(
     handle_rpc_client: SCP_Handle_SCP_Handle1_Client,
     cfg: proto::SCPConfig,
     secret_key: &proto::SecretKey,
@@ -107,6 +107,23 @@ async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
     let mut service_map = ServiceMap::new();
     service_map.add_service(Box::new(
         groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
+    ));
+
+    RpcServer::new(service_map, listener).start().await;
+
+    sockaddr
+}
+
+pub async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
+    addr: &str,
+    svc: S,
+) -> SocketAddr {
+    let listener = TcpListener::bind(addr).await.unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+
+    let mut service_map = ServiceMap::new();
+    service_map.add_service(Box::new(
+        groundhog_scp::SCP_Handle_SCP_Handle1_Dispatcher::new(Box::new(svc)),
     ));
 
     RpcServer::new(service_map, listener).start().await;

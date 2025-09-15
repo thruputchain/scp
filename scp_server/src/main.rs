@@ -99,3 +99,6 @@ async fn main() {
 
 #[cfg(test)]
 mod service_test;
+
+#[cfg(test)]
+mod system_test;

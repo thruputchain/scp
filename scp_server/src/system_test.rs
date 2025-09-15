@@ -1,17 +1,26 @@
-use crate::service::*;
 use async_trait::async_trait;
-use core::net::SocketAddr;
 use futures::future;
 use proto::*;
-use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
+use rpc_driver::connect_client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio;
-use tokio::net::TcpListener;
-use tokio::signal;
 use tokio::sync::Mutex;
 use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
+
+#[allow(dead_code)]
+fn instrument_test() {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::metadata::LevelFilter::DEBUG)
+        .with_test_writer() // important: routes to test harness writer
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(false)
+        .event_format(tracing_subscriber::fmt::format())
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+        .try_init();
+}
 
 struct TestHandlerState {
     quorum_sets: HashMap<SCPHash, SCPQuorumSet>,

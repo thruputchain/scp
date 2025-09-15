@@ -5,12 +5,11 @@ use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
 
-mod service;
-use service::*;
+mod system;
+use system::*;
 
 mod controller;
 mod handler;
-mod system;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "SCP Server - Stellar Consensus Protocol stand-alone server", long_about = None)]
@@ -96,9 +95,6 @@ async fn main() {
 
     todo!("XXX")
 }
-
-#[cfg(test)]
-mod service_test;
 
 #[cfg(test)]
 mod system_test;

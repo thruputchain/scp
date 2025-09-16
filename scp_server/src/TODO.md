@@ -1,1 +1,2 @@
+- [ ] combine_candidates must return a value
 - [ ] dos prevention: verify that values are worth pre-validating

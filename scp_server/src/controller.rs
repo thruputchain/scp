@@ -341,48 +341,48 @@ impl ControlKernel {
                     .unwrap()
             }
             ControlRequest::ReceivedEnvelope(env) => {
-                // XXX: ask kernel if the envelope values should be validated
+                if self.kernel.proto().should_process_envelope(&env) {
+                    let slot_index = env.statement.slot_index;
+                    let (nom_values, ballot_values) =
+                        StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
+                            &env.statement,
+                        );
 
-                let slot_index = env.statement.slot_index;
-                let (nom_values, ballot_values) =
-                    StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
-                        &env.statement,
-                    );
-
-                // filter non-cached values
-                let validate_nomination_values = nom_values
-                    .into_iter()
-                    .filter(|value| {
-                        self.handler
-                            .get_cached_validation(slot_index, value)
-                            .is_none()
-                    })
-                    .collect::<Vec<_>>();
-                let validate_ballot_values = ballot_values
-                    .into_iter()
-                    .filter(|value| {
-                        self.handler
-                            .get_cached_validation(slot_index, value)
-                            .is_none()
-                    })
-                    .collect::<Vec<_>>();
-
-                // skip validate_envelope if no values to validate
-                if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {
-                    self.kernel.proto().received_envelope(&env);
-                    self.flush_timer_switches();
-                } else {
-                    self.tx_validate_envelope
-                        .blocking_send(ValidateEnvelope {
-                            env,
-                            validate_nomination_values,
-                            validate_ballot_values,
+                    // filter non-cached values
+                    let validate_nomination_values = nom_values
+                        .into_iter()
+                        .filter(|value| {
+                            self.handler
+                                .get_cached_validation(slot_index, value)
+                                .is_none()
                         })
-                        .unwrap();
+                        .collect::<Vec<_>>();
+                    let validate_ballot_values = ballot_values
+                        .into_iter()
+                        .filter(|value| {
+                            self.handler
+                                .get_cached_validation(slot_index, value)
+                                .is_none()
+                        })
+                        .collect::<Vec<_>>();
+
+                    // skip validate_envelope if no values to validate
+                    if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {
+                        self.kernel.proto().received_envelope(&env);
+                        self.flush_timer_switches();
+                    } else {
+                        self.tx_validate_envelope
+                            .blocking_send(ValidateEnvelope {
+                                env,
+                                validate_nomination_values,
+                                validate_ballot_values,
+                            })
+                            .unwrap();
+                    }
+                    self.tx_reply
+                        .blocking_send(ControlReply::ReceivedEnvelope())
+                        .unwrap()
                 }
-                self.tx_reply
-                    .blocking_send(ControlReply::ReceivedEnvelope())
-                    .unwrap()
             }
         }
     }

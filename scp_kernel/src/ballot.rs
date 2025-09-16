@@ -182,7 +182,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn check_valid(
-        ballot_proto: &mut BallotProto<'a, 'b, C, D>,
+        ballot_proto: &BallotProto<'a, 'b, C, D>,
         statement: &proto::SCPStatement,
         ours: bool,
         env: &proto::SCPEnvelope,
@@ -205,6 +205,18 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             return EnvelopeState::Invalid;
         }
         EnvelopeState::Valid
+    }
+
+    pub fn should_process_envelope(&self, env: &proto::SCPEnvelope, ours: bool) -> bool {
+        assert!(env.statement.slot_index == self.slot_proto().index());
+
+        let statement = &env.statement;
+
+        if let EnvelopeState::Invalid = Self::check_valid(self, statement, ours, env) {
+            false
+        } else {
+            true
+        }
     }
 
     #[instrument]

@@ -170,6 +170,16 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             .get_state(node, self_already_moved_on)
     }
 
+    pub fn should_process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> bool {
+        assert_eq!(env.statement.slot_index, self.index());
+        match &env.statement.pledges {
+            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                self.nomination_proto().should_process_envelope(env)
+            }
+            _ => self.ballot_proto().should_process_envelope(env, ours),
+        }
+    }
+
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert_eq!(envelope.statement.slot_index, self.index());
 

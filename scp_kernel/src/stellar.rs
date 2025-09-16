@@ -496,6 +496,12 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn get_value_string(&self, value: &proto::SCPValue) -> String {
         self.cd.driver.get_value_string(value)
     }
+
+    pub fn should_process_envelope(&mut self, env: &proto::SCPEnvelope) -> bool {
+        let slot_index = env.statement.slot_index;
+        self.slot_proto_or_create(slot_index)
+            .should_process_envelope(env, false)
+    }
 }
 
 impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {

@@ -444,6 +444,25 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             .extract_valid_value(self.slot_proto().index(), value)
     }
 
+    pub fn should_process_envelope(&self, env: &proto::SCPEnvelope) -> bool {
+        let st = &env.statement;
+
+        if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+            if !self.is_newer_node_statement(&st.node_id, nom) {
+                return false;
+            }
+
+            if !self.is_sane(st) {
+                trace!("nomination proto message didn't pass sanity check");
+                return false;
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
     #[instrument]
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope) -> EnvelopeState {
         let st = &envelope.statement;

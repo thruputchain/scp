@@ -1,4 +1,4 @@
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use core::net::SocketAddr;
 use futures::future;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
@@ -20,7 +20,6 @@ mod handler;
 #[command(version, about = "SCP Server - Stellar Consensus Protocol stand-alone server", long_about = None)]
 struct Args {
     #[arg(
-        short,
         long,
         default_value = ":11055",
         help = "Bind address for the SCP control API"
@@ -28,7 +27,6 @@ struct Args {
     control_addr: String,
 
     #[arg(
-        short,
         long,
         default_value = "localhost:22022",
         help = "Connect address for the SCP handler API"
@@ -36,15 +34,14 @@ struct Args {
     handle_addr: String,
 
     #[arg(
-        short,
         long,
-        action = ArgAction::SetTrue,
+        default_value = "false",
+        value_parser = clap::value_parser!(bool),
         help = "Is this SCP node a validator"
     )]
-    is_validator: bool,
+    is_validator: Option<bool>,
 
     #[arg(
-        short,
         long,
         default_value = "config.json",
         help = "Path to JSON config file with schema according to scp_config.x"
@@ -52,7 +49,6 @@ struct Args {
     config_path: String,
 
     #[arg(
-        short,
         long,
         default_value = "",
         help = "Base64-std encoded secret key for this SCP node"
@@ -94,7 +90,7 @@ async fn main() {
     let secret_key = proto::parse_secret_key_from_base64(&args.secret_key)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
-    let service = start_service(handle_client, cfg, &secret_key, args.is_validator).await;
+    let service = start_service(handle_client, cfg, &secret_key, args.is_validator.unwrap()).await;
 
     // control server
 

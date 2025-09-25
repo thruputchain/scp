@@ -1,12 +1,14 @@
 use clap::{ArgAction, Parser};
 use core::net::SocketAddr;
 use futures::future;
-use proto::*;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
 use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
 use xdr_common::*;
+
+mod config_shim;
+use config_shim::SCPConfigShim;
 
 mod system;
 use system::*;
@@ -67,20 +69,17 @@ async fn main() {
         args.control_addr, args.handle_addr
     );
 
-    // XXX: parse config
-    let qset = SCPQuorumSet {
-        threshold: 0,
-        validators: Default::default(),
-        inner_sets: Default::default(),
-    };
-    let cfg = SCPConfig {
-        max_timeout_ms: 1000,
-        initial_ballot_timeout_ms: 750,
-        increment_ballot_timeout_ms: 750,
-        initial_nomination_timeout_ms: 750,
-        increment_nomination_timeout_ms: 750,
-        quorum_set: qset.clone(),
-    };
+    // TODO: remove the shim when XDR-JSON is available
+    // parse the file args.config_path from JSON as an SCPConfig_shim value;
+    // convert that value into SCPConfig and assign it to a variable called cfg.
+    let config_json = tokio::fs::read_to_string(&args.config_path)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to read config file '{}': {}", args.config_path, e));
+
+    let config_shim: SCPConfigShim = serde_json::from_str(&config_json)
+        .unwrap_or_else(|e| panic!("Failed to parse config JSON: {}", e));
+
+    let cfg = config_shim.to_scp_config();
 
     // handle client
 

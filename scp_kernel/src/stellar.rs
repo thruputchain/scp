@@ -135,7 +135,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         let is_validator = self.is_validator();
         let known_slots = &mut self.state.known_slots;
         if !known_slots.contains_key(&slot_index) {
-            known_slots.insert(slot_index, SlotState::new(is_validator));
+            known_slots.insert(slot_index, SlotState::new(slot_index, is_validator));
         };
         SlotProto {
             cd: &self.cd,

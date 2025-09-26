@@ -1,6 +1,10 @@
 use proto::{SCPHash, SCPSlotIndex, SCPValue};
 use xdr_common::BytesM;
 
+pub fn hah(bytes: &[u8]) -> String {
+    hex_abbrev(&proto::hash_bytes(bytes)[..])
+}
+
 pub fn hex_abbrev(bytes: &[u8]) -> String {
     let k = bytes.len().min(3);
     bytes[..k]
@@ -18,7 +22,10 @@ pub fn hex_full(bytes: &[u8]) -> String {
 
 pub fn parse_node_id_from_hex(hex_str: &str) -> Result<proto::SCPNodeID, String> {
     if hex_str.len() != 64 {
-        return Err(format!("Expected 64 hex characters for Ed25519 public key, got {}", hex_str.len()));
+        return Err(format!(
+            "Expected 64 hex characters for Ed25519 public key, got {}",
+            hex_str.len()
+        ));
     }
 
     let mut bytes = [0u8; 32];
@@ -29,7 +36,9 @@ pub fn parse_node_id_from_hex(hex_str: &str) -> Result<proto::SCPNodeID, String>
     }
 
     let ed25519_key = proto::Ed25519PublicKey::from(bytes);
-    Ok(proto::PublicKey::Ed25519 { ed25519: ed25519_key })
+    Ok(proto::PublicKey::Ed25519 {
+        ed25519: ed25519_key,
+    })
 }
 
 pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> proto::SCPHash

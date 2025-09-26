@@ -26,9 +26,9 @@ pub struct HistoricalStatement {
 }
 
 impl SlotState {
-    pub fn new(is_validator: bool) -> Self {
+    pub fn new(slot_index: SlotIndex, is_validator: bool) -> Self {
         SlotState {
-            slot_index: 0,
+            slot_index: slot_index,
             nomination: NominationState::new(),
             ballot: BallotState::new(),
             statements_history: Vec::new(),

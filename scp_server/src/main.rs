@@ -21,14 +21,14 @@ mod handler;
 struct Args {
     #[arg(
         long,
-        default_value = ":11055",
+        default_value = "127.0.0.1:11055",
         help = "Bind address for the SCP control API"
     )]
     control_addr: String,
 
     #[arg(
         long,
-        default_value = "localhost:22022",
+        default_value = "127.0.0.1:22022",
         help = "Connect address for the SCP handler API"
     )]
     handle_addr: String,

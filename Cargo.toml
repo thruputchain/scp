@@ -11,3 +11,6 @@ features = ["std", "xdrs"]
 git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
 package = "groundhog_scp"
 features = ["std", "xdrs"]
+
+# [patch.'ssh://git@github.com/groundhogchain/protocol-rs.git']
+# groundhog_scp = { path = "../protocol-rs/groundhog_scp" }

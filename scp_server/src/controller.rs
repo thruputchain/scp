@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
 use tokio::sync::oneshot;
 use tokio::time::sleep;
+use tracing::info;
 use xdr_common::*;
 
 pub struct ControlService(Arc<TokioRwLock<ControlServiceState>>);
@@ -137,6 +138,7 @@ pub struct EnvelopeValidated {
     pub validated_values: Vec<(SlotIndex, SCPValue, ValidationLevel)>,
 }
 
+#[derive(Debug)]
 pub struct TimerExpired {
     slot_index: SlotIndex,
     timer: Timer,
@@ -302,6 +304,7 @@ impl ControlKernel {
     }
 
     fn handle_timer_expired(&mut self, x: TimerExpired) {
+        info!("timer expired {:?}", x);
         self.stop_timer(x.slot_index, x.timer);
         self.kernel.proto().driver_calling_back(x.cb);
         self.flush_timer_switches();

@@ -5,6 +5,7 @@ use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
 use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
+use tracing_subscriber;
 use xdr_common::*;
 
 mod config_shim;
@@ -17,7 +18,11 @@ mod controller;
 mod handler;
 
 #[derive(Parser, Debug)]
-#[command(version, about = "SCP Server - Stellar Consensus Protocol stand-alone server", long_about = None)]
+#[command(
+    version,
+    about = "SCP Server - Stellar Consensus Protocol stand-alone server",
+    long_about = "Use `RUST_LOG=warn|info|debug|trace` to set loggin level."
+)]
 struct Args {
     #[arg(
         long,
@@ -58,6 +63,12 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .with_level(false)
+        .with_ansi(false)
+        .init();
     let args = Args::parse();
 
     info!(

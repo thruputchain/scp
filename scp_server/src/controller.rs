@@ -228,6 +228,9 @@ impl ControlKernel {
                     SwitchTimer::StopTimer(slot_index, timer) => {
                         self.stop_timer(slot_index, timer);
                     }
+                    SwitchTimer::StopTimersNotAbove(slot_index) => {
+                        self.stop_timers_not_above(slot_index);
+                    }
                 }
             } else {
                 break;

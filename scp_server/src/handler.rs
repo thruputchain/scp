@@ -372,6 +372,7 @@ impl fmt::Debug for HandleKernelState {
 pub enum SwitchTimer {
     StartTimer(SlotIndex, Timer, Duration, DriverCallback),
     StopTimer(SlotIndex, Timer),
+    StopTimersNotAbove(SlotIndex),
 }
 
 impl HandleKernel {
@@ -494,7 +495,14 @@ impl Consensus for HandleKernel {
 
 impl ConsensusNotify for HandleKernel {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        // cancel timers not above slot_index
+        self.lock()
+            .tx_switch_timer
+            .send(SwitchTimer::StopTimersNotAbove(slot_index))
+            .unwrap();
+
         self.purge_cached_validations(slot_index);
+
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ValueExternalized(slot_index, value.clone()))

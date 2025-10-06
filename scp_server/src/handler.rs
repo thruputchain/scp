@@ -372,7 +372,7 @@ impl fmt::Debug for HandleKernelState {
 pub enum SwitchTimer {
     StartTimer(SlotIndex, Timer, Duration, DriverCallback),
     StopTimer(SlotIndex, Timer),
-    StopTimersNotAbove(SlotIndex),
+    SlotExternalized(SlotIndex),
 }
 
 impl HandleKernel {
@@ -498,7 +498,7 @@ impl ConsensusNotify for HandleKernel {
         // cancel timers not above slot_index
         self.lock()
             .tx_switch_timer
-            .send(SwitchTimer::StopTimersNotAbove(slot_index))
+            .send(SwitchTimer::SlotExternalized(slot_index))
             .unwrap();
 
         self.purge_cached_validations(slot_index);

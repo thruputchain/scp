@@ -228,8 +228,12 @@ impl ControlKernel {
                     SwitchTimer::StopTimer(slot_index, timer) => {
                         self.stop_timer(slot_index, timer);
                     }
-                    SwitchTimer::StopTimersNotAbove(slot_index) => {
+                    SwitchTimer::SlotExternalized(slot_index) => {
                         self.stop_timers_not_above(slot_index);
+                        // purge slots not above slot_index
+                        self.kernel
+                            .proto()
+                            .purge_slots(slot_index + 1, slot_index + 1);
                     }
                 }
             } else {

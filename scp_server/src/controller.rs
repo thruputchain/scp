@@ -276,6 +276,20 @@ impl ControlKernel {
         }
     }
 
+    fn stop_timers_not_above(&mut self, not_above: SlotIndex) {
+        let mut to_stop = vec![];
+        for (slot_index, timers) in &self.armed_timers {
+            if slot_index <= &not_above {
+                for (timer, _) in timers {
+                    to_stop.push((slot_index.clone(), timer.clone()));
+                }
+            }
+        }
+        for (slot_index, timer) in to_stop {
+            self.stop_timer(slot_index, timer);
+        }
+    }
+
     pub fn start(mut self) -> std::thread::JoinHandle<()> {
         thread::spawn(move || {
             loop {

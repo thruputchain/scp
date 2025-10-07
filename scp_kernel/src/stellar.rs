@@ -502,6 +502,14 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         self.slot_proto_or_create(slot_index)
             .should_process_envelope(env, false)
     }
+
+    pub fn envelope_to_str(&self, env: &proto::SCPEnvelope, full_keys: bool) -> String {
+        self.cd.envelope_to_str(env, full_keys)
+    }
+
+    pub fn statement_to_str(&self, st: &proto::SCPStatement, full_keys: bool) -> String {
+        self.cd.statement_to_str(st, full_keys)
+    }
 }
 
 impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {

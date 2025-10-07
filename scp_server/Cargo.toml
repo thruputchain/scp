@@ -17,7 +17,7 @@ scp_kernel = { path = "../scp_kernel" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.47.1", features = ["full"] }
-console-subscriber = "0.3"
+console-subscriber = "0.4"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
@@ -31,3 +31,6 @@ git = "ssh://git@github.com/groundhogchain/xdr_common.git"
 [dependencies.rpc_driver]
 git = "ssh://git@github.com/groundhogchain/xdr_rpc.git"
 package = "rpc_driver"
+
+[dev-dependencies]
+ctrlc = "3.4"

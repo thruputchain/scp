@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use proto::*;
 use rpc_driver::connect_client;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio;
 use tokio::sync::Mutex;
@@ -25,6 +27,7 @@ struct TestHandlerState {
     quorum_sets: HashMap<SCPHash, SCPQuorumSet>,
     externalized: Vec<(SCPSlotIndex, SCPValue)>,
     emitted: Vec<SCPEnvelope>,
+    control: Option<ControlService>,
 }
 
 #[derive(Clone)]
@@ -36,7 +39,12 @@ impl TestHandler {
             quorum_sets: HashMap::new(),
             externalized: vec![],
             emitted: vec![],
+            control: None,
         })))
+    }
+
+    async fn set_control_service(&self, s: ControlService) {
+        self.0.lock().await.control = Some(s);
     }
 
     async fn add_qset(&self, q: SCPQuorumSet) {
@@ -69,6 +77,10 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
+        println!(
+            "scp_handle_emit_envelope, slot {}",
+            env.statement.slot_index,
+        );
         self.0.lock().await.emitted.push(env);
         Ok(())
     }
@@ -111,17 +123,40 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
         slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        println!("value_externalized {}", value);
-        self.0.lock().await.externalized.push((slot_index, value));
+        println!(
+            "scp_handle_value_externalized, slot {}, value {}",
+            slot_index, value
+        );
+        self.0
+            .lock()
+            .await
+            .externalized
+            .push((slot_index, value.clone()));
+        // stop nomination after externalization
+        if let Some(s) = &self.0.lock().await.control {
+            let s2 = s.clone();
+            let v2 = value.clone();
+            tokio::spawn(async move {
+                s2.scp_control_stop_nomination(slot_index).await.unwrap();
+                println!("  stopped nomination for {}", slot_index);
+                s2.scp_control_nominate(slot_index + 1, BytesM(vec![0]), v2)
+                    .await
+                    .unwrap();
+                println!("  started nomination for {}", slot_index + 1);
+            });
+        };
         Ok(())
     }
 
     async fn scp_handle_nominating_value(
         &self,
-        _slot_index: SCPSlotIndex,
-        _value: SCPValue,
+        slot_index: SCPSlotIndex,
+        value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        println!("nominating_value {}", _value);
+        println!(
+            "scp_handle_nominating_value, slot {}, value {}",
+            slot_index, value
+        );
         Ok(())
     }
 
@@ -179,6 +214,11 @@ use crate::system::*;
 
 #[tokio::test]
 async fn five() {
+    console_subscriber::init();
+    // tracing_subscriber::fmt()
+    //     .with_max_level(tracing::Level::DEBUG)
+    //     .init();
+
     // handlers
 
     let h0 = TestHandler::new();
@@ -239,6 +279,10 @@ async fn five() {
     let s1 = start_service(client1, cfg.clone(), &sk1, true).await;
     let s2 = start_service(client2, cfg.clone(), &sk2, true).await;
 
+    h0.set_control_service(s0.clone()).await;
+    h1.set_control_service(s1.clone()).await;
+    h2.set_control_service(s2.clone()).await;
+
     // experiment
     let nom0 = s0
         .scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![9]))
@@ -258,7 +302,7 @@ async fn five() {
 
     for _ in 0..2 {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        println!("waking");
+        println!("WAKING");
         flush_emits(&nodes).await;
     }
 
@@ -272,11 +316,9 @@ async fn five() {
 async fn flush_emits(nodes: &Vec<(ControlService, TestHandler)>) {
     loop {
         let mut delivered = false;
-        // println!("FLUSH");
+        println!("FLUSHING");
         for (i, (_, h)) in nodes.iter().enumerate() {
-            // println!("draining node {}", i);
             for e in h.0.lock().await.emitted.drain(..) {
-                // println!("draining envelope");
                 for (j, (s, _)) in nodes.iter().enumerate() {
                     if i != j {
                         s.scp_control_received_envelope(e.clone()).await.unwrap();
@@ -288,5 +330,7 @@ async fn flush_emits(nodes: &Vec<(ControlService, TestHandler)>) {
         if !delivered {
             break;
         }
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     }
+    println!("EXIT FLUSH");
 }

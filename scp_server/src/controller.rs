@@ -13,6 +13,7 @@ use tokio::time::sleep;
 use tracing::info;
 use xdr_common::*;
 
+#[derive(Clone)]
 pub struct ControlService(Arc<TokioRwLock<ControlServiceState>>);
 
 struct ControlServiceState {
@@ -403,10 +404,10 @@ impl ControlKernel {
                             })
                             .unwrap();
                     }
-                    self.tx_reply
-                        .blocking_send(ControlReply::ReceivedEnvelope())
-                        .unwrap()
                 }
+                self.tx_reply
+                    .blocking_send(ControlReply::ReceivedEnvelope())
+                    .unwrap()
             }
         }
     }

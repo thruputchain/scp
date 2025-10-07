@@ -25,7 +25,7 @@ fn instrument_test() {
 
 struct TestHandlerState {
     quorum_sets: HashMap<SCPHash, SCPQuorumSet>,
-    externalized: Vec<(SCPSlotIndex, SCPValue)>,
+    externalized: HashMap<SCPSlotIndex, SCPValue>,
     emitted: Vec<SCPEnvelope>,
     control: Option<ControlService>,
 }
@@ -37,7 +37,7 @@ impl TestHandler {
     pub fn new() -> Self {
         Self(Arc::new(Mutex::new(TestHandlerState {
             quorum_sets: HashMap::new(),
-            externalized: vec![],
+            externalized: HashMap::new(),
             emitted: vec![],
             control: None,
         })))
@@ -131,14 +131,14 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
             .lock()
             .await
             .externalized
-            .push((slot_index, value.clone()));
-        // stop nomination after externalization
+            .insert(slot_index, value.clone());
+        // start next nomination
         if let Some(s) = &self.0.lock().await.control {
             let s2 = s.clone();
             let v2 = value.clone();
             tokio::spawn(async move {
-                s2.scp_control_stop_nomination(slot_index).await.unwrap();
-                println!("  stopped nomination for {}", slot_index);
+                // s2.scp_control_stop_nomination(slot_index).await.unwrap();
+                // println!("  stopped nomination for {}", slot_index);
                 s2.scp_control_nominate(slot_index + 1, BytesM(vec![0]), v2)
                     .await
                     .unwrap();
@@ -214,7 +214,7 @@ use crate::system::*;
 
 #[tokio::test]
 async fn five() {
-    console_subscriber::init();
+    // console_subscriber::init();
     // tracing_subscriber::fmt()
     //     .with_max_level(tracing::Level::DEBUG)
     //     .init();
@@ -300,20 +300,21 @@ async fn five() {
 
     let nodes = vec![(s0, h0.clone()), (s1, h1.clone()), (s2, h2.clone())];
 
-    for _ in 0..2 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        println!("WAKING");
-        flush_emits(&nodes).await;
-    }
-
-    assert_eq!(h0.num_externalized().await, 1);
-    assert_eq!(h1.num_externalized().await, 1);
-    assert_eq!(h2.num_externalized().await, 1);
+    flush_emits(&nodes, async || {
+        h0.num_externalized().await >= 3
+            && h1.num_externalized().await >= 3
+            && h2.num_externalized().await >= 3
+    })
+    .await;
 
     // future::pending::<()>().await;
 }
 
-async fn flush_emits(nodes: &Vec<(ControlService, TestHandler)>) {
+async fn flush_emits<F, Fut>(nodes: &Vec<(ControlService, TestHandler)>, exit: F)
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = bool>,
+{
     loop {
         let mut delivered = false;
         println!("FLUSHING");
@@ -328,9 +329,12 @@ async fn flush_emits(nodes: &Vec<(ControlService, TestHandler)>) {
             }
         }
         if !delivered {
+            assert!(false);
             break;
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        if exit().await {
+            break;
+        }
     }
-    println!("EXIT FLUSH");
 }

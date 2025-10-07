@@ -10,6 +10,7 @@ use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
+use tracing::info;
 use xdr_common::*;
 
 // ValidateClient
@@ -57,14 +58,26 @@ impl ValidateClient {
             handles.push(tokio::spawn({
                 let x = self.clone();
                 async move {
-                    (
+                    info!(
+                        "validating nomination value {} for slot {}",
+                        scp_kernel::hah(&v),
+                        slot_index
+                    );
+                    let r = (
                         slot_index,
                         v.clone(),
                         x.client
                             .scp_handle_validate_nomination_value(&slot_index, &v)
                             .await
                             .unwrap(),
-                    )
+                    );
+                    info!(
+                        "validated nomination value {} for slot {} as {:#?}",
+                        scp_kernel::hah(&v),
+                        slot_index,
+                        r.2
+                    );
+                    r
                 }
             }));
         }
@@ -72,14 +85,26 @@ impl ValidateClient {
             handles.push(tokio::spawn({
                 let x = self.clone();
                 async move {
-                    (
+                    info!(
+                        "validating ballot value {} for slot {}",
+                        scp_kernel::hah(&v),
+                        slot_index
+                    );
+                    let r = (
                         slot_index,
                         v.clone(),
                         x.client
                             .scp_handle_validate_ballot_value(&slot_index, &v)
                             .await
                             .unwrap(),
-                    )
+                    );
+                    info!(
+                        "validated ballot value {} for slot {} as {:#?}",
+                        scp_kernel::hah(&v),
+                        slot_index,
+                        r.2
+                    );
+                    r
                 }
             }));
         }
@@ -495,6 +520,7 @@ impl Consensus for HandleKernel {
 
 impl ConsensusNotify for HandleKernel {
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+        info!("externalizing value for slot {}", slot_index);
         // cancel timers not above slot_index
         self.lock()
             .tx_switch_timer
@@ -510,6 +536,7 @@ impl ConsensusNotify for HandleKernel {
         if let HandleReply::ValueExternalized() =
             self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
         {
+            info!("externalized value for slot {}", slot_index);
         } else {
             panic!("bug")
         }
@@ -742,6 +769,7 @@ impl Driver for HandleKernel {
     }
 
     fn emit_envelope(&self, env: proto::SCPEnvelope) {
+        info!("emitting envelope for slot {}", env.statement.slot_index);
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::EmitEnvelope(env.clone()))
@@ -749,6 +777,7 @@ impl Driver for HandleKernel {
         if let HandleReply::EmitEnvelope() =
             self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
         {
+            info!("emitted envelope for slot {}", env.statement.slot_index);
         } else {
             panic!("bug")
         }

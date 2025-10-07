@@ -3,7 +3,6 @@ use proto::*;
 use rpc_driver::connect_client;
 use std::collections::HashMap;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio;
 use tokio::sync::Mutex;
@@ -26,7 +25,8 @@ fn instrument_test() {
 struct TestHandlerState {
     quorum_sets: HashMap<SCPHash, SCPQuorumSet>,
     externalized: HashMap<SCPSlotIndex, SCPValue>,
-    emitted: Vec<SCPEnvelope>,
+    n_emitted: i64,
+    emitted: Vec<(i64, SCPEnvelope)>,
     control: Option<ControlService>,
 }
 
@@ -38,6 +38,7 @@ impl TestHandler {
         Self(Arc::new(Mutex::new(TestHandlerState {
             quorum_sets: HashMap::new(),
             externalized: HashMap::new(),
+            n_emitted: 0,
             emitted: vec![],
             control: None,
         })))
@@ -81,7 +82,10 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
             "scp_handle_emit_envelope, slot {}",
             env.statement.slot_index,
         );
-        self.0.lock().await.emitted.push(env);
+        let mut lk = self.0.lock().await;
+        let seq_no = lk.n_emitted;
+        lk.emitted.push((seq_no, env));
+        lk.n_emitted += 1;
         Ok(())
     }
 
@@ -319,7 +323,7 @@ where
         let mut delivered = false;
         println!("FLUSHING");
         for (i, (_, h)) in nodes.iter().enumerate() {
-            for e in h.0.lock().await.emitted.drain(..) {
+            for (_, e) in h.0.lock().await.emitted.drain(..) {
                 for (j, (s, _)) in nodes.iter().enumerate() {
                     if i != j {
                         s.scp_control_received_envelope(e.clone()).await.unwrap();

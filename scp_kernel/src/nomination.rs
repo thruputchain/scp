@@ -465,6 +465,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
     #[instrument(skip_all)]
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope) -> EnvelopeState {
+        debug!(
+            "nomination state: {}",
+            serde_json::to_string_pretty(&self.get_json_info()).unwrap()
+        );
+
         let st = &envelope.statement;
 
         if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
@@ -605,6 +610,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         previous_value: &proto::SCPValue,
         timed_out: bool,
     ) -> bool {
+        debug!(
+            "nomination state: {}",
+            serde_json::to_string_pretty(&self.get_json_info()).unwrap()
+        );
+
         // No need to continue nominating, as per the whitepaper:
         // "As soon as `v` has a candidate value, however, it must cease
         // voting to nominate `x` for any new values `x`"

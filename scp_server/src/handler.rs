@@ -508,10 +508,11 @@ impl Consensus for HandleKernel {
         slot_index: SCPSlotIndex,
         candidates: &HashSet<proto::SCPValue>,
     ) -> Option<proto::SCPValue> {
-        let candidates = VecM::<SCPValue>(candidates.iter().cloned().collect());
+        let mut candidates_vec = VecM::<SCPValue>(candidates.iter().cloned().collect());
+        candidates_vec.0.sort();
         self.lock()
             .tx_handle_request
-            .blocking_send(HandleRequest::CombineCandidates(slot_index, candidates))
+            .blocking_send(HandleRequest::CombineCandidates(slot_index, candidates_vec))
             .unwrap();
         if let HandleReply::CombineCandidates(r) =
             self.lock_mut().rx_handle_reply.blocking_recv().unwrap()

@@ -92,6 +92,17 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
         result.push_str(" }");
         result
     }
+
+    pub fn node_ids_to_str(&self, ns: &[proto::SCPNodeID]) -> String {
+        let mut s = "[".to_string();
+        for (i, n) in ns.iter().enumerate() {
+            s.push_str(&format!("{}", self.driver.to_str_key(n, false)));
+            if i + 1 < ns.len() {
+                s.push_str(", ");
+            }
+        }
+        s
+    }
 }
 
 #[derive(Debug)]

@@ -77,3 +77,21 @@ where
     }
     res
 }
+
+pub fn node_ids_to_str(ns: &[proto::SCPNodeID]) -> String {
+    let mut s = "[".to_string();
+    for (i, n) in ns.iter().enumerate() {
+        s.push_str(&format!("{}", to_str_key(n, false)));
+        if i + 1 < ns.len() {
+            s.push_str(", ");
+        }
+    }
+    s.push_str("]");
+    s
+}
+
+pub fn to_str_key(pk: &proto::SCPNodeID, _full_key: bool) -> String {
+    match pk {
+        proto::PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+    }
+}

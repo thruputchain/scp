@@ -463,13 +463,21 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
+    fn state_to_str(&self) -> String {
+        let mut s = format!("latest_envelopes: {{\n");
+        for (node_id, env) in &self.nomination().latest_nominations {
+            s.push_str(&format!(
+                "   {} -> {}\n",
+                self.driver().to_str_key(node_id, false),
+                self.slot_proto().cd.envelope_to_str(env, false)
+            ));
+        }
+        s.push_str("}");
+        s
+    }
+
     #[instrument(skip_all)]
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope) -> EnvelopeState {
-        debug!(
-            "nomination state: {}",
-            serde_json::to_string_pretty(&self.get_json_info()).unwrap()
-        );
-
         let st = &envelope.statement;
 
         if let proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
@@ -488,6 +496,13 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 // Track if we should emit a new nomination message
                 let mut modified = false;
                 let mut new_candidates = false;
+
+                debug!(
+                    "nomination before promotion:\ninfo: {}\nstate: {}\nenvelope: {}",
+                    serde_json::to_string_pretty(&self.get_json_info()).unwrap(),
+                    self.state_to_str(),
+                    self.slot_proto().cd.envelope_to_str(envelope, false)
+                );
 
                 // Attempt to promote some of the votes to accepted
                 for v in nom.votes.iter() {
@@ -515,6 +530,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         &accept_predicate,
                         &self.nomination().latest_nominations,
                     ) {
+                        debug!("accepted {}", hex_abbrev(v));
                         let validation_level = self.validate_value(v);
                         if validation_level == ValidationLevel::FullyValid {
                             self.nomination_mut().accepted.insert(v.clone());
@@ -529,6 +545,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                                 }
                             }
                         }
+                    } else {
+                        debug!("did not accept {}", hex_abbrev(v));
                     }
                 }
 

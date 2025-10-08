@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
-use tracing::instrument;
+use tracing::{debug, instrument};
 use xdr_common::VecM;
 
 #[derive(Debug)]
@@ -236,6 +236,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 }
             })
             .collect();
+        debug!("nodes passing filter: {}", node_ids_to_str(&p_nodes)); //XXX:tmp
 
         // Iterate until convergence (fixed point)
         loop {
@@ -249,6 +250,11 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                     if Self::is_quorum_slice_internal(&node_qset, &p_nodes) {
                         f_nodes.push(node_id.clone());
                     }
+                } else {
+                    debug!(
+                        "qset for {}'s envelope is missing",
+                        to_str_key(node_id, false)
+                    );
                 }
             }
 
@@ -259,6 +265,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 break;
             }
         }
+        debug!("nodes final set: {}", node_ids_to_str(&p_nodes)); //XXX:tmp
 
         // Check if final set forms a quorum slice for the given qset
         Self::is_quorum_slice_internal(qset, &p_nodes)

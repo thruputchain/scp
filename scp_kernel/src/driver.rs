@@ -20,6 +20,29 @@ pub enum DriverCallback {
     },
 }
 
+impl std::fmt::Display for DriverCallback {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DriverCallback::BallotTimerExpired { slot_index } => {
+                write!(f, "BallotTimerExpired{{i: {}}}", slot_index)
+            }
+            DriverCallback::NominationTimerExpired {
+                slot_index,
+                value,
+                prev_value,
+            } => {
+                write!(
+                    f,
+                    "NominationTimerExpired{{i: {} | X: {} | X': {}}}",
+                    slot_index,
+                    hex_abbrev(value),
+                    hex_abbrev(prev_value)
+                )
+            }
+        }
+        //
+    }
+}
 pub trait Driver: Clone + Debug {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;

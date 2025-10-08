@@ -139,7 +139,7 @@ pub struct EnvelopeValidated {
     pub validated_values: Vec<(SlotIndex, SCPValue, ValidationLevel)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimerExpired {
     slot_index: SlotIndex,
     timer: Timer,
@@ -339,10 +339,11 @@ impl ControlKernel {
 
     #[tracing::instrument(skip_all)]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
-        info!("timer expired {:?}", x);
+        info!("timer expired, driver calling back {:?}", x);
         self.stop_timer(x.slot_index, x.timer);
-        self.kernel.proto().driver_calling_back(x.cb);
+        self.kernel.proto().driver_calling_back(x.cb.clone());
         self.flush_timer_switches();
+        info!("timer expired, driver called back {:?}", x);
     }
 
     fn handle_request(&mut self, req: ControlRequest) {

@@ -321,10 +321,23 @@ impl ControlKernel {
         for (slot_index, value, level) in x.validated_values.into_iter() {
             self.handler.set_cached_validation(slot_index, value, level);
         }
-        self.kernel.proto().received_envelope(&x.env);
-        self.flush_timer_switches();
+        self.call_received_envelope(&x.env);
     }
 
+    fn call_received_envelope(&mut self, env: &proto::SCPEnvelope) {
+        info!(
+            "control kernel calling scp received envelope {}",
+            self.kernel.proto().envelope_to_str(env, false),
+        );
+        self.kernel.proto().received_envelope(env);
+        self.flush_timer_switches();
+        info!(
+            "control kernel finished calling scp receive envelope {}",
+            self.kernel.proto().envelope_to_str(env, false),
+        );
+    }
+
+    #[tracing::instrument(skip_all)]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
         info!("timer expired {:?}", x);
         self.stop_timer(x.slot_index, x.timer);
@@ -366,6 +379,10 @@ impl ControlKernel {
                     .unwrap()
             }
             ControlRequest::ReceivedEnvelope(env) => {
+                info!(
+                    "control kernel received envelope {}",
+                    self.kernel.proto().envelope_to_str(&env, false)
+                );
                 if self.kernel.proto().should_process_envelope(&env) {
                     let slot_index = env.statement.slot_index;
                     let (nom_values, ballot_values) =
@@ -393,8 +410,7 @@ impl ControlKernel {
 
                     // skip validate_envelope if no values to validate
                     if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {
-                        self.kernel.proto().received_envelope(&env);
-                        self.flush_timer_switches();
+                        self.call_received_envelope(&env);
                     } else {
                         self.tx_validate_envelope
                             .blocking_send(ValidateEnvelope {

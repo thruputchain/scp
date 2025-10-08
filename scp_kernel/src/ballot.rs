@@ -219,7 +219,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert!(env.statement.slot_index == self.slot_proto().index());
 
@@ -364,7 +364,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
@@ -401,7 +401,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn bump_state(&mut self, value: proto::SCPValue, force: bool) -> bool {
         let n = match &self.ballot_state().current {
             Some(b) => {
@@ -444,7 +444,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
-    #[instrument]
+    #[instrument(skip_all)]
     fn update_current_value(&mut self, new_ballot: proto::SCPBallot) -> bool {
         if self.ballot_state().phase != Phase::Prepare
             && self.ballot_state().phase != Phase::Confirm
@@ -573,7 +573,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         self.abandon_ballot(0);
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn create_statement(&self, typ: proto::SCPStatementType) -> proto::SCPStatement {
         self.check_invariants();
 
@@ -648,7 +648,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn send_latest_envelope(&mut self) {
         // emit current envelope if needed
         if self.ballot_state().msg_level == 0 && self.slot_proto().is_fully_validated() {
@@ -668,7 +668,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn emit_current_state_statement(&mut self) {
         let statement_type = match self.ballot_state().phase {
             Phase::Prepare => proto::SCPStatementType::SCP_ST_PREPARE,
@@ -720,7 +720,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn get_prepare_candidates(&self, hint: &proto::SCPStatement) -> HashSet<proto::SCPBallot> {
         let mut hint_ballots = HashSet::new();
 
@@ -967,7 +967,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             .federated_ratify(&voted, &self.ballot_state().latest_envelopes)
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn set_confirm_prepared(&mut self, new_c: &proto::SCPBallot, new_h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot_proto().index(),
@@ -1125,7 +1125,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn check_heard_from_quorum(&mut self) {
         // this method is safe to call regardless of the transitions of the other
         // nodes on the network:
@@ -1218,7 +1218,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn attempt_accept_prepared(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot_state().phase != Phase::Prepare
             && self.ballot_state().phase != Phase::Confirm
@@ -1391,7 +1391,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn set_accept_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot_proto().index(),
@@ -1444,7 +1444,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         did_work
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn attempt_accept_commit(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot_state().phase != Phase::Prepare
             && self.ballot_state().phase != Phase::Confirm
@@ -1549,7 +1549,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn attempt_bump(&mut self) -> bool {
         if self.ballot_state().phase == Phase::Prepare
             || self.ballot_state().phase == Phase::Confirm
@@ -1600,7 +1600,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn attempt_confirm_commit(&mut self, hint: &proto::SCPStatement) -> bool {
         if self.ballot_state().phase != Phase::Confirm {
             return false;
@@ -1657,7 +1657,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         false
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn set_confirm_commit(&mut self, c: &proto::SCPBallot, h: &proto::SCPBallot) -> bool {
         trace!(
             slot_index = self.slot_proto().index(),
@@ -1717,7 +1717,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn set_state_from_envelope(&mut self, env: &proto::SCPEnvelope) {
         // cannot set state after starting ballot protocol
         assert!(self.ballot_state().current.is_none());
@@ -1853,7 +1853,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         res
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn validate_values(&self, st: &proto::SCPStatement) -> ValidationLevel {
         let values = Self::get_statement_values(st);
 
@@ -2034,7 +2034,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress
-    #[instrument]
+    #[instrument(skip_all)]
     fn advance_slot(&mut self, hint: &proto::SCPStatement) {
         const MAX_ADVANCE_SLOT_RECURSION: i64 = 100;
 

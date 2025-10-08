@@ -64,10 +64,14 @@ struct Args {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+        .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
+        .with_target(false)
         .with_file(true)
         .with_line_number(true)
         .with_level(false)
         .with_ansi(false)
+        .compact()
         .init();
     let args = Args::parse();
 

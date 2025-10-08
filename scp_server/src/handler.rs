@@ -519,6 +519,7 @@ impl Consensus for HandleKernel {
 }
 
 impl ConsensusNotify for HandleKernel {
+    #[tracing::instrument(skip(self))]
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
         info!("externalizing value for slot {}", slot_index);
         // cancel timers not above slot_index
@@ -768,6 +769,7 @@ impl Driver for HandleKernel {
         Duration::from_millis(timeout_ms as u64)
     }
 
+    #[tracing::instrument(skip_all)]
     fn emit_envelope(&self, env: proto::SCPEnvelope) {
         info!("emitting envelope for slot {}", env.statement.slot_index);
         self.lock()

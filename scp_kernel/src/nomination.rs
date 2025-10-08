@@ -165,7 +165,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         self.slot_proto_mut().record_statement(&env.statement);
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn emit_nomination(&mut self) {
         // Create SCP statement for nomination
         let node_id = self.slot_proto().local_proto().get_node_id().clone();
@@ -266,7 +266,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn update_round_leaders(&mut self) {
         let mut my_qset = self.slot_proto().local_proto().get_qset().clone();
         let local_id = self.slot_proto().local_proto().get_node_id().clone();
@@ -342,7 +342,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         debug!("nomination update_round_leaders: nothing to do")
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn get_node_priority(&self, node_id: &proto::SCPNodeID, qset: &proto::SCPQuorumSet) -> u64 {
         let is_local = node_id == self.slot_proto().local_proto().get_node_id();
         let weight = self.driver().get_node_weight(node_id, qset, is_local);
@@ -356,7 +356,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn hash_node(&self, is_priority: bool, node_id: &proto::SCPNodeID) -> u64 {
         if let Some(ref previous_value) = self.nomination().previous_value {
             self.driver().compute_hash_node(
@@ -371,7 +371,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn hash_value(&self, value: &proto::SCPValue) -> u64 {
         if let Some(ref previous_value) = self.nomination().previous_value {
             self.driver().compute_value_hash(
@@ -385,7 +385,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn get_new_value_from_nomination(
         &self,
         nom: &proto::SCPStatementNominate,
@@ -432,13 +432,13 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         new_vote
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn validate_value(&self, value: &proto::SCPValue) -> ValidationLevel {
         self.consensus()
             .validate_nomination_value(self.slot_proto().index(), value)
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     fn extract_valid_value(&self, value: &proto::SCPValue) -> Option<proto::SCPValue> {
         self.consensus()
             .extract_valid_value(self.slot_proto().index(), value)
@@ -463,7 +463,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope) -> EnvelopeState {
         let st = &envelope.statement;
 
@@ -598,7 +598,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         res
     }
 
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn nominate(
         &mut self,
         value: &proto::SCPValue,

@@ -219,9 +219,16 @@ use crate::system::*;
 #[tokio::test]
 async fn five() {
     // console_subscriber::init();
-    // tracing_subscriber::fmt()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .init();
+    tracing_subscriber::fmt()
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+        .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
+        .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
+        .with_level(false)
+        .with_ansi(false)
+        .compact()
+        .init();
 
     // handlers
 
@@ -289,15 +296,15 @@ async fn five() {
 
     // experiment
     let nom0 = s0
-        .scp_control_nominate(0, BytesM(vec![0]), BytesM(vec![9]))
+        .scp_control_nominate(1, BytesM(vec![0]), BytesM(vec![9]))
         .await
         .unwrap();
     let nom1 = s1
-        .scp_control_nominate(0, BytesM(vec![1]), BytesM(vec![9]))
+        .scp_control_nominate(1, BytesM(vec![1]), BytesM(vec![9]))
         .await
         .unwrap();
     let nom2 = s2
-        .scp_control_nominate(0, BytesM(vec![2]), BytesM(vec![9]))
+        .scp_control_nominate(1, BytesM(vec![2]), BytesM(vec![9]))
         .await
         .unwrap();
     println!("noms: {} {} {}", nom0, nom1, nom2);
@@ -336,7 +343,7 @@ where
             assert!(false);
             break;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
         if exit().await {
             break;
         }

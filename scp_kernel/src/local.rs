@@ -69,7 +69,7 @@ pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
 }
 
 impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
-    #[instrument]
+    #[instrument(skip_all)]
     pub fn update_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
         let mut normalized_qset = qset.clone();
         normalize_qset(&mut normalized_qset, None);

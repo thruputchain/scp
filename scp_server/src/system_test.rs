@@ -9,16 +9,21 @@ use tokio::sync::Mutex;
 use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
 
-#[allow(dead_code)]
 fn instrument_test() {
     let _ = tracing_subscriber::fmt()
-        .with_max_level(tracing::metadata::LevelFilter::DEBUG)
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+        // .with_max_level(tracing::metadata::LevelFilter::DEBUG)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug")),
+        )
+        .with_level(true)
         .with_test_writer() // important: routes to test harness writer
         .with_file(true)
         .with_line_number(true)
+        .with_level(true)
         .with_target(false)
         .event_format(tracing_subscriber::fmt::format())
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
         .try_init();
 }
 
@@ -218,17 +223,18 @@ use crate::system::*;
 
 #[tokio::test]
 async fn five() {
+    instrument_test();
     // console_subscriber::init();
-    tracing_subscriber::fmt()
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
-        .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
-        .with_target(false)
-        .with_file(true)
-        .with_line_number(true)
-        .with_level(false)
-        .with_ansi(false)
-        .compact()
-        .init();
+    // tracing_subscriber::fmt()
+    //     .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+    //     .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
+    //     .with_target(false)
+    //     .with_file(true)
+    //     .with_line_number(true)
+    //     .with_level(false)
+    //     .with_ansi(false)
+    //     .compact()
+    //     .init();
 
     // handlers
 

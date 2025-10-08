@@ -617,9 +617,9 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
 
         debug!(
-            "nomination nominate ({}) value: {:?}",
+            "nomination nominate ({}) value: {}",
             self.nomination().round_number,
-            value
+            hex_abbrev(value)
         );
 
         let mut updated = false;

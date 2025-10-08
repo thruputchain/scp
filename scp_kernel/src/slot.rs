@@ -563,9 +563,6 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
         // Log the statement (similar to C++ version)
         tracing::debug!(
-            statement = ?st,
-            validated = self.slot_state.fully_validated,
-            slot_index = self.slot_state.slot_index,
             "new statement recorded, i: {} st: {} validated: {}",
             self.slot_state.slot_index,
             self.cd.statement_to_str(st, false),

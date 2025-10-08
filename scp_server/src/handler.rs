@@ -524,11 +524,11 @@ impl Consensus for HandleKernel {
 }
 
 impl ConsensusNotify for HandleKernel {
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
         info!(
             "externalizing value {} for slot {}",
-            scp_kernel::hah(value),
+            scp_kernel::hex_abbrev(value),
             slot_index
         );
         // cancel timers not above slot_index

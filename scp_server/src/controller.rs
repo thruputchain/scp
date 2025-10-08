@@ -146,6 +146,12 @@ pub struct TimerExpired {
     cb: DriverCallback,
 }
 
+impl std::fmt::Display for TimerExpired {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimerExpired{{ i: {} | {} }}", self.slot_index, self.cb,)
+    }
+}
+
 pub enum ControlSignal {
     ControlRequest(ControlRequest),
     EnvelopeValidated(EnvelopeValidated),
@@ -339,11 +345,11 @@ impl ControlKernel {
 
     #[tracing::instrument(skip_all)]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
-        info!("timer expired, driver calling back {:?}", x);
+        info!("timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);
         self.kernel.proto().driver_calling_back(x.cb.clone());
         self.flush_timer_switches();
-        info!("timer expired, driver called back {:?}", x);
+        info!("timer expired, driver called back {}", x);
     }
 
     fn handle_request(&mut self, req: ControlRequest) {

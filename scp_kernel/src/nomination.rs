@@ -617,7 +617,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
 
         debug!(
-            "nomination nominate ({}) value: {}",
+            "nomination nominate, round {}, value: {}",
             self.nomination().round_number,
             hex_abbrev(value)
         );
@@ -629,7 +629,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
 
         if timed_out && !self.nomination().nomination_started {
-            debug!("nomination nominate (TIMED OUT)");
+            debug!("nomination nominate, TIMED OUT");
             return false;
         }
 
@@ -688,7 +688,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         if updated {
             self.emit_nomination();
         } else {
-            debug!("nomination nominate (SKIPPED)");
+            debug!("nomination nominate, SKIPPED");
         }
 
         updated

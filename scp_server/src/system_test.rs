@@ -17,14 +17,14 @@ fn instrument_test() {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug")),
         )
+        .event_format(tracing_subscriber::fmt::format())
         .with_level(true)
         .with_test_writer() // important: routes to test harness writer
         .with_file(true)
         .with_line_number(true)
         .with_level(true)
         .with_target(false)
-        .event_format(tracing_subscriber::fmt::format())
-        .try_init();
+        .init();
 }
 
 struct TestHandlerState {
@@ -333,7 +333,7 @@ where
     Fut: Future<Output = bool>,
 {
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         let mut delivered = false;
         println!("FLUSHING");
         for (i, (_, h)) in nodes.iter().enumerate() {

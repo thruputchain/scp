@@ -327,6 +327,7 @@ where
     Fut: Future<Output = bool>,
 {
     loop {
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         let mut delivered = false;
         println!("FLUSHING");
         for (i, (_, h)) in nodes.iter().enumerate() {
@@ -343,7 +344,6 @@ where
             assert!(false);
             break;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
         if exit().await {
             break;
         }

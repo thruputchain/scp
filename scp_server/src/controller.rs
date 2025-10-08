@@ -332,7 +332,7 @@ impl ControlKernel {
         self.kernel.proto().received_envelope(env);
         self.flush_timer_switches();
         info!(
-            "control kernel finished calling scp receive envelope {}",
+            "control kernel called scp receive envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
     }

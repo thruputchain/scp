@@ -8,6 +8,10 @@ pub struct ConsensusDriver<C: Consensus, D: Driver> {
 }
 
 impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
+    pub fn new(consensus: C, driver: D) -> ConsensusDriver<C, D> {
+        ConsensusDriver { consensus, driver }
+    }
+
     pub fn ballot_to_str(&self, b: &proto::SCPBallot) -> String {
         format!("<{},{}>", b.counter, self.driver.get_value_string(&b.value),)
     }

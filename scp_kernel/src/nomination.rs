@@ -334,7 +334,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             } else {
                 self.nomination_mut().round_number += 1;
                 debug!(
-                    "nomination update_round_leaders fast timeout (would no op) -> {}",
+                    "nomination update_round_leaders fast timeout (would no op) -> round {}",
                     self.nomination().round_number
                 );
             }

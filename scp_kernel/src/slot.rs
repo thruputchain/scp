@@ -1,6 +1,7 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
+use tracing::instrument;
 
 pub type SlotIndex = u64;
 
@@ -180,6 +181,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
+    #[instrument(skip_all)]
     pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
         assert_eq!(envelope.statement.slot_index, self.index());
 

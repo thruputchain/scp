@@ -332,24 +332,24 @@ impl ControlKernel {
 
     fn call_received_envelope(&mut self, env: &proto::SCPEnvelope) {
         info!(
-            "control kernel calling scp received envelope {}",
+            "---> control kernel calling scp received envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
         self.kernel.proto().received_envelope(env);
         self.flush_timer_switches();
         info!(
-            "control kernel called scp receive envelope {}",
+            "<--- control kernel called scp receive envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
     }
 
     #[tracing::instrument(skip_all)]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
-        info!("timer expired, driver calling back {}", x);
+        info!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);
         self.kernel.proto().driver_calling_back(x.cb.clone());
         self.flush_timer_switches();
-        info!("timer expired, driver called back {}", x);
+        info!("<--- timer expired, driver called back {}", x);
     }
 
     fn handle_request(&mut self, req: ControlRequest) {

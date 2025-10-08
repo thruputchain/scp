@@ -121,10 +121,14 @@ impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
     async fn scp_handle_combine_candidates(
         &self,
         _slot_index: SCPSlotIndex,
-        mut arg1: SCPValues,
+        mut values: SCPValues,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
-        arg1.0.sort();
-        Ok(Some(arg1.0[0].clone()))
+        if values.len() > 0 {
+            values.0.sort();
+            Ok(Some(values.0[0].clone()))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn scp_handle_value_externalized(

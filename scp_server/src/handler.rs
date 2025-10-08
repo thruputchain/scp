@@ -60,7 +60,7 @@ impl ValidateClient {
                 async move {
                     // info!(
                     //     "validating nomination value {} for slot {}",
-                    //     scp_kernel::hah(&v),
+                    //     scp_kernel::hex_abbrev(&v),
                     //     slot_index
                     // );
                     let r = (
@@ -73,7 +73,7 @@ impl ValidateClient {
                     );
                     info!(
                         "validated nomination value {} for slot {} as {:#?}",
-                        scp_kernel::hah(&v),
+                        scp_kernel::hex_abbrev(&v),
                         slot_index,
                         r.2
                     );

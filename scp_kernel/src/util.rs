@@ -78,7 +78,7 @@ where
     res
 }
 
-pub fn node_ids_to_str(ns: &[proto::SCPNodeID]) -> String {
+pub fn dbg_node_ids_to_str(ns: &[proto::SCPNodeID]) -> String {
     let mut s = "[".to_string();
     for (i, n) in ns.iter().enumerate() {
         s.push_str(&format!("{}", to_str_key(n, false)));

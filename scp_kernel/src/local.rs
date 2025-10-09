@@ -236,7 +236,6 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 }
             })
             .collect();
-        debug!("nodes passing filter: {}", node_ids_to_str(&p_nodes)); //XXX:tmp
 
         // Iterate until convergence (fixed point)
         loop {
@@ -265,7 +264,6 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 break;
             }
         }
-        debug!("nodes final set: {}", node_ids_to_str(&p_nodes)); //XXX:tmp
 
         // Check if final set forms a quorum slice for the given qset
         Self::is_quorum_slice_internal(qset, &p_nodes)

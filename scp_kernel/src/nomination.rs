@@ -463,7 +463,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    fn state_to_str(&self) -> String {
+    #[allow(dead_code)]
+    fn dbg_state_to_str(&self) -> String {
         let mut s = format!("latest_envelopes: {{\n");
         for (node_id, env) in &self.nomination().latest_nominations {
             s.push_str(&format!(
@@ -497,12 +498,12 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 let mut modified = false;
                 let mut new_candidates = false;
 
-                debug!(
-                    "nomination before promotion:\ninfo: {}\nstate: {}\nenvelope: {}",
-                    serde_json::to_string_pretty(&self.get_json_info()).unwrap(),
-                    self.state_to_str(),
-                    self.slot_proto().cd.envelope_to_str(envelope, false)
-                );
+                // debug!(
+                //     "nomination before promotion:\ninfo: {}\nstate: {}\nenvelope: {}",
+                //     serde_json::to_string_pretty(&self.get_json_info()).unwrap(),
+                //     self.dbg_state_to_str(),
+                //     self.slot_proto().cd.envelope_to_str(envelope, false)
+                // );
 
                 // Attempt to promote some of the votes to accepted
                 for v in nom.votes.iter() {
@@ -530,7 +531,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         &accept_predicate,
                         &self.nomination().latest_nominations,
                     ) {
-                        debug!("accepted {}", hex_abbrev(v));
                         let validation_level = self.validate_value(v);
                         if validation_level == ValidationLevel::FullyValid {
                             self.nomination_mut().accepted.insert(v.clone());
@@ -545,8 +545,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                                 }
                             }
                         }
-                    } else {
-                        debug!("did not accept {}", hex_abbrev(v));
                     }
                 }
 
@@ -628,10 +626,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         previous_value: &proto::SCPValue,
         timed_out: bool,
     ) -> bool {
-        debug!(
-            "nomination state: {}",
-            serde_json::to_string_pretty(&self.get_json_info()).unwrap()
-        );
+        // debug!(
+        //     "nomination state: {}",
+        //     serde_json::to_string_pretty(&self.get_json_info()).unwrap()
+        // );
 
         // No need to continue nominating, as per the whitepaper:
         // "As soon as `v` has a candidate value, however, it must cease

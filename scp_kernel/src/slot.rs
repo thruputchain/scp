@@ -357,6 +357,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         ret
     }
 
+    #[instrument(skip_all)]
     pub fn federated_accept<F1, F2>(
         &self,
         voted: &F1,
@@ -385,6 +386,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, &ratify_filter)
     }
 
+    #[instrument(skip_all)]
     pub fn federated_ratify<F>(
         &self,
         voted: &F,

@@ -369,6 +369,8 @@ struct HandleKernelState {
     validated_values: ValidatedValues,
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
+    //
+    highest_externalized: Option<SlotIndex>,
 }
 
 impl fmt::Debug for HandleKernelState {
@@ -421,6 +423,7 @@ impl HandleKernel {
             secret_key: secret_key.clone(),
             validated_values: HashMap::new(),
             tx_switch_timer,
+            highest_externalized: None,
         })))
     }
 
@@ -465,6 +468,23 @@ impl HandleKernel {
 
     pub fn purge_cached_validations(&self, slot_index: SlotIndex) {
         self.lock_mut().validated_values.remove(&slot_index);
+    }
+
+    pub fn is_above_highest_externalized(&self, slot_index: SlotIndex) -> bool {
+        if let Some(highest) = self.lock().highest_externalized {
+            slot_index > highest
+        } else {
+            true
+        }
+    }
+
+    pub fn update_highest_externalized(&self, slot_index: SlotIndex) {
+        let mut lk = self.lock_mut();
+        if let Some(old_highest) = lk.highest_externalized {
+            lk.highest_externalized = Some(std::cmp::max(slot_index, old_highest))
+        } else {
+            lk.highest_externalized = Some(slot_index)
+        }
     }
 }
 
@@ -538,6 +558,7 @@ impl ConsensusNotify for HandleKernel {
             .send(SwitchTimer::SlotExternalized(slot_index))
             .unwrap();
 
+        self.update_highest_externalized(slot_index);
         self.purge_cached_validations(slot_index);
 
         self.lock()

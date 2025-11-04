@@ -335,8 +335,13 @@ impl ControlKernel {
             "---> control kernel calling scp received envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
-        self.kernel.proto().received_envelope(env);
-        self.flush_timer_switches();
+        if self
+            .handler
+            .is_above_highest_externalized(env.statement.slot_index)
+        {
+            self.kernel.proto().received_envelope(env);
+            self.flush_timer_switches();
+        }
         info!(
             "<--- control kernel called scp receive envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
@@ -390,7 +395,11 @@ impl ControlKernel {
                     "control kernel received envelope {}",
                     self.kernel.proto().envelope_to_str(&env, false)
                 );
-                if self.kernel.proto().should_process_envelope(&env) {
+                if self
+                    .handler
+                    .is_above_highest_externalized(env.statement.slot_index)
+                    && self.kernel.proto().should_process_envelope(&env)
+                {
                     let slot_index = env.statement.slot_index;
                     let (nom_values, ballot_values) =
                         StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(

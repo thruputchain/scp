@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 #### Added
 - `section!` macro for writing tests, analog to the C++ CATCH2 test library
 
+### proto
+
+#### Added
+- Hashing, signing, verifying signatures for XDR structures
+
 ### scp_kernel
 
 #### Added

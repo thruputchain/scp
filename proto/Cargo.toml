@@ -1,6 +1,7 @@
 [package]
 name = "proto"
-version = "0.1.0"
+description = "SCP protocol manipulation utilities"
+version = "1.0.0"
 edition = "2024"
 
 [lib]

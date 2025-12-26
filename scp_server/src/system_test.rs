@@ -54,11 +54,15 @@ impl TestHandler {
     }
 
     async fn add_qset(&self, q: SCPQuorumSet) {
-        self.0
-            .lock()
+        let mut s = self.0.lock().await;
+        s.quorum_sets
+            .insert(proto::hash_xdr_scp(&q).unwrap(), q.clone());
+        s.control
+            .as_ref()
+            .unwrap()
+            .scp_control_set_qset(q)
             .await
-            .quorum_sets
-            .insert(proto::hash_xdr_scp(&q).unwrap(), q);
+            .unwrap();
     }
 
     async fn num_externalized(&self) -> usize {
@@ -291,9 +295,6 @@ async fn five() {
         increment_nomination_timeout_ms: 750,
         quorum_set: qset.clone(),
     };
-    h0.add_qset(qset.clone()).await;
-    h1.add_qset(qset.clone()).await;
-    h2.add_qset(qset.clone()).await;
 
     // services
     let s0 = start_service(client0, cfg.clone(), &sk0, true).await;
@@ -303,6 +304,10 @@ async fn five() {
     h0.set_control_service(s0.clone()).await;
     h1.set_control_service(s1.clone()).await;
     h2.set_control_service(s2.clone()).await;
+
+    h0.add_qset(qset.clone()).await;
+    h1.add_qset(qset.clone()).await;
+    h2.add_qset(qset.clone()).await;
 
     // experiment
     let nom0 = s0

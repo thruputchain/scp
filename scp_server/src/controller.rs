@@ -42,6 +42,9 @@ pub enum ControlRequest {
     StopNomination(SCPSlotIndex),
     UpdateLocalQuorumSet(SCPQuorumSet),
     ReceivedEnvelope(SCPEnvelope),
+    SetKnownQSet(SCPQuorumSet),
+    GetKnownQSet(SCPHash),
+    RemoveKnownQSet(SCPHash),
 }
 
 pub enum ControlReply {
@@ -49,6 +52,9 @@ pub enum ControlReply {
     StopNomination(),
     UpdateLocalQuorumSet(),
     ReceivedEnvelope(),
+    SetKnownQSet(Option<SCPQuorumSet>),
+    GetKnownQSet(Option<SCPQuorumSet>),
+    RemoveKnownQSet(Option<SCPQuorumSet>),
 }
 
 #[async_trait]
@@ -118,6 +124,54 @@ impl proto::SCP_Control_SCP_Control1 for ControlService {
             .unwrap();
         if let ControlReply::ReceivedEnvelope() = x.rx_reply.recv().await.unwrap() {
             Ok(())
+        } else {
+            panic!("bug")
+        }
+    }
+
+    async fn scp_control_set_qset(
+        &self,
+        qset: SCPQuorumSet,
+    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::SetKnownQSet(qset))
+            .await
+            .unwrap();
+        if let ControlReply::SetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+            Ok(optq)
+        } else {
+            panic!("bug")
+        }
+    }
+
+    async fn scp_control_get_qset(
+        &self,
+        qhash: SCPHash,
+    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::GetKnownQSet(qhash))
+            .await
+            .unwrap();
+        if let ControlReply::GetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+            Ok(optq)
+        } else {
+            panic!("bug")
+        }
+    }
+
+    async fn scp_control_remove_qset(
+        &self,
+        qhash: SCPHash,
+    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::RemoveKnownQSet(qhash))
+            .await
+            .unwrap();
+        if let ControlReply::RemoveKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+            Ok(optq)
         } else {
             panic!("bug")
         }
@@ -439,6 +493,24 @@ impl ControlKernel {
                 }
                 self.tx_reply
                     .blocking_send(ControlReply::ReceivedEnvelope())
+                    .unwrap()
+            }
+            ControlRequest::SetKnownQSet(qset) => {
+                let optq = self.handler.set_known_qset(qset);
+                self.tx_reply
+                    .blocking_send(ControlReply::SetKnownQSet(optq))
+                    .unwrap()
+            }
+            ControlRequest::GetKnownQSet(qhash) => {
+                let optq = self.handler.get_known_qset(&qhash);
+                self.tx_reply
+                    .blocking_send(ControlReply::GetKnownQSet(optq))
+                    .unwrap()
+            }
+            ControlRequest::RemoveKnownQSet(qhash) => {
+                let optq = self.handler.remove_known_qset(&qhash);
+                self.tx_reply
+                    .blocking_send(ControlReply::RemoveKnownQSet(optq))
                     .unwrap()
             }
         }

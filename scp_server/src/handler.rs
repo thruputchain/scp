@@ -318,6 +318,7 @@ pub enum HandleRequest {
     // ValidateNominationValue(SCPSlotIndex, SCPValue),
     ExtractValidValue(SCPSlotIndex, SCPValue),
     CombineCandidates(SCPSlotIndex, SCPValues),
+    #[allow(dead_code)]
     GetQuorumSet(SCPHash),
     //
     ValueExternalized(SlotIndex, SCPValue),
@@ -337,6 +338,7 @@ pub enum HandleReply {
     // ValidateNominationValue(SCPValidationLevel),
     ExtractValidValue(SCPOptValue),
     CombineCandidates(SCPOptValue),
+    #[allow(dead_code)]
     GetQuorumSet(SCPOptQuorumSet),
     //
     ValueExternalized(),

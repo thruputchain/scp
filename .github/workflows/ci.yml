@@ -19,6 +19,7 @@ jobs:
        with:
         ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
+            ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
      - name: Checkout repository
        uses: actions/checkout@v4
       

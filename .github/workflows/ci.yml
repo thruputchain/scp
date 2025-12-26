@@ -11,11 +11,19 @@ jobs:
     runs-on: self-hosted
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+     - name: Clean up .gitconfig
+        run: |
+            echo "Cleaning up .gitconfig"
+            rm -f /home/hogci/.gitconfig
+     - uses: webfactory/ssh-agent@v0.9.1
+       with:
+        ssh-private-key: |
+            ${{ secrets.SCP_TO_SELF_KEY }}
+     - name: Checkout repository
+       uses: actions/checkout@v4
       
-    - name: Run hog schedule
-      run: |
+     - name: Run hog schedule
+       run: |
           # For pull requests, use the PR branch name (github.head_ref)
           # For push/workflow_dispatch, use the branch from github.ref_name
           BRANCH_NAME="${{ github.head_ref || github.ref_name }}"

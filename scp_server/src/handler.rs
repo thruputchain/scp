@@ -367,6 +367,7 @@ struct HandleKernelState {
     secret_key: proto::SecretKey,
     //
     validated_values: ValidatedValues,
+    known_qsets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
     //
@@ -391,6 +392,7 @@ impl fmt::Debug for HandleKernelState {
             )
             .field("secret_key", &self.secret_key)
             .field("validated_values", &self.validated_values)
+            .field("known_qsets", &self.known_qsets)
             // skipping driver_calling_back
             .finish()
     }
@@ -422,6 +424,7 @@ impl HandleKernel {
             ),
             secret_key: secret_key.clone(),
             validated_values: HashMap::new(),
+            known_qsets: HashMap::new(),
             tx_switch_timer,
             highest_externalized: None,
         })))
@@ -464,6 +467,20 @@ impl HandleKernel {
         } else {
             None
         }
+    }
+
+    pub fn set_known_qset(&self, qset: proto::SCPQuorumSet) -> Option<proto::SCPQuorumSet> {
+        self.lock_mut()
+            .known_qsets
+            .insert(proto::hash_xdr_scp(&qset).unwrap(), qset)
+    }
+
+    pub fn get_known_qset(&self, hash: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+        self.lock().known_qsets.get(hash).cloned()
+    }
+
+    pub fn remove_known_qset(&self, hash: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+        self.lock_mut().known_qsets.remove(hash)
     }
 
     pub fn purge_cached_validations(&self, slot_index: SlotIndex) {
@@ -682,18 +699,23 @@ impl ConsensusNotify for HandleKernel {
 
 impl Driver for HandleKernel {
     fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
-        self.lock()
-            .tx_handle_request
-            .blocking_send(HandleRequest::GetQuorumSet(h.clone()))
-            .unwrap();
-        if let HandleReply::GetQuorumSet(q) =
-            self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
-        {
-            q
-        } else {
-            panic!("bug")
-        }
+        self.get_known_qset(h)
     }
+
+    // Alternatively, call into the app at the cost of network latency on the critical path.
+    // fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+    //     self.lock()
+    //         .tx_handle_request
+    //         .blocking_send(HandleRequest::GetQuorumSet(h.clone()))
+    //         .unwrap();
+    //     if let HandleReply::GetQuorumSet(q) =
+    //         self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
+    //     {
+    //         q
+    //     } else {
+    //         panic!("bug")
+    //     }
+    // }
 
     fn to_short_string(&self, pk: &proto::SCPNodeID) -> String {
         self.to_str_key(pk, false)

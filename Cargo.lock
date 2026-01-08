@@ -1267,6 +1267,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "scp_proto"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "rpc_driver",
+ "xdr_common",
+ "xdrs",
+]
+
+[[package]]
 name = "scp_server"
 version = "1.0.0"
 dependencies = [
@@ -1276,7 +1286,6 @@ dependencies = [
  "derivative",
  "futures",
  "groundhog_scp",
- "groundhog_xdr",
  "proto",
  "rpc_driver",
  "scp_kernel",

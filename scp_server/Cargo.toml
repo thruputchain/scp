@@ -12,7 +12,7 @@ async-trait = "0.1"
 clap = { version = "4.5.47", features = ["derive"] }
 derivative = "2.2"
 futures = "0.3"
-proto = { path = "../proto" }
+proto = { path = "../scp_util" }
 scp_kernel = { path = "../scp_kernel" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -22,12 +22,10 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 
 # git dependencies with explicit package names
-groundhog_xdr = { workspace = true }
 groundhog_scp = { workspace = true }
 
 [dependencies.xdr_common]
-git = "ssh://git@github.com/groundhogchain/xdr_common.git"
+workspace = true
 
 [dependencies.rpc_driver]
-git = "ssh://git@github.com/groundhogchain/xdr_rpc.git"
-package = "rpc_driver"
+workspace = true

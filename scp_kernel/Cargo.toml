@@ -8,7 +8,7 @@ name = "scp_kernel"
 path = "src/lib.rs"
 
 [dependencies]
-proto = { path = "../proto" }
+proto = { path = "../scp_util" }
 shfix = { path = "../shfix" }
 async-trait = "0.1"
 derive_more = { version = "2", features = ["full"] }

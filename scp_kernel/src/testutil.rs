@@ -3,31 +3,31 @@ use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
 pub fn make_envelope(
-    secret_key: &proto::SecretKey,
-    slot_index: proto::SCPSlotIndex,
-    mut statement: proto::SCPStatement,
-) -> Result<proto::SCPEnvelope, proto::SigningError> {
+    secret_key: &scp_proto::SecretKey,
+    slot_index: scp_proto::SCPSlotIndex,
+    mut statement: scp_proto::SCPStatement,
+) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
     statement.node_id = derive_public_key(secret_key);
     statement.slot_index = slot_index;
-    let signature = proto::sign_xdr(secret_key, &statement)?;
-    Ok(proto::SCPEnvelope {
+    let signature = scp_util::sign_xdr(secret_key, &statement)?;
+    Ok(scp_proto::SCPEnvelope {
         statement,
         signature,
     })
 }
 
 pub fn make_externalize(
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    commit_ballot: proto::SCPBallot,
-    n_h: proto::SCPCount,
-) -> Result<proto::SCPEnvelope, proto::SigningError> {
-    let statement = proto::SCPStatement {
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    commit_ballot: scp_proto::SCPBallot,
+    n_h: scp_proto::SCPCount,
+) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
+    let statement = scp_proto::SCPStatement {
         node_id: derive_public_key(secret_key),
         slot_index,
-        pledges: proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
-            externalize: proto::SCPStatementExternalize {
+        pledges: scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+            externalize: scp_proto::SCPStatementExternalize {
                 commit: commit_ballot,
                 n_h,
                 commit_quorum_set_hash: qset_hash,
@@ -38,19 +38,19 @@ pub fn make_externalize(
 }
 
 pub fn make_confirm(
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    prepare_counter: proto::SCPCount,
-    ballot: proto::SCPBallot,
-    n_c: proto::SCPCount,
-    n_h: proto::SCPCount,
-) -> Result<proto::SCPEnvelope, proto::SigningError> {
-    let statement = proto::SCPStatement {
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    prepare_counter: scp_proto::SCPCount,
+    ballot: scp_proto::SCPBallot,
+    n_c: scp_proto::SCPCount,
+    n_h: scp_proto::SCPCount,
+) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
+    let statement = scp_proto::SCPStatement {
         node_id: derive_public_key(secret_key),
         slot_index,
-        pledges: proto::SCPStatement_pledges::SCP_ST_CONFIRM {
-            confirm: proto::SCPStatementConfirm {
+        pledges: scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM {
+            confirm: scp_proto::SCPStatementConfirm {
                 ballot,
                 n_prepared: prepare_counter,
                 n_commit: n_c,
@@ -63,20 +63,20 @@ pub fn make_confirm(
 }
 
 pub fn make_prepare(
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    ballot: proto::SCPBallot,
-    prepared: Option<proto::SCPBallot>,
-    n_c: proto::SCPCount,
-    n_h: proto::SCPCount,
-    prepared_prime: Option<proto::SCPBallot>,
-) -> Result<proto::SCPEnvelope, proto::SigningError> {
-    let statement = proto::SCPStatement {
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    ballot: scp_proto::SCPBallot,
+    prepared: Option<scp_proto::SCPBallot>,
+    n_c: scp_proto::SCPCount,
+    n_h: scp_proto::SCPCount,
+    prepared_prime: Option<scp_proto::SCPBallot>,
+) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
+    let statement = scp_proto::SCPStatement {
         node_id: derive_public_key(secret_key),
         slot_index,
-        pledges: proto::SCPStatement_pledges::SCP_ST_PREPARE {
-            prepare: proto::SCPStatementPrepare {
+        pledges: scp_proto::SCPStatement_pledges::SCP_ST_PREPARE {
+            prepare: scp_proto::SCPStatementPrepare {
                 quorum_set_hash: qset_hash,
                 ballot,
                 prepared,
@@ -90,12 +90,12 @@ pub fn make_prepare(
 }
 
 pub fn make_nominate(
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    mut votes: Vec<proto::SCPValue>,
-    mut accepted: Vec<proto::SCPValue>,
-) -> Result<proto::SCPEnvelope, proto::SigningError> {
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    mut votes: Vec<scp_proto::SCPValue>,
+    mut accepted: Vec<scp_proto::SCPValue>,
+) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
     // Sort votes and accepted as in C++ version
     votes.sort();
     accepted.sort();
@@ -104,11 +104,11 @@ pub fn make_nominate(
     let votes_vecm = VecM(votes);
     let accepted_vecm = VecM(accepted);
 
-    let statement = proto::SCPStatement {
+    let statement = scp_proto::SCPStatement {
         node_id: derive_public_key(secret_key),
         slot_index,
-        pledges: proto::SCPStatement_pledges::SCP_ST_NOMINATE {
-            nominate: proto::SCPStatementNominate {
+        pledges: scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: scp_proto::SCPStatementNominate {
                 quorum_set_hash: qset_hash,
                 votes: votes_vecm,
                 accepted: accepted_vecm,
@@ -120,15 +120,15 @@ pub fn make_nominate(
 
 // Verification functions - compare actual envelope with expected envelope
 pub fn verify_prepare(
-    actual: &proto::SCPEnvelope,
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    ballot: proto::SCPBallot,
-    prepared: Option<proto::SCPBallot>,
-    n_c: proto::SCPCount,
-    n_h: proto::SCPCount,
-    prepared_prime: Option<proto::SCPBallot>,
+    actual: &scp_proto::SCPEnvelope,
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    ballot: scp_proto::SCPBallot,
+    prepared: Option<scp_proto::SCPBallot>,
+    n_c: scp_proto::SCPCount,
+    n_h: scp_proto::SCPCount,
+    prepared_prime: Option<scp_proto::SCPBallot>,
 ) {
     let expected = make_prepare(
         secret_key,
@@ -146,14 +146,14 @@ pub fn verify_prepare(
 }
 
 pub fn verify_confirm(
-    actual: &proto::SCPEnvelope,
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    prepare_counter: proto::SCPCount,
-    ballot: proto::SCPBallot,
-    n_c: proto::SCPCount,
-    n_h: proto::SCPCount,
+    actual: &scp_proto::SCPEnvelope,
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    prepare_counter: scp_proto::SCPCount,
+    ballot: scp_proto::SCPBallot,
+    n_c: scp_proto::SCPCount,
+    n_h: scp_proto::SCPCount,
 ) {
     let expected = make_confirm(
         secret_key,
@@ -170,12 +170,12 @@ pub fn verify_confirm(
 }
 
 pub fn verify_externalize(
-    actual: &proto::SCPEnvelope,
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    commit_ballot: proto::SCPBallot,
-    n_h: proto::SCPCount,
+    actual: &scp_proto::SCPEnvelope,
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    commit_ballot: scp_proto::SCPBallot,
+    n_h: scp_proto::SCPCount,
 ) {
     let expected = make_externalize(secret_key, qset_hash, slot_index, commit_ballot, n_h)
         .expect("Failed to create expected envelope");
@@ -184,12 +184,12 @@ pub fn verify_externalize(
 }
 
 pub fn verify_nominate(
-    actual: &proto::SCPEnvelope,
-    secret_key: &proto::SecretKey,
-    qset_hash: proto::SCPHash,
-    slot_index: proto::SCPSlotIndex,
-    votes: Vec<proto::SCPValue>,
-    accepted: Vec<proto::SCPValue>,
+    actual: &scp_proto::SCPEnvelope,
+    secret_key: &scp_proto::SecretKey,
+    qset_hash: scp_proto::SCPHash,
+    slot_index: scp_proto::SCPSlotIndex,
+    votes: Vec<scp_proto::SCPValue>,
+    accepted: Vec<scp_proto::SCPValue>,
 ) {
     let expected = make_nominate(secret_key, qset_hash, slot_index, votes, accepted)
         .expect("Failed to create expected envelope");
@@ -199,11 +199,11 @@ pub fn verify_nominate(
 
 #[derive(Clone)]
 pub struct TestValues {
-    pub x_value: proto::SCPValue,
-    pub y_value: proto::SCPValue,
-    pub z_value: proto::SCPValue,
-    pub zz_value: proto::SCPValue,
-    pub k_value: proto::SCPValue,
+    pub x_value: scp_proto::SCPValue,
+    pub y_value: scp_proto::SCPValue,
+    pub z_value: scp_proto::SCPValue,
+    pub zz_value: scp_proto::SCPValue,
+    pub k_value: scp_proto::SCPValue,
 }
 
 impl Default for TestValues {
@@ -239,7 +239,7 @@ impl Default for TestValues {
 }
 
 pub struct TestNode {
-    pub secret_key: proto::SecretKey,
+    pub secret_key: scp_proto::SecretKey,
 }
 
 impl TestNode {
@@ -253,11 +253,11 @@ impl TestNode {
 
     pub fn new(n: i64) -> TestNode {
         let seed = Sha256::digest(format!("NODE_SEED_{}", n));
-        let secret_key = proto::generate_secret_key(&seed);
+        let secret_key = scp_util::generate_secret_key(&seed);
         TestNode { secret_key }
     }
 
-    pub fn node_id(&self) -> proto::SCPNodeID {
-        proto::derive_public_key(&self.secret_key)
+    pub fn node_id(&self) -> scp_proto::SCPNodeID {
+        scp_util::derive_public_key(&self.secret_key)
     }
 }

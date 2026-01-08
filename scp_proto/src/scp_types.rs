@@ -32,6 +32,24 @@ use ::serde_arrays;
 
 
 
+#[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
+#[cfg_attr(feature = "spec", derive(XDR))]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(C)]
+pub struct uint128_xdr {
+    pub highbits: u64,
+    pub lowbits: u64,
+}
+
+#[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
+#[cfg_attr(feature = "spec", derive(XDR))]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(C)]
+pub struct int128_xdr {
+    pub highbits: i64,
+    pub lowbits: u64,
+}
+
 // ed25519 sig len is 512 bits
 // 
 // ed25519 key len is 256 bits
@@ -262,6 +280,65 @@ pub enum SecretKey {
     Ed25519 { ed25519: Ed25519SecretKey } = CryptographicScheme::Ed25519 as i32,
     
 }
+
+// 256 bit hash
+// 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
+#[cfg_attr(feature = "spec", derive(XDR))]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Default, Copy)]
+#[repr(transparent)]
+pub struct SHA256Hash {
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    inner: [u8; 32 as usize],
+}
+impl From<[u8; 32 as usize]> for SHA256Hash {
+    fn from(_inner: [u8; 32 as usize]) -> Self {
+        Self { inner: _inner }
+    }
+}
+impl SHA256Hash {
+    pub fn into_inner(self) -> [u8; 32 as usize] {
+        self.inner
+    }
+    pub const fn new(_inner: [u8; 32 as usize]) -> Self {
+        Self { inner: _inner }
+    }
+}
+
+impl Deref for SHA256Hash {
+    type Target = [u8; 32 as usize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+impl DerefMut for SHA256Hash {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+impl AsRef<[u8]> for SHA256Hash {
+    fn as_ref(&self) -> &[u8] {
+        self.deref().as_slice()
+    }
+}
+impl<'a> From<&'a [u8; 32]> for &'a SHA256Hash {
+    fn from(arr: &[u8; 32]) -> Self {
+        let ptr = arr as *const [u8; 32] as *const SHA256Hash;
+        unsafe { &*ptr }
+    }
+}
+#[cfg(feature = "xdrs")]
+impl<'r> ReadXDR<'r> for &'r SHA256Hash {
+    fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
+        let arr: &[u8; 32] = xdrs::read_xdr(r)?;
+        let val = Self::from(arr);
+        Ok(val)
+    }
+}
+
 
 
 //

@@ -98,14 +98,14 @@ async fn main() {
     // handle client
 
     let handle_socket_addr: SocketAddr = args.handle_addr.parse().unwrap();
-    let handle_client = proto::SCP_Handle_SCP_Handle1_Client::new(
+    let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handle_socket_addr).await.unwrap(),
     );
 
     // create server
 
     assert!(!args.secret_key.is_empty(), "no secret key provided");
-    let secret_key = proto::parse_secret_key_from_base64(&args.secret_key)
+    let secret_key = scp_util::parse_secret_key_from_base64(&args.secret_key)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
     let service = start_service(handle_client, cfg, &secret_key, args.is_validator.unwrap()).await;
@@ -116,7 +116,7 @@ async fn main() {
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
-        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
+        scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
     ));
 
     let control_server = RpcServer::new(control_service_map, control_listener);

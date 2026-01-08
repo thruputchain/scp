@@ -13,13 +13,13 @@ pub enum QSetError {
 
 struct QuorumSetSanityChecker {
     extra_checks: bool,
-    known_nodes: HashSet<proto::SCPNodeID>,
+    known_nodes: HashSet<scp_proto::SCPNodeID>,
     is_sane: bool,
     count: usize,
 }
 
 impl QuorumSetSanityChecker {
-    fn new(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<Self, QSetError> {
+    fn new(qset: &scp_proto::SCPQuorumSet, extra_checks: bool) -> Result<Self, QSetError> {
         let mut checker = QuorumSetSanityChecker {
             extra_checks,
             known_nodes: HashSet::new(),
@@ -42,7 +42,11 @@ impl QuorumSetSanityChecker {
         self.is_sane
     }
 
-    fn check_sanity(&mut self, qset: &proto::SCPQuorumSet, depth: u32) -> Result<bool, QSetError> {
+    fn check_sanity(
+        &mut self,
+        qset: &scp_proto::SCPQuorumSet,
+        depth: u32,
+    ) -> Result<bool, QSetError> {
         if depth > MAXIMUM_QUORUM_NESTING_LEVEL {
             return Err(QSetError::SanityError(
                 "maximum quorum nesting level exceeded".to_string(),
@@ -93,7 +97,7 @@ impl QuorumSetSanityChecker {
     }
 }
 
-pub fn is_qset_sane(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<(), QSetError> {
+pub fn is_qset_sane(qset: &scp_proto::SCPQuorumSet, extra_checks: bool) -> Result<(), QSetError> {
     let checker = QuorumSetSanityChecker::new(qset, extra_checks)?;
     if checker.is_sane() {
         Ok(())
@@ -103,8 +107,8 @@ pub fn is_qset_sane(qset: &proto::SCPQuorumSet, extra_checks: bool) -> Result<()
 }
 
 fn normalize_qset_simplify(
-    qset: &mut proto::SCPQuorumSet,
-    id_to_remove: Option<&proto::SCPNodeID>,
+    qset: &mut scp_proto::SCPQuorumSet,
+    id_to_remove: Option<&scp_proto::SCPNodeID>,
 ) {
     // remove the specified node ID if provided
     if let Some(id_to_remove) = id_to_remove {
@@ -144,16 +148,16 @@ fn normalize_qset_simplify(
     }
 }
 
-pub fn compare_public_key(l: &proto::PublicKey, r: &proto::PublicKey) -> Ordering {
+pub fn compare_public_key(l: &scp_proto::PublicKey, r: &scp_proto::PublicKey) -> Ordering {
     match (l, r) {
         (
-            proto::PublicKey::Ed25519 { ed25519: l_key },
-            proto::PublicKey::Ed25519 { ed25519: r_key },
+            scp_proto::PublicKey::Ed25519 { ed25519: l_key },
+            scp_proto::PublicKey::Ed25519 { ed25519: r_key },
         ) => l_key.as_ref().cmp(r_key.as_ref()),
     }
 }
 
-fn qset_compare(l: &proto::SCPQuorumSet, r: &proto::SCPQuorumSet) -> Ordering {
+fn qset_compare(l: &scp_proto::SCPQuorumSet, r: &scp_proto::SCPQuorumSet) -> Ordering {
     // Compare by validators first - lexicographically (element by element)
     for (l_validator, r_validator) in l.validators.0.iter().zip(r.validators.0.iter()) {
         let validator_cmp = compare_public_key(l_validator, r_validator);
@@ -186,7 +190,7 @@ fn qset_compare(l: &proto::SCPQuorumSet, r: &proto::SCPQuorumSet) -> Ordering {
     l.threshold.cmp(&r.threshold)
 }
 
-fn normalize_quorum_set_reorder(qset: &mut proto::SCPQuorumSet) {
+fn normalize_quorum_set_reorder(qset: &mut scp_proto::SCPQuorumSet) {
     // Sort validators using custom comparison
     qset.validators.0.sort_by(compare_public_key);
 
@@ -199,7 +203,10 @@ fn normalize_quorum_set_reorder(qset: &mut proto::SCPQuorumSet) {
     qset.inner_sets.0.sort_by(qset_compare);
 }
 
-pub fn normalize_qset(qset: &mut proto::SCPQuorumSet, id_to_remove: Option<&proto::SCPNodeID>) {
+pub fn normalize_qset(
+    qset: &mut scp_proto::SCPQuorumSet,
+    id_to_remove: Option<&scp_proto::SCPNodeID>,
+) {
     normalize_qset_simplify(qset, id_to_remove);
     normalize_quorum_set_reorder(qset);
 }

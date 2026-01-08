@@ -1,4 +1,4 @@
-pub use proto::*;
+pub use scp_util::*;
 
 mod consensus;
 pub use consensus::*;

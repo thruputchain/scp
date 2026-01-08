@@ -1,6 +1,7 @@
 use crate::controller::*;
 use futures::future::join_all;
 use scp_kernel::*;
+use scp_proto::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -366,10 +367,10 @@ struct HandleKernelState {
     initial_nomination_timeout: Duration,
     increment_nomination_timeout: Duration,
     //
-    secret_key: proto::SecretKey,
+    secret_key: scp_proto::SecretKey,
     //
     validated_values: ValidatedValues,
-    known_qsets: HashMap<proto::SCPHash, proto::SCPQuorumSet>,
+    known_qsets: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>,
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
     //
@@ -411,8 +412,8 @@ impl HandleKernel {
         tx_handle_request: Sender<HandleRequest>,
         rx_handle_reply: Receiver<HandleReply>,
         tx_switch_timer: UnboundedSender<SwitchTimer>,
-        cfg: &proto::SCPConfig,
-        secret_key: &proto::SecretKey,
+        cfg: &scp_proto::SCPConfig,
+        secret_key: &scp_proto::SecretKey,
     ) -> HandleKernel {
         HandleKernel(Arc::new(StdRwLock::new(HandleKernelState {
             tx_handle_request,
@@ -440,7 +441,7 @@ impl HandleKernel {
         self.0.write().unwrap()
     }
 
-    fn envelope_to_str(&self, env: &proto::SCPEnvelope) -> String {
+    fn envelope_to_str(&self, env: &scp_proto::SCPEnvelope) -> String {
         let cd = ConsensusDriver::<HandleKernel, HandleKernel>::new(self.clone(), self.clone());
         cd.envelope_to_str(env, false)
     }
@@ -448,7 +449,7 @@ impl HandleKernel {
     pub fn set_cached_validation(
         &self,
         slot_index: SlotIndex,
-        v: proto::SCPValue,
+        v: scp_proto::SCPValue,
         l: ValidationLevel,
     ) {
         let mut state = self.lock_mut();
@@ -462,7 +463,7 @@ impl HandleKernel {
     pub fn get_cached_validation(
         &self,
         slot_index: SlotIndex,
-        v: &proto::SCPValue,
+        v: &scp_proto::SCPValue,
     ) -> Option<ValidationLevel> {
         if let Some(x) = self.lock().validated_values.get(&slot_index) {
             x.get(v).cloned()
@@ -471,17 +472,17 @@ impl HandleKernel {
         }
     }
 
-    pub fn set_known_qset(&self, qset: proto::SCPQuorumSet) -> Option<proto::SCPQuorumSet> {
+    pub fn set_known_qset(&self, qset: scp_proto::SCPQuorumSet) -> Option<scp_proto::SCPQuorumSet> {
         self.lock_mut()
             .known_qsets
-            .insert(proto::hash_xdr_scp(&qset).unwrap(), qset)
+            .insert(scp_util::hash_xdr_scp(&qset).unwrap(), qset)
     }
 
-    pub fn get_known_qset(&self, hash: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+    pub fn get_known_qset(&self, hash: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet> {
         self.lock().known_qsets.get(hash).cloned()
     }
 
-    pub fn remove_known_qset(&self, hash: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+    pub fn remove_known_qset(&self, hash: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet> {
         self.lock_mut().known_qsets.remove(hash)
     }
 
@@ -511,7 +512,7 @@ impl Consensus for HandleKernel {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
+        value: &scp_proto::SCPValue,
     ) -> ValidationLevel {
         self.get_cached_validation(slot_index, value).unwrap()
     }
@@ -519,7 +520,7 @@ impl Consensus for HandleKernel {
     fn validate_nomination_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
+        value: &scp_proto::SCPValue,
     ) -> ValidationLevel {
         self.get_cached_validation(slot_index, value).unwrap()
     }
@@ -527,8 +528,8 @@ impl Consensus for HandleKernel {
     fn extract_valid_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &proto::SCPValue,
-    ) -> Option<proto::SCPValue> {
+        value: &scp_proto::SCPValue,
+    ) -> Option<scp_proto::SCPValue> {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ExtractValidValue(slot_index, value.clone()))
@@ -545,8 +546,8 @@ impl Consensus for HandleKernel {
     fn combine_candidates(
         &self,
         slot_index: SCPSlotIndex,
-        candidates: &HashSet<proto::SCPValue>,
-    ) -> Option<proto::SCPValue> {
+        candidates: &HashSet<scp_proto::SCPValue>,
+    ) -> Option<scp_proto::SCPValue> {
         let mut candidates_vec = VecM::<SCPValue>(candidates.iter().cloned().collect());
         candidates_vec.0.sort();
         self.lock()
@@ -565,7 +566,7 @@ impl Consensus for HandleKernel {
 
 impl ConsensusNotify for HandleKernel {
     #[tracing::instrument(skip_all)]
-    fn value_externalized(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+    fn value_externalized(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         info!(
             "externalizing value {} for slot {}",
             scp_kernel::hex_abbrev(value),
@@ -592,7 +593,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+    fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::StartedBallotProto(
@@ -608,7 +609,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+    fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::AcceptedBallotPrepared(
@@ -624,7 +625,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+    fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ConfirmedBallotPrepared(
@@ -640,7 +641,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn accepted_commit(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+    fn accepted_commit(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::AcceptedCommit(slot_index, ballot.clone()))
@@ -653,7 +654,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &proto::SCPBallot) {
+    fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::BallotDidHearFromQuorum(
@@ -669,7 +670,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn nominating_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+    fn nominating_value(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::NominatingValue(slot_index, value.clone()))
@@ -682,7 +683,7 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
-    fn updated_candidate_value(&self, slot_index: SlotIndex, value: &proto::SCPValue) {
+    fn updated_candidate_value(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::UpdatedCandidateValue(
@@ -700,12 +701,12 @@ impl ConsensusNotify for HandleKernel {
 }
 
 impl Driver for HandleKernel {
-    fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+    fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet> {
         self.get_known_qset(h)
     }
 
     // Alternatively, call into the app at the cost of network latency on the critical path.
-    // fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet> {
+    // fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet> {
     //     self.lock()
     //         .tx_handle_request
     //         .blocking_send(HandleRequest::GetQuorumSet(h.clone()))
@@ -719,11 +720,11 @@ impl Driver for HandleKernel {
     //     }
     // }
 
-    fn to_short_string(&self, pk: &proto::SCPNodeID) -> String {
+    fn to_short_string(&self, pk: &scp_proto::SCPNodeID) -> String {
         self.to_str_key(pk, false)
     }
 
-    fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String {
+    fn to_str_key(&self, pk: &scp_proto::SCPNodeID, full_key: bool) -> String {
         match pk {
             PublicKey::Ed25519 { ed25519 } => {
                 if full_key {
@@ -735,22 +736,22 @@ impl Driver for HandleKernel {
         }
     }
 
-    fn from_str_key(&self, s: &str) -> Result<proto::SCPNodeID, String> {
+    fn from_str_key(&self, s: &str) -> Result<scp_proto::SCPNodeID, String> {
         parse_node_id_from_hex(s)
     }
 
-    fn get_value_string(&self, value: &proto::SCPValue) -> String {
+    fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
         format!("{}", hex_abbrev(&value.0))
     }
 
-    fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash {
+    fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {
         hash_bytes(opaque)
     }
 
     fn get_node_weight(
         &self,
-        node_id: &proto::SCPNodeID,
-        qset: &proto::SCPQuorumSet,
+        node_id: &scp_proto::SCPNodeID,
+        qset: &scp_proto::SCPQuorumSet,
         is_local_node: bool,
     ) -> u64 {
         get_node_weight(node_id, qset, is_local_node)
@@ -758,23 +759,25 @@ impl Driver for HandleKernel {
 
     fn compute_hash_node(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
+        slot_index: scp_proto::SCPSlotIndex,
+        prev: &scp_proto::SCPValue,
         is_priority: bool,
-        round_number: proto::SCPCount,
-        node_id: &proto::SCPNodeID,
+        round_number: scp_proto::SCPCount,
+        node_id: &scp_proto::SCPNodeID,
     ) -> u64 {
         hash_helper(
             slot_index,
             prev,
             |v| {
                 v.push(BytesM(
-                    proto::marshal_xdr(if is_priority { &HASH_P } else { &HASH_N })
+                    scp_util::marshal_xdr(if is_priority { &HASH_P } else { &HASH_N })
                         .unwrap()
                         .to_vec(),
                 ));
-                v.push(BytesM(proto::marshal_xdr(&round_number).unwrap().to_vec()));
-                v.push(BytesM(proto::marshal_xdr(node_id).unwrap().to_vec()));
+                v.push(BytesM(
+                    scp_util::marshal_xdr(&round_number).unwrap().to_vec(),
+                ));
+                v.push(BytesM(scp_util::marshal_xdr(node_id).unwrap().to_vec()));
             },
             |b| self.get_hash_of(b),
         )
@@ -782,28 +785,30 @@ impl Driver for HandleKernel {
 
     fn compute_value_hash(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
-        round_number: proto::SCPCount,
-        value: &proto::SCPValue,
+        slot_index: scp_proto::SCPSlotIndex,
+        prev: &scp_proto::SCPValue,
+        round_number: scp_proto::SCPCount,
+        value: &scp_proto::SCPValue,
     ) -> u64 {
         hash_helper(
             slot_index,
             prev,
             |v| {
-                v.push(BytesM(proto::marshal_xdr(&HASH_K).unwrap().to_vec()));
-                v.push(BytesM(proto::marshal_xdr(&round_number).unwrap().to_vec()));
-                v.push(BytesM(proto::marshal_xdr(value).unwrap().to_vec()));
+                v.push(BytesM(scp_util::marshal_xdr(&HASH_K).unwrap().to_vec()));
+                v.push(BytesM(
+                    scp_util::marshal_xdr(&round_number).unwrap().to_vec(),
+                ));
+                v.push(BytesM(scp_util::marshal_xdr(value).unwrap().to_vec()));
             },
             |b| self.get_hash_of(b),
         )
     }
 
-    fn sign_envelope(&self, env: &mut proto::SCPEnvelope) {
+    fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope) {
         env.signature = sign_xdr(&self.lock().secret_key, &env.statement).unwrap()
     }
 
-    fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration {
+    fn compute_timeout(&self, round_number: scp_proto::SCPCount, is_nomination: bool) -> Duration {
         let (initial_timeout_ms, increment_ms) = if is_nomination {
             (
                 self.lock().initial_nomination_timeout.as_millis(),
@@ -824,7 +829,7 @@ impl Driver for HandleKernel {
     }
 
     #[tracing::instrument(skip_all)]
-    fn emit_envelope(&self, env: proto::SCPEnvelope) {
+    fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
         info!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()
             .tx_handle_request
@@ -859,7 +864,7 @@ impl Driver for HandleKernel {
     }
 }
 
-fn to_validation_level(x: proto::SCPValidationLevel) -> ValidationLevel {
+fn to_validation_level(x: scp_proto::SCPValidationLevel) -> ValidationLevel {
     match x {
         SCPValidationLevel::SCP_INVALID => ValidationLevel::Invalid,
         SCPValidationLevel::SCP_MAYBE_VALID => ValidationLevel::MaybeValid,

@@ -1,6 +1,6 @@
 #[cfg(test)]
 use crate::qset::*;
-use proto::*;
+use scp_proto::*;
 use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
@@ -206,7 +206,7 @@ fn test_nested_quorum_sets() {
         }
 
         // Create expected normalized version
-        let mut expected_normalized = proto::SCPQuorumSet {
+        let mut expected_normalized = scp_proto::SCPQuorumSet {
             threshold: 1,
             validators: VecM(vec![]),
             inner_sets: VecM(vec![]),

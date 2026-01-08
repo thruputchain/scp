@@ -6,90 +6,92 @@
 %#include "types.hh"
 
 namespace hogd {
-  // clang-format on
+// clang-format on
 
-  typedef opaque SCPHash[32];
-  typedef PublicKey SCPNodeID;
+typedef opaque SCPHash[32];
+typedef PublicKey SCPNodeID;
 
-  typedef unsigned int SCPCount;
-  typedef unsigned hyper SCPSlotIndex;
+typedef unsigned int SCPCount;
+typedef unsigned hyper SCPSlotIndex;
 
-  typedef opaque SCPValue<>;
-  typedef SCPValue SCPValues<>;
-  typedef SCPValue *SCPOptValue;
+typedef opaque SCPValue<>;
+typedef SCPValue SCPValues<>;
+typedef SCPValue *SCPOptValue;
 
-  struct SCPBallot {
-    SCPCount counter; // n
-    SCPValue value;   // x
-  };
+struct SCPBallot {
+  SCPCount counter; // n
+  SCPValue value;   // x
+};
 
-  enum SCPStatementType {
-    SCP_ST_PREPARE = 0,
-    SCP_ST_CONFIRM = 1,
-    SCP_ST_EXTERNALIZE = 2,
-    SCP_ST_NOMINATE = 3
-  };
+enum SCPStatementType {
+  SCP_ST_PREPARE = 0,
+  SCP_ST_CONFIRM = 1,
+  SCP_ST_EXTERNALIZE = 2,
+  SCP_ST_NOMINATE = 3
+};
 
-  struct SCPStatementNominate {
-    SCPHash quorum_set_hash; // D
-    SCPValue votes<>;        // X
-    SCPValue accepted<>;     // Y
-  };
+struct SCPStatementNominate {
+  SCPHash quorum_set_hash; // D
+  SCPValue votes<>;        // X
+  SCPValue accepted<>;     // Y
+};
 
-  struct SCPStatementPrepare {
-    SCPHash quorum_set_hash;   // D
-    SCPBallot ballot;          // b
-    SCPBallot *prepared;       // p
-    SCPBallot *prepared_prime; // p'
-    SCPCount n_c;              // c.n
-    SCPCount n_h;              // h.n
-  };
+struct SCPStatementPrepare {
+  SCPHash quorum_set_hash;   // D
+  SCPBallot ballot;          // b
+  SCPBallot *prepared;       // p
+  SCPBallot *prepared_prime; // p'
+  SCPCount n_c;              // c.n
+  SCPCount n_h;              // h.n
+};
 
-  struct SCPStatementConfirm {
-    SCPBallot ballot;        // b
-    SCPCount n_prepared;     // p.n
-    SCPCount n_commit;       // c.n
-    SCPCount n_h;            // h.n
-    SCPHash quorum_set_hash; // D
-  };
+struct SCPStatementConfirm {
+  SCPBallot ballot;        // b
+  SCPCount n_prepared;     // p.n
+  SCPCount n_commit;       // c.n
+  SCPCount n_h;            // h.n
+  SCPHash quorum_set_hash; // D
+};
 
-  struct SCPStatementExternalize {
-    SCPBallot commit;               // c
-    SCPCount n_h;                   // h.n
-    SCPHash commit_quorum_set_hash; // D used before EXTERNALIZE
-  };
+struct SCPStatementExternalize {
+  SCPBallot commit;               // c
+  SCPCount n_h;                   // h.n
+  SCPHash commit_quorum_set_hash; // D used before EXTERNALIZE
+};
 
-  struct SCPStatement {
-    SCPNodeID node_id;       // v
-    SCPSlotIndex slot_index; // i
+struct SCPStatement {
+  SCPNodeID node_id;       // v
+  SCPSlotIndex slot_index; // i
 
-    union switch (SCPStatementType stmt_type)
-    {
-    case SCP_ST_PREPARE:
-      SCPStatementPrepare prepare;
-    case SCP_ST_CONFIRM:
-      SCPStatementConfirm confirm;
-    case SCP_ST_EXTERNALIZE:
-      SCPStatementExternalize externalize;
-    case SCP_ST_NOMINATE:
-      SCPStatementNominate nominate;
-    }
-    pledges;
-  };
+  union switch (SCPStatementType stmt_type)
+  {
+  case SCP_ST_PREPARE:
+    SCPStatementPrepare prepare;
+  case SCP_ST_CONFIRM:
+    SCPStatementConfirm confirm;
+  case SCP_ST_EXTERNALIZE:
+    SCPStatementExternalize externalize;
+  case SCP_ST_NOMINATE:
+    SCPStatementNominate nominate;
+  }
+  pledges;
+};
 
-  struct SCPEnvelope {
-    SCPStatement statement;
-    Signature signature;
-  };
+struct SCPEnvelope {
+  SCPStatement statement;
+  Signature signature;
+};
 
-  // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
-  // only allows 2 levels of nesting
-  struct SCPQuorumSet {
-    SCPCount threshold;
-    SCPNodeID validators<>;
-    SCPQuorumSet inner_sets<>;
-  };
+typedef SCPEnvelope SCPEnvelopes<>;
 
-  typedef SCPQuorumSet *SCPOptQuorumSet;
+// supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
+// only allows 2 levels of nesting
+struct SCPQuorumSet {
+  SCPCount threshold;
+  SCPNodeID validators<>;
+  SCPQuorumSet inner_sets<>;
+};
+
+typedef SCPQuorumSet *SCPOptQuorumSet;
 
 } // namespace hogd

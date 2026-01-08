@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use proto::*;
 use rpc_driver::connect_client;
+use scp_proto::*;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -56,7 +56,7 @@ impl TestHandler {
     async fn add_qset(&self, q: SCPQuorumSet) {
         let mut s = self.0.lock().await;
         s.quorum_sets
-            .insert(proto::hash_xdr_scp(&q).unwrap(), q.clone());
+            .insert(scp_util::hash_xdr_scp(&q).unwrap(), q.clone());
         s.control
             .as_ref()
             .unwrap()
@@ -71,7 +71,7 @@ impl TestHandler {
 }
 
 #[async_trait]
-impl proto::SCP_Handle_SCP_Handle1 for TestHandler {
+impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
     async fn scp_handle_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
@@ -257,30 +257,30 @@ async fn five() {
     // clients
 
     // let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
-    let client0 = proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client0 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler0_sockaddr).await.unwrap(),
     );
 
     // let handler1_sockaddr: SocketAddr = "localhost:7771".parse().unwrap();
-    let client1 = proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client1 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler1_sockaddr).await.unwrap(),
     );
 
     // let handler2_sockaddr: SocketAddr = "localhost:7772".parse().unwrap();
-    let client2 = proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client2 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler2_sockaddr).await.unwrap(),
     );
 
     // secret keys
-    let sk0 = proto::generate_secret_key(&[0]);
-    let sk1 = proto::generate_secret_key(&[1]);
-    let sk2 = proto::generate_secret_key(&[2]);
+    let sk0 = scp_util::generate_secret_key(&[0]);
+    let sk1 = scp_util::generate_secret_key(&[1]);
+    let sk2 = scp_util::generate_secret_key(&[2]);
 
     // configs
     let vs = VecM(vec![
-        proto::derive_public_key(&sk0),
-        proto::derive_public_key(&sk1),
-        proto::derive_public_key(&sk2),
+        scp_util::derive_public_key(&sk0),
+        scp_util::derive_public_key(&sk1),
+        scp_util::derive_public_key(&sk2),
     ]);
     let qset = SCPQuorumSet {
         threshold: 2,

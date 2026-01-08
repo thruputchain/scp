@@ -12,7 +12,8 @@ async-trait = "0.1"
 clap = { version = "4.5.47", features = ["derive"] }
 derivative = "2.2"
 futures = "0.3"
-proto = { path = "../scp_util" }
+scp_proto = { path = "../scp_proto" }
+scp_util = { path = "../scp_util" }
 scp_kernel = { path = "../scp_kernel" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -20,9 +21,6 @@ tokio = { version = "1.47.1", features = ["full"] }
 console-subscriber = "0.4"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-
-# git dependencies with explicit package names
-groundhog_scp = { workspace = true }
 
 [dependencies.xdr_common]
 workspace = true

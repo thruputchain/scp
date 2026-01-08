@@ -1,8 +1,7 @@
-use crate as proto;
 use ed25519_dalek::SigningKey;
 use sha2::{Digest, Sha256};
 
-pub fn generate_secret_key(seed: &[u8]) -> proto::SecretKey {
+pub fn generate_secret_key(seed: &[u8]) -> scp_proto::SecretKey {
     let mut hasher = Sha256::new();
     hasher.update(seed);
     let hash = hasher.finalize();
@@ -14,32 +13,32 @@ pub fn generate_secret_key(seed: &[u8]) -> proto::SecretKey {
     secret_key_bytes[..32].copy_from_slice(&signing_key.to_bytes());
     secret_key_bytes[32..].copy_from_slice(&signing_key.verifying_key().to_bytes());
 
-    proto::SecretKey::Ed25519 {
-        ed25519: proto::Ed25519SecretKey::from(secret_key_bytes),
+    scp_proto::SecretKey::Ed25519 {
+        ed25519: scp_proto::Ed25519SecretKey::from(secret_key_bytes),
     }
 }
 
-pub fn derive_public_key(secret_key: &proto::SecretKey) -> proto::PublicKey {
+pub fn derive_public_key(secret_key: &scp_proto::SecretKey) -> scp_proto::PublicKey {
     match secret_key {
-        proto::SecretKey::Ed25519 { ed25519 } => {
+        scp_proto::SecretKey::Ed25519 { ed25519 } => {
             let secret_bytes: &[u8; 32] = &ed25519[..32].try_into().unwrap();
             let signing_key = SigningKey::from_bytes(secret_bytes);
             let public_bytes = signing_key.verifying_key().to_bytes();
 
-            proto::PublicKey::Ed25519 {
-                ed25519: proto::Ed25519PublicKey::from(public_bytes),
+            scp_proto::PublicKey::Ed25519 {
+                ed25519: scp_proto::Ed25519PublicKey::from(public_bytes),
             }
         }
     }
 }
 
-pub fn derive_node_id(sk: &proto::SecretKey) -> proto::SCPNodeID {
+pub fn derive_node_id(sk: &scp_proto::SecretKey) -> scp_proto::SCPNodeID {
     derive_public_key(sk)
 }
 
 /// Parse a SecretKey from a Base64 standard encoded string of the 64-byte secret key
-pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<proto::SecretKey, String> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<scp_proto::SecretKey, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
 
     if base64_str.is_empty() {
         return Err("empty base64 string".to_string());
@@ -57,7 +56,7 @@ pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<proto::SecretKey
         .try_into()
         .map_err(|_| "failed to convert to 64-byte array".to_string())?;
 
-    Ok(proto::SecretKey::Ed25519 {
-        ed25519: proto::Ed25519SecretKey::from(secret_key_bytes),
+    Ok(scp_proto::SecretKey::Ed25519 {
+        ed25519: scp_proto::Ed25519SecretKey::from(secret_key_bytes),
     })
 }

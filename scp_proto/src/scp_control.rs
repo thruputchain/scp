@@ -32,7 +32,7 @@ use xdrs::xdr_repr::*;
 #[async_trait::async_trait]
 pub trait SCP_Control_SCP_Control1: Send + Sync {    
     async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError>;
-          // arguments: slot index, value to nominate, previous value
+        // arguments: slot index, value to nominate, previous value
 
     async fn scp_control_nominate(&self, arg0 : SCPSlotIndex, arg1 : SCPValue, arg2 : SCPValue) -> Result<bool, ::rpc_driver::ProgramError>;
     
@@ -41,6 +41,12 @@ pub trait SCP_Control_SCP_Control1: Send + Sync {
     async fn scp_control_update_local_quorum_set(&self, arg0 : SCPQuorumSet) -> Result<(), ::rpc_driver::ProgramError>;
     
     async fn scp_control_received_envelope(&self, arg0 : SCPEnvelope) -> Result<(), ::rpc_driver::ProgramError>;
+    
+    async fn scp_control_set_qset(&self, arg0 : SCPQuorumSet) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
+    
+    async fn scp_control_get_qset(&self, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
+    
+    async fn scp_control_remove_qset(&self, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
 }
 
 
@@ -97,6 +103,27 @@ impl ::rpc_driver::ServerDispatch for SCP_Control_SCP_Control1_Dispatcher {
                 let res = self.inner.scp_control_received_envelope(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::serialize_txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
+            // scp_control_set_qset
+            300 => {
+                let args: (SCPQuorumSet, ) =
+                    xdrs::serialize_txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+                let res = self.inner.scp_control_set_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                xdrs::serialize_txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
+            }
+            // scp_control_get_qset
+            301 => {
+                let args: (SCPHash, ) =
+                    xdrs::serialize_txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+                let res = self.inner.scp_control_get_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                xdrs::serialize_txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
+            }
+            // scp_control_remove_qset
+            302 => {
+                let args: (SCPHash, ) =
+                    xdrs::serialize_txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+                let res = self.inner.scp_control_remove_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                xdrs::serialize_txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
+            }
             _ => Err(::rpc_driver::RpcError::InvalidProcedure),
         }
     }
@@ -138,6 +165,21 @@ impl SCP_Control_SCP_Control1_Client {
     pub async fn scp_control_received_envelope(&self, arg0 : &SCPEnvelope) -> Result<(), ::rpc_driver::RpcError> {
          let data = xdrs::serialize_txs::encode(&(&arg0)).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
          let buf = self.handle.send_call(Self::prog_vers(), 200, &data).await?;
+         xdrs::serialize_txs::decode(&buf).map_err(|_| ::rpc_driver::RpcError::SystemError)
+    }
+    pub async fn scp_control_set_qset(&self, arg0 : &SCPQuorumSet) -> Result<SCPOptQuorumSet, ::rpc_driver::RpcError> {
+         let data = xdrs::serialize_txs::encode(&(&arg0)).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+         let buf = self.handle.send_call(Self::prog_vers(), 300, &data).await?;
+         xdrs::serialize_txs::decode(&buf).map_err(|_| ::rpc_driver::RpcError::SystemError)
+    }
+    pub async fn scp_control_get_qset(&self, arg0 : &SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::RpcError> {
+         let data = xdrs::serialize_txs::encode(&(&arg0)).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+         let buf = self.handle.send_call(Self::prog_vers(), 301, &data).await?;
+         xdrs::serialize_txs::decode(&buf).map_err(|_| ::rpc_driver::RpcError::SystemError)
+    }
+    pub async fn scp_control_remove_qset(&self, arg0 : &SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::RpcError> {
+         let data = xdrs::serialize_txs::encode(&(&arg0)).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
+         let buf = self.handle.send_call(Self::prog_vers(), 302, &data).await?;
          xdrs::serialize_txs::decode(&buf).map_err(|_| ::rpc_driver::RpcError::SystemError)
     }
 }

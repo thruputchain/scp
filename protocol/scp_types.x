@@ -1,7 +1,15 @@
 // clang-format off
-%#include "scp.hh"
-
 namespace hogd {
+
+struct uint128_xdr {
+  unsigned hyper highbits;
+  unsigned hyper lowbits;
+};
+
+struct int128_xdr {
+  hyper highbits;
+  unsigned hyper lowbits;
+};
 
 // ed25519 sig len is 512 bits
 typedef opaque Ed25519Signature[64]; // #[rust(newtype)]
@@ -31,5 +39,8 @@ union SecretKey switch (CryptographicScheme scheme)
 case Ed25519:
   Ed25519SecretKey ed25519;
 };
+
+// 256 bit hash
+typedef opaque SHA256Hash[32]; // #[rust(newtype)]
 
 } // namespace hogd

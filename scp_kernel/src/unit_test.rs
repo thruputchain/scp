@@ -2,6 +2,7 @@
 mod unit_tests {
     use crate::testutil::*;
     use crate::*;
+    use scp_proto::*;
     use shfix::shfix;
     use std::collections::{HashMap, HashSet};
     use std::u32;
@@ -60,17 +61,17 @@ mod unit_tests {
     }
 
     fn make_qset(
-        node_ids: &[proto::SCPNodeID],
+        node_ids: &[scp_proto::SCPNodeID],
         threshold: u32,
         total: usize,
         offset: usize,
-    ) -> proto::SCPQuorumSet {
+    ) -> scp_proto::SCPQuorumSet {
         let mut validators = Vec::new();
         for i in 0..total {
             validators.push(node_ids[i + offset].clone());
         }
 
-        proto::SCPQuorumSet {
+        scp_proto::SCPQuorumSet {
             threshold,
             validators: VecM(validators),
             inner_sets: VecM(vec![]),
@@ -82,19 +83,19 @@ mod unit_tests {
     fn nomination_weight_stats() {
         let nodes = TestNode::new_batch(7);
 
-        let node_ids: Vec<proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
+        let node_ids: Vec<scp_proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
 
         let total_slots = 1000;
         let max_round_per_slot = 5; // 5 -> 15 seconds
         let total_rounds = total_slots * max_round_per_slot;
 
-        let run_tests = |qset: &proto::SCPQuorumSet| -> HashMap<proto::SCPNodeID, i32> {
-            let mut wins = HashMap::<proto::SCPNodeID, i32>::new();
+        let run_tests = |qset: &scp_proto::SCPQuorumSet| -> HashMap<scp_proto::SCPNodeID, i32> {
+            let mut wins = HashMap::<scp_proto::SCPNodeID, i32>::new();
 
             let mut uk = UnitTestKernel::new(node_ids[0].clone(), qset.clone(), true);
 
             for s in 0..total_slots {
-                let mut value = proto::SCPValue::default();
+                let mut value = scp_proto::SCPValue::default();
                 value.0.push(s as u8); // anything will do as a value
 
                 let mut proto = uk.proto();
@@ -170,7 +171,7 @@ mod unit_tests {
     fn nomination_two_nodes_win() {
         let nb_rounds_for_stats = 9;
         let nodes = TestNode::new_batch(7);
-        let node_ids: Vec<proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
+        let node_ids: Vec<scp_proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
 
         let total_iter = 10000;
 
@@ -178,15 +179,15 @@ mod unit_tests {
         // the iteration is considered successful if validators could
         // agree on what to nominate before maxRounds is reached
         let nomination_leaders = |max_rounds: u32,
-                                  qset_node0: &proto::SCPQuorumSet,
-                                  qset_node1: &proto::SCPQuorumSet|
+                                  qset_node0: &scp_proto::SCPQuorumSet,
+                                  qset_node1: &scp_proto::SCPQuorumSet|
          -> i32 {
             let mut uk0 = UnitTestKernel::new(node_ids[0].clone(), qset_node0.clone(), true);
             let mut uk1 = UnitTestKernel::new(node_ids[1].clone(), qset_node1.clone(), true);
 
             let mut tot = 0;
             for g in 0..total_iter {
-                let mut value = proto::SCPValue::default();
+                let mut value = scp_proto::SCPValue::default();
                 value.0.push(g as u8);
 
                 let mut proto0 = uk0.proto();
@@ -217,8 +218,8 @@ mod unit_tests {
                     let l1 = nom_proto1.dbg_get_round_leaders();
                     assert!(!l1.is_empty());
 
-                    let update_voted = |node_id: &proto::SCPNodeID,
-                                        leaders: &HashSet<proto::SCPNodeID>,
+                    let update_voted = |node_id: &scp_proto::SCPNodeID,
+                                        leaders: &HashSet<scp_proto::SCPNodeID>,
                                         voted: &mut bool| {
                         if !*voted {
                             *voted = leaders.contains(node_id);
@@ -227,9 +228,9 @@ mod unit_tests {
 
                     // checks if id voted (any past round, including this one)
                     // AND id is a leader this round
-                    let find_node = |node_id: &proto::SCPNodeID,
+                    let find_node = |node_id: &scp_proto::SCPNodeID,
                                      id_voted: bool,
-                                     other_leaders: &HashSet<proto::SCPNodeID>|
+                                     other_leaders: &HashSet<scp_proto::SCPNodeID>|
                      -> bool {
                         id_voted && other_leaders.contains(node_id)
                     };

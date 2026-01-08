@@ -1137,20 +1137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proto"
-version = "1.0.0"
-dependencies = [
- "base64 0.22.1",
- "ed25519-dalek",
- "groundhog_scp",
- "serde",
- "sha2 0.10.9",
- "thiserror",
- "xdr_common",
- "xdrs",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1253,8 +1239,9 @@ version = "1.0.0"
 dependencies = [
  "async-trait",
  "derive_more",
- "proto",
  "rand",
+ "scp_proto",
+ "scp_util",
  "serde_json",
  "sha2 0.10.9",
  "shfix",
@@ -1285,16 +1272,31 @@ dependencies = [
  "console-subscriber",
  "derivative",
  "futures",
- "groundhog_scp",
- "proto",
  "rpc_driver",
  "scp_kernel",
+ "scp_proto",
+ "scp_util",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "xdr_common",
+]
+
+[[package]]
+name = "scp_util"
+version = "1.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "groundhog_scp",
+ "scp_proto",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror",
+ "xdr_common",
+ "xdrs",
 ]
 
 [[package]]

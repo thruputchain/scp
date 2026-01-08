@@ -187,6 +187,8 @@ pub struct SCPEnvelope {
     pub signature: Signature,
 }
 
+pub type SCPEnvelopes = VecM::<SCPEnvelope>;
+
 // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
 // only allows 2 levels of nesting
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]

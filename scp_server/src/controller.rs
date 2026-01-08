@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use scp_kernel::*;
+use scp_proto::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
@@ -58,7 +59,7 @@ pub enum ControlReply {
 }
 
 #[async_trait]
-impl proto::SCP_Control_SCP_Control1 for ControlService {
+impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
@@ -384,7 +385,7 @@ impl ControlKernel {
         self.call_received_envelope(&x.env);
     }
 
-    fn call_received_envelope(&mut self, env: &proto::SCPEnvelope) {
+    fn call_received_envelope(&mut self, env: &scp_proto::SCPEnvelope) {
         info!(
             "---> control kernel calling scp received envelope {}",
             self.kernel.proto().envelope_to_str(env, false),

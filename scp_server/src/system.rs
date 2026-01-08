@@ -7,6 +7,7 @@ use crate::handler::*;
 use core::net::SocketAddr;
 use rpc_driver::*;
 use scp_kernel::*;
+use scp_proto::*;
 use tokio;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -15,20 +16,21 @@ use tokio::sync::mpsc;
 pub async fn start_server(
     handler_sockaddr: SocketAddr,
     bind_controller_sockaddr: SocketAddr,
-    cfg: proto::SCPConfig,
-    secret_key: &proto::SecretKey,
+    cfg: scp_proto::SCPConfig,
+    secret_key: &SecretKey,
     is_validator: bool,
 ) -> SocketAddr {
-    let handle_client =
-        proto::SCP_Handle_SCP_Handle1_Client::new(connect_client(&handler_sockaddr).await.unwrap());
+    let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+        connect_client(&handler_sockaddr).await.unwrap(),
+    );
     let control_service = start_service(handle_client, cfg, secret_key, is_validator).await;
     start_control_server(&bind_controller_sockaddr, control_service).await
 }
 
 pub async fn start_service(
     handle_rpc_client: SCP_Handle_SCP_Handle1_Client,
-    cfg: proto::SCPConfig,
-    secret_key: &proto::SecretKey,
+    cfg: scp_proto::SCPConfig,
+    secret_key: &SecretKey,
     is_validator: bool,
 ) -> ControlService {
     // construct
@@ -108,7 +110,7 @@ async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
 
     let mut service_map = ServiceMap::new();
     service_map.add_service(Box::new(
-        groundhog_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
+        scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
     ));
 
     RpcServer::new(service_map, listener).start().await;
@@ -125,9 +127,9 @@ pub async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
     let sockaddr = listener.local_addr().unwrap();
 
     let mut service_map = ServiceMap::new();
-    service_map.add_service(Box::new(
-        groundhog_scp::SCP_Handle_SCP_Handle1_Dispatcher::new(Box::new(svc)),
-    ));
+    service_map.add_service(Box::new(scp_proto::SCP_Handle_SCP_Handle1_Dispatcher::new(
+        Box::new(svc),
+    )));
 
     RpcServer::new(service_map, listener).start().await;
 

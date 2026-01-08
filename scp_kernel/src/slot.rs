@@ -22,7 +22,7 @@ pub struct SlotState {
 #[derive(Debug, Clone)]
 pub struct HistoricalStatement {
     pub when: SystemTime,
-    pub statement: proto::SCPStatement,
+    pub statement: scp_proto::SCPStatement,
     pub validated: bool,
 }
 
@@ -104,19 +104,19 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     pub fn get_companion_quorum_set_hash_from_statement(
-        statement: &proto::SCPStatement,
-    ) -> proto::SCPHash {
+        statement: &scp_proto::SCPStatement,
+    ) -> scp_proto::SCPHash {
         match &statement.pledges {
-            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                 prepare.quorum_set_hash.clone()
             }
-            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                 confirm.quorum_set_hash.clone()
             }
-            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
                 externalize.commit_quorum_set_hash.clone()
             }
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 nominate.quorum_set_hash.clone()
             }
         }
@@ -124,10 +124,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     /// returns (nom values, ballot values)
     pub fn get_statement_values(
-        statement: &proto::SCPStatement,
-    ) -> (Vec<proto::SCPValue>, Vec<proto::SCPValue>) {
+        statement: &scp_proto::SCPStatement,
+    ) -> (Vec<scp_proto::SCPValue>, Vec<scp_proto::SCPValue>) {
         match &statement.pledges {
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => (
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => (
                 NominationProto::<C, D>::get_statement_values(&statement),
                 vec![],
             ),
@@ -140,19 +140,19 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn get_quorum_set_from_statement(
         &self,
-        statement: &proto::SCPStatement,
-    ) -> Option<proto::SCPQuorumSet> {
+        statement: &scp_proto::SCPStatement,
+    ) -> Option<scp_proto::SCPQuorumSet> {
         match &statement.pledges {
-            proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. } => {
                 Some(self.local_proto().get_singleton_qset(&statement.node_id))
             }
-            proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                 self.driver().get_qset(&prepare.quorum_set_hash)
             }
-            proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                 self.driver().get_qset(&confirm.quorum_set_hash)
             }
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 self.driver().get_qset(&nominate.quorum_set_hash)
             }
         }
@@ -160,7 +160,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn get_state(
         &mut self,
-        node: &proto::SCPNodeID,
+        node: &scp_proto::SCPNodeID,
         self_already_moved_on: bool,
     ) -> QuorumInfoNodeState {
         let ballot_state = self.ballot_proto().get_state(node, self_already_moved_on);
@@ -171,10 +171,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             .get_state(node, self_already_moved_on)
     }
 
-    pub fn should_process_envelope(&mut self, env: &proto::SCPEnvelope, ours: bool) -> bool {
+    pub fn should_process_envelope(&mut self, env: &scp_proto::SCPEnvelope, ours: bool) -> bool {
         assert_eq!(env.statement.slot_index, self.index());
         match &env.statement.pledges {
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                 self.nomination_proto().should_process_envelope(env)
             }
             _ => self.ballot_proto().should_process_envelope(env, ours),
@@ -182,7 +182,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     #[instrument(skip_all)]
-    pub fn process_envelope(&mut self, envelope: &proto::SCPEnvelope, ours: bool) -> EnvelopeState {
+    pub fn process_envelope(
+        &mut self,
+        envelope: &scp_proto::SCPEnvelope,
+        ours: bool,
+    ) -> EnvelopeState {
         assert_eq!(envelope.statement.slot_index, self.index());
 
         tracing::trace!(
@@ -195,7 +199,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             match &envelope.statement.pledges {
-                proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                     self.nomination_proto().process_envelope(envelope)
                 }
                 _ => self.ballot_proto().process_envelope(envelope, ours),
@@ -245,14 +249,14 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.ballot_proto().abandon_ballot(0)
     }
 
-    pub fn bump_state(&mut self, value: &proto::SCPValue, force: bool) -> bool {
+    pub fn bump_state(&mut self, value: &scp_proto::SCPValue, force: bool) -> bool {
         self.ballot_proto().bump_state(value.clone(), force)
     }
 
     pub fn nominate(
         &mut self,
-        value: &proto::SCPValue,
-        previous_value: &proto::SCPValue,
+        value: &scp_proto::SCPValue,
+        previous_value: &scp_proto::SCPValue,
         timed_out: bool,
     ) -> bool {
         self.nomination_proto()
@@ -263,7 +267,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.nomination_proto().stop_nomination()
     }
 
-    pub fn get_nomination_leaders(&mut self) -> HashSet<proto::SCPNodeID> {
+    pub fn get_nomination_leaders(&mut self) -> HashSet<scp_proto::SCPNodeID> {
         self.nomination_proto().get_leaders()
     }
 
@@ -271,14 +275,17 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.slot_state.fully_validated = validated;
     }
 
-    pub fn get_latest_composite_candidate(&mut self) -> Option<proto::SCPValue> {
+    pub fn get_latest_composite_candidate(&mut self) -> Option<scp_proto::SCPValue> {
         self.nomination_proto().get_latest_composite_candidate()
     }
 
-    pub fn create_envelope(&mut self, statement: proto::SCPStatement) -> proto::SCPEnvelope {
-        use proto::{Ed25519Signature, Signature};
+    pub fn create_envelope(
+        &mut self,
+        statement: scp_proto::SCPStatement,
+    ) -> scp_proto::SCPEnvelope {
+        use scp_proto::{Ed25519Signature, Signature};
 
-        let mut envelope = proto::SCPEnvelope {
+        let mut envelope = scp_proto::SCPEnvelope {
             statement: statement,
             signature: Signature::Ed25519 {
                 ed25519: Ed25519Signature::new([0u8; 64]),
@@ -301,7 +308,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         use serde_json::{Value, json};
 
         let mut statements = Vec::new();
-        let mut qsets_used: HashMap<proto::SCPHash, proto::SCPQuorumSet> = HashMap::new();
+        let mut qsets_used: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet> = HashMap::new();
 
         for item in self.slot_state.statements_history.iter() {
             let mut statement_array = Vec::new();
@@ -342,7 +349,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn get_json_quorum_info(
         &mut self,
-        id: &proto::SCPNodeID,
+        id: &scp_proto::SCPNodeID,
         summary: bool,
         full_keys: bool,
     ) -> serde_json::Value {
@@ -362,11 +369,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         &self,
         voted: &F1,
         accepted: &F2,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
     ) -> bool
     where
-        F1: Fn(&proto::SCPStatement) -> bool,
-        F2: Fn(&proto::SCPStatement) -> bool,
+        F1: Fn(&scp_proto::SCPStatement) -> bool,
+        F2: Fn(&scp_proto::SCPStatement) -> bool,
     {
         let local_proto = self.local_proto();
         let qset = local_proto.get_qset();
@@ -377,9 +384,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
 
         // Checks if the set of nodes that accepted or voted for it form a quorum
-        let ratify_filter = |st: &proto::SCPStatement| -> bool { accepted(st) || voted(st) };
+        let ratify_filter = |st: &scp_proto::SCPStatement| -> bool { accepted(st) || voted(st) };
 
-        let qset_getter = |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+        let qset_getter = |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
             self.get_quorum_set_from_statement(st)
         };
 
@@ -390,15 +397,15 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     pub fn federated_ratify<F>(
         &self,
         voted: &F,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
     ) -> bool
     where
-        F: Fn(&proto::SCPStatement) -> bool,
+        F: Fn(&scp_proto::SCPStatement) -> bool,
     {
         let local_proto = self.local_proto();
         let qset = local_proto.get_qset();
 
-        let qset_getter = |st: &proto::SCPStatement| -> Option<proto::SCPQuorumSet> {
+        let qset_getter = |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
             self.get_quorum_set_from_statement(st)
         };
 
@@ -413,10 +420,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.slot_state.got_vblocking
     }
 
-    pub fn get_entire_current_state(&mut self) -> Vec<proto::SCPEnvelope> {
+    pub fn get_entire_current_state(&mut self) -> Vec<scp_proto::SCPEnvelope> {
         let mut res = Vec::new();
         self.process_current_state(
-            &mut |envelope: &proto::SCPEnvelope| {
+            &mut |envelope: &scp_proto::SCPEnvelope| {
                 res.push(envelope.clone());
                 true
             },
@@ -425,7 +432,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         res
     }
 
-    pub fn get_latest_messages_send(&mut self) -> Vec<proto::SCPEnvelope> {
+    pub fn get_latest_messages_send(&mut self) -> Vec<scp_proto::SCPEnvelope> {
         let mut res = Vec::new();
 
         if self.slot_state.fully_validated {
@@ -443,7 +450,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         res
     }
 
-    pub fn get_latest_message(&mut self, node_id: &proto::SCPNodeID) -> Option<proto::SCPEnvelope> {
+    pub fn get_latest_message(
+        &mut self,
+        node_id: &scp_proto::SCPNodeID,
+    ) -> Option<scp_proto::SCPEnvelope> {
         // Check ballot protocol first
         if let Some(envelope) = self.ballot_proto().get_latest_message(node_id) {
             return Some(envelope);
@@ -478,7 +488,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    pub fn set_state_from_envelope(&mut self, envelope: &proto::SCPEnvelope) {
+    pub fn set_state_from_envelope(&mut self, envelope: &scp_proto::SCPEnvelope) {
         let statement = &envelope.statement;
         let local_node_id = self.local_proto().get_node_id().clone();
 
@@ -486,7 +496,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             let had_previous_message = self.get_latest_message(&statement.node_id).is_some();
 
             match &statement.pledges {
-                proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                     self.nomination_proto().set_state_from_envelope(envelope);
                 }
                 _ => {
@@ -510,7 +520,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
     pub fn process_current_state<F>(&mut self, f: &mut F, force_self: bool)
     where
-        F: FnMut(&proto::SCPEnvelope) -> bool,
+        F: FnMut(&scp_proto::SCPEnvelope) -> bool,
     {
         if self.nomination_proto().process_current_state(f, force_self) {
             self.ballot_proto().process_current_state(f, force_self);
@@ -518,16 +528,16 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     }
 
     pub fn is_newer_nomination_or_ballot_st(
-        old_st: &proto::SCPStatement,
-        new_st: &proto::SCPStatement,
+        old_st: &scp_proto::SCPStatement,
+        new_st: &scp_proto::SCPStatement,
     ) -> bool {
         let old_nomination = matches!(
             old_st.pledges,
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
         );
         let new_nomination = matches!(
             new_st.pledges,
-            proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
+            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
         );
 
         if old_nomination != new_nomination {
@@ -537,8 +547,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         // Handle each type appropriately
         if old_nomination {
             if let (
-                proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_nom },
-                proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: new_nom },
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_nom },
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: new_nom },
             ) = (&old_st.pledges, &new_st.pledges)
             {
                 NominationProto::<C, D>::is_newer_statement(old_nom, new_nom)
@@ -550,11 +560,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    pub fn get_externalizing_state(&mut self) -> Vec<proto::SCPEnvelope> {
+    pub fn get_externalizing_state(&mut self) -> Vec<scp_proto::SCPEnvelope> {
         self.ballot_proto().get_externalizing_state()
     }
 
-    pub fn record_statement(&mut self, st: &proto::SCPStatement) {
+    pub fn record_statement(&mut self, st: &scp_proto::SCPStatement) {
         let historical_statement = HistoricalStatement {
             when: std::time::SystemTime::now(), //XXX:diff
             statement: st.clone(),

@@ -1,5 +1,5 @@
 [package]
-name = "proto"
+name = "scp_util"
 description = "SCP protocol manipulation utilities"
 version = "1.0.0"
 edition = "2024"
@@ -10,6 +10,9 @@ crate-type = ["rlib"]
 [features]
 default = ["xdrs"]
 xdrs = []
+
+[dependencies]
+scp_proto = { path = "../scp_proto" }
 
 [dependencies.xdr_common]
 git = "ssh://git@github.com/groundhogchain/xdr_common.git"

@@ -1,8 +1,8 @@
-use proto::{SCPHash, SCPSlotIndex, SCPValue};
+use scp_proto::*;
 use xdr_common::BytesM;
 
 pub fn hah(bytes: &[u8]) -> String {
-    hex_abbrev(&proto::hash_bytes(bytes)[..])
+    hex_abbrev(&scp_util::hash_bytes(bytes)[..])
 }
 
 pub fn hex_abbrev(bytes: &[u8]) -> String {
@@ -20,7 +20,7 @@ pub fn hex_full(bytes: &[u8]) -> String {
         .collect::<String>()
 }
 
-pub fn parse_node_id_from_hex(hex_str: &str) -> Result<proto::SCPNodeID, String> {
+pub fn parse_node_id_from_hex(hex_str: &str) -> Result<scp_proto::SCPNodeID, String> {
     if hex_str.len() != 64 {
         return Err(format!(
             "Expected 64 hex characters for Ed25519 public key, got {}",
@@ -35,15 +35,15 @@ pub fn parse_node_id_from_hex(hex_str: &str) -> Result<proto::SCPNodeID, String>
             .map_err(|_| format!("Invalid hex character in position {}", i * 2))?;
     }
 
-    let ed25519_key = proto::Ed25519PublicKey::from(bytes);
-    Ok(proto::PublicKey::Ed25519 {
+    let ed25519_key = Ed25519PublicKey::from(bytes);
+    Ok(PublicKey::Ed25519 {
         ed25519: ed25519_key,
     })
 }
 
-pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> proto::SCPHash
+pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> scp_proto::SCPHash
 where
-    F: Fn(&[u8]) -> proto::SCPHash,
+    F: Fn(&[u8]) -> scp_proto::SCPHash,
 {
     let mut concatenated = Vec::new();
     for bytes_m in v {
@@ -64,8 +64,8 @@ where
 {
     let mut vals = Vec::new();
 
-    vals.push(BytesM(proto::marshal_xdr(&slot_index).unwrap().to_vec()));
-    vals.push(BytesM(proto::marshal_xdr(prev).unwrap().to_vec()));
+    vals.push(BytesM(scp_util::marshal_xdr(&slot_index).unwrap().to_vec()));
+    vals.push(BytesM(scp_util::marshal_xdr(prev).unwrap().to_vec()));
 
     extra(&mut vals);
 
@@ -78,7 +78,7 @@ where
     res
 }
 
-pub fn dbg_node_ids_to_str(ns: &[proto::SCPNodeID]) -> String {
+pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
     let mut s = "[".to_string();
     for (i, n) in ns.iter().enumerate() {
         s.push_str(&format!("{}", to_str_key(n, false)));
@@ -90,8 +90,8 @@ pub fn dbg_node_ids_to_str(ns: &[proto::SCPNodeID]) -> String {
     s
 }
 
-pub fn to_str_key(pk: &proto::SCPNodeID, _full_key: bool) -> String {
+pub fn to_str_key(pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
     match pk {
-        proto::PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+        PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
     }
 }

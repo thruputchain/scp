@@ -2,11 +2,6 @@
 resolver = "3"
 members = ["shfix", "scp_proto", "scp_util", "scp_kernel", "scp_server"]
 
-[workspace.dependencies.groundhog_scp]
-git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
-package = "groundhog_scp"
-features = ["std", "xdrs"]
-
 [workspace.dependencies]
 xdrs = { git = "ssh://git@github.com/groundhogchain/xdrs.git", features = [
     "extras",
@@ -17,6 +12,3 @@ xdrs = { git = "ssh://git@github.com/groundhogchain/xdrs.git", features = [
 ] }
 xdr_common = { git = "ssh://git@github.com/groundhogchain/xdr_common.git" }
 rpc_driver = { git = "ssh://git@github.com/groundhogchain/xdr_rpc.git" }
-
-# [patch.'ssh://git@github.com/groundhogchain/protocol-rs.git']
-# groundhog_scp = { path = "../scp_utilcol-rs/groundhog_scp" }

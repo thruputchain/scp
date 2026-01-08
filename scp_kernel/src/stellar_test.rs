@@ -3,6 +3,7 @@ mod stellar_tests {
     use crate::testkernel::*;
     use crate::testutil::*;
     use crate::*;
+    use scp_proto::*;
     use shfix::shfix;
     use std::collections::HashSet;
     use std::u32;
@@ -170,17 +171,17 @@ mod stellar_tests {
         check(&q_set, &good, 4);
     }
 
-    type GenEnvelope = Box<dyn Fn(&proto::SecretKey) -> proto::SCPEnvelope>;
+    type GenEnvelope = Box<dyn Fn(&scp_proto::SecretKey) -> scp_proto::SCPEnvelope>;
 
     fn make_prepare_gen(
-        qset_hash: proto::SCPHash,
-        ballot: proto::SCPBallot,
-        prepared: Option<proto::SCPBallot>,
-        n_c: proto::SCPCount,
-        n_h: proto::SCPCount,
-        prepared_prime: Option<proto::SCPBallot>,
+        qset_hash: scp_proto::SCPHash,
+        ballot: scp_proto::SCPBallot,
+        prepared: Option<scp_proto::SCPBallot>,
+        n_c: scp_proto::SCPCount,
+        n_h: scp_proto::SCPCount,
+        prepared_prime: Option<scp_proto::SCPBallot>,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SecretKey| {
             make_prepare(
                 secret_key,
                 qset_hash,
@@ -196,13 +197,13 @@ mod stellar_tests {
     }
 
     fn make_confirm_gen(
-        qset_hash: proto::SCPHash,
-        prepare_counter: proto::SCPCount,
-        ballot: proto::SCPBallot,
-        n_c: proto::SCPCount,
-        n_h: proto::SCPCount,
+        qset_hash: scp_proto::SCPHash,
+        prepare_counter: scp_proto::SCPCount,
+        ballot: scp_proto::SCPBallot,
+        n_c: scp_proto::SCPCount,
+        n_h: scp_proto::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SecretKey| {
             make_confirm(
                 secret_key,
                 qset_hash,
@@ -217,11 +218,11 @@ mod stellar_tests {
     }
 
     fn make_externalize_gen(
-        qset_hash: proto::SCPHash,
-        commit_ballot: proto::SCPBallot,
-        n_h: proto::SCPCount,
+        qset_hash: scp_proto::SCPHash,
+        commit_ballot: scp_proto::SCPBallot,
+        n_h: scp_proto::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SecretKey| {
             make_externalize(
                 secret_key,
                 qset_hash,
@@ -295,7 +296,7 @@ mod stellar_tests {
                 inner_sets: VecM(vec![]),
             };
             normalize_qset(&mut q_set, None); // NOTE: LocalProto internally normalizes qsets! This ensures parity.
-            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let qset_hash = scp_util::hash_xdr(&q_set).unwrap();
             let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
             let v0_secret_key = nodes[0].secret_key.clone();
             let v1_secret_key = nodes[1].secret_key.clone();
@@ -3837,7 +3838,7 @@ mod stellar_tests {
                 nodes_all_pledge_to_commit(&mut tk);
                 assert_eq!(tk.driver().envelopes.len(), 3);
 
-                let b = proto::SCPBallot {
+                let b = scp_proto::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -3995,7 +3996,7 @@ mod stellar_tests {
                             by_value,
                             "bumpToBallot prevented once committed (by value)",
                             {
-                                let b2 = proto::SCPBallot {
+                                let b2 = scp_proto::SCPBallot {
                                     counter: 1,
                                     value: values.z_value.clone(),
                                 };
@@ -4054,7 +4055,7 @@ mod stellar_tests {
                             by_counter,
                             "bumpToBallot prevented once committed (by counter)",
                             {
-                                let b2 = proto::SCPBallot {
+                                let b2 = scp_proto::SCPBallot {
                                     counter: 2,
                                     value: values.x_value.clone(),
                                 };
@@ -4113,7 +4114,7 @@ mod stellar_tests {
                             by_value_and_counter,
                             "bumpToBallot prevented once committed (by value and counter)",
                             {
-                                let b2 = proto::SCPBallot {
+                                let b2 = scp_proto::SCPBallot {
                                     counter: 2,
                                     value: values.z_value.clone(),
                                 };
@@ -4175,7 +4176,7 @@ mod stellar_tests {
                 nodes_all_pledge_to_commit(&mut tk);
                 assert_eq!(tk.driver().envelopes.len(), 3);
 
-                let b = proto::SCPBallot {
+                let b = scp_proto::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -4253,7 +4254,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     4,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 4,
                         value: values.x_value.clone(),
                     },
@@ -4266,7 +4267,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     6,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 6,
                         value: values.x_value.clone(),
                     },
@@ -4280,7 +4281,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     5,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 5,
                         value: values.x_value.clone(),
                     },
@@ -4293,7 +4294,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     6,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 6,
                         value: values.x_value.clone(),
                     },
@@ -4317,7 +4318,7 @@ mod stellar_tests {
                     qset_hash0,
                     0,
                     4,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 4,
                         value: values.x_value.clone(),
                     },
@@ -4342,7 +4343,7 @@ mod stellar_tests {
                     &v0_secret_key,
                     qset_hash0,
                     0,
-                    proto::SCPBallot {
+                    scp_proto::SCPBallot {
                         counter: 3,
                         value: values.x_value.clone(),
                     },
@@ -4354,7 +4355,7 @@ mod stellar_tests {
                 timeout_h_set,
                 "timeout when h is set -> stay locked on h",
                 {
-                    let bx = proto::SCPBallot {
+                    let bx = scp_proto::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -4390,7 +4391,7 @@ mod stellar_tests {
                     // now, see if we can timeout and move to a different value
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 4);
-                    let newbx = proto::SCPBallot {
+                    let newbx = scp_proto::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -4413,14 +4414,14 @@ mod stellar_tests {
                 "timeout when h exists but can't be set -> vote for h",
                 {
                     // start with (1,y)
-                    let by = proto::SCPBallot {
+                    let by = scp_proto::SCPBallot {
                         counter: 1,
                         value: values.y_value.clone(),
                     };
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 1);
 
-                    let bx = proto::SCPBallot {
+                    let bx = scp_proto::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -4467,7 +4468,7 @@ mod stellar_tests {
 
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 3);
-                    let newbx = proto::SCPBallot {
+                    let newbx = scp_proto::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -4491,7 +4492,7 @@ mod stellar_tests {
             section!(timeout_multiple_nodes, "timeout from multiple nodes", {
                 assert!(tk.bump_state(0, &values.x_value));
 
-                let x1 = proto::SCPBallot {
+                let x1 = scp_proto::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -4527,7 +4528,7 @@ mod stellar_tests {
                     None,
                 );
 
-                let x2 = proto::SCPBallot {
+                let x2 = scp_proto::SCPBallot {
                     counter: 2,
                     value: values.x_value.clone(),
                 };
@@ -4643,7 +4644,7 @@ mod stellar_tests {
                 {
                     assert!(tk.bump_state(0, &values.x_value));
 
-                    let x1 = proto::SCPBallot {
+                    let x1 = scp_proto::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -4715,7 +4716,7 @@ mod stellar_tests {
                         None,
                     );
 
-                    let x2 = proto::SCPBallot {
+                    let x2 = scp_proto::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -4735,7 +4736,7 @@ mod stellar_tests {
                         None,
                     );
 
-                    let x3 = proto::SCPBallot {
+                    let x3 = scp_proto::SCPBallot {
                         counter: 3,
                         value: values.x_value.clone(),
                     };
@@ -4836,7 +4837,7 @@ mod stellar_tests {
                     tk_nv.driver().store_quorum_set(&q_set);
                     let qset_hash_nv = tk_nv.proto().local_proto().get_qset_hash().clone();
 
-                    let b = proto::SCPBallot {
+                    let b = scp_proto::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -4882,7 +4883,7 @@ mod stellar_tests {
                         qset_hash_nv,
                         0,
                         u32::MAX,
-                        proto::SCPBallot {
+                        scp_proto::SCPBallot {
                             counter: u32::MAX,
                             value: values.x_value.clone(),
                         },
@@ -4910,7 +4911,7 @@ mod stellar_tests {
             );
 
             section!(restore_ballot_protocol, "restore ballot protocol", {
-                let b = proto::SCPBallot {
+                let b = scp_proto::SCPBallot {
                     counter: 2,
                     value: values.x_value.clone(),
                 };
@@ -4964,7 +4965,7 @@ mod stellar_tests {
                 inner_sets: VecM(vec![]),
             };
             normalize_qset(&mut q_set, None);
-            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let qset_hash = scp_util::hash_xdr(&q_set).unwrap();
             let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
             let v0_secret_key = nodes[0].secret_key.clone();
             let v1_secret_key = nodes[1].secret_key.clone();
@@ -5037,11 +5038,11 @@ mod stellar_tests {
             let a_value = &values.z_value;
             let b_value = &values.x_value;
 
-            let a1 = proto::SCPBallot {
+            let a1 = scp_proto::SCPBallot {
                 counter: 1,
                 value: a_value.clone(),
             };
-            let b1 = proto::SCPBallot {
+            let b1 = scp_proto::SCPBallot {
                 counter: 1,
                 value: b_value.clone(),
             };
@@ -5059,12 +5060,12 @@ mod stellar_tests {
             a5.counter += 1;
 
             #[allow(unused_variables)]
-            let a_inf = proto::SCPBallot {
+            let a_inf = scp_proto::SCPBallot {
                 counter: u32::MAX,
                 value: a_value.clone(),
             };
             #[allow(unused_variables)]
-            let b_inf = proto::SCPBallot {
+            let b_inf = scp_proto::SCPBallot {
                 counter: u32::MAX,
                 value: b_value.clone(),
             };
@@ -5362,7 +5363,7 @@ mod stellar_tests {
                 inner_sets: VecM(vec![]),
             };
             normalize_qset(&mut q_set, None);
-            let qset_hash = proto::hash_xdr(&q_set).unwrap();
+            let qset_hash = scp_util::hash_xdr(&q_set).unwrap();
             let mut tk = TestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
             #[allow(unused_variables)]
             let v0_secret_key = nodes[0].secret_key.clone();
@@ -5384,7 +5385,7 @@ mod stellar_tests {
             assert!(values.y_value < values.z_value);
 
             #[allow(unused_variables)]
-            let check_leaders = |tk: &mut TestKernel, expected_leaders: &[proto::SCPNodeID]| {
+            let check_leaders = |tk: &mut TestKernel, expected_leaders: &[scp_proto::SCPNodeID]| {
                 let leaders = tk.get_nomination_leaders(0);
                 let expected_set: HashSet<_> = expected_leaders.iter().cloned().collect();
                 assert_eq!(leaders, expected_set);
@@ -5522,7 +5523,7 @@ mod stellar_tests {
                                 &v0_secret_key,
                                 qset_hash0,
                                 0,
-                                proto::SCPBallot {
+                                scp_proto::SCPBallot {
                                     counter: 1,
                                     value: values.x_value.clone(),
                                 },
@@ -5682,7 +5683,7 @@ mod stellar_tests {
                                             &v0_secret_key,
                                             qset_hash0,
                                             0,
-                                            proto::SCPBallot {
+                                            scp_proto::SCPBallot {
                                                 counter: 1,
                                                 value: values.x_value.clone(),
                                             },
@@ -5702,7 +5703,7 @@ mod stellar_tests {
                                             &v0_secret_key,
                                             qset_hash0,
                                             0,
-                                            proto::SCPBallot {
+                                            scp_proto::SCPBallot {
                                                 counter: 1,
                                                 value: values.k_value.clone(),
                                             },
@@ -6003,7 +6004,7 @@ mod stellar_tests {
                                 &v0_secret_key,
                                 qset_hash0,
                                 0,
-                                proto::SCPBallot {
+                                scp_proto::SCPBallot {
                                     counter: 1,
                                     value: values.y_value.clone(),
                                 },
@@ -6032,7 +6033,7 @@ mod stellar_tests {
                 let votes_y = vec![values.y_value.clone()];
                 #[allow(unused_variables)]
                 let votes_k = vec![values.k_value.clone()];
-                let empty_v: Vec<proto::SCPValue> = vec![];
+                let empty_v: Vec<scp_proto::SCPValue> = vec![];
 
                 let votes_xy = vec![values.x_value.clone(), values.y_value.clone()];
 
@@ -6049,13 +6050,14 @@ mod stellar_tests {
                 ];
                 values_hash.sort();
 
-                tk.driver().hash_value_calculator = Box::new(move |v: &proto::SCPValue| -> u64 {
-                    if let Some(pos) = values_hash.iter().position(|val| val == v) {
-                        (pos + 1) as u64
-                    } else {
-                        panic!("value not found in hash values");
-                    }
-                });
+                tk.driver().hash_value_calculator =
+                    Box::new(move |v: &scp_proto::SCPValue| -> u64 {
+                        if let Some(pos) = values_hash.iter().position(|val| val == v) {
+                            (pos + 1) as u64
+                        } else {
+                            panic!("value not found in hash values");
+                        }
+                    });
 
                 #[allow(unused_variables)]
                 let nom1 = make_nominate(

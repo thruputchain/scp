@@ -5,36 +5,36 @@ use xdr_common::VecM;
 
 #[derive(Debug)]
 pub struct LocalState {
-    node_id: proto::SCPNodeID,
+    node_id: scp_proto::SCPNodeID,
     is_validator: bool,
-    qset: proto::SCPQuorumSet,
-    qset_hash: proto::SCPHash,
+    qset: scp_proto::SCPQuorumSet,
+    qset_hash: scp_proto::SCPHash,
     #[allow(dead_code)]
-    single_qset: Option<proto::SCPQuorumSet>,
+    single_qset: Option<scp_proto::SCPQuorumSet>,
     #[allow(dead_code)]
-    single_qset_hash: Option<proto::SCPHash>,
+    single_qset_hash: Option<scp_proto::SCPHash>,
 }
 
 impl LocalState {
     pub fn new(
-        node_id: proto::SCPNodeID,
+        node_id: scp_proto::SCPNodeID,
         is_validator: bool,
-        qset: proto::SCPQuorumSet,
-        get_hash_of: impl Fn(&[u8]) -> proto::SCPHash,
+        qset: scp_proto::SCPQuorumSet,
+        get_hash_of: impl Fn(&[u8]) -> scp_proto::SCPHash,
     ) -> LocalState {
         // Normalize the quorum set (equivalent to normalizeQSet(mQSet) in C++)
         let mut normalized_qset = qset;
         normalize_qset(&mut normalized_qset, None);
 
         // Calculate hash of the normalized quorum set (equivalent to mQSetHash = driver.getHashOf(...))
-        let qset_bytes = proto::marshal_xdr(&normalized_qset).unwrap();
+        let qset_bytes = scp_util::marshal_xdr(&normalized_qset).unwrap();
         let qset_hash = get_hash_of(&qset_bytes);
 
         // Build singleton quorum set (equivalent to buildSingletonQSet(mNodeID))
         let single_qset = Self::build_singleton_qset(&node_id);
 
         // Calculate hash of singleton quorum set
-        let single_qset_bytes = proto::marshal_xdr(&single_qset).unwrap();
+        let single_qset_bytes = scp_util::marshal_xdr(&single_qset).unwrap();
         let single_qset_hash = get_hash_of(&single_qset_bytes);
 
         LocalState {
@@ -47,8 +47,8 @@ impl LocalState {
         }
     }
 
-    fn build_singleton_qset(node_id: &proto::SCPNodeID) -> proto::SCPQuorumSet {
-        proto::SCPQuorumSet {
+    fn build_singleton_qset(node_id: &scp_proto::SCPNodeID) -> scp_proto::SCPQuorumSet {
+        scp_proto::SCPQuorumSet {
             threshold: 1,
             validators: VecM(vec![node_id.clone()]),
             inner_sets: VecM(vec![]),
@@ -70,11 +70,11 @@ pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
 
 impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
     #[instrument(skip_all)]
-    pub fn update_quorum_set(&mut self, qset: &proto::SCPQuorumSet) {
+    pub fn update_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
         let mut normalized_qset = qset.clone();
         normalize_qset(&mut normalized_qset, None);
 
-        let qset_bytes = proto::marshal_xdr(&normalized_qset).unwrap();
+        let qset_bytes = scp_util::marshal_xdr(&normalized_qset).unwrap();
         let qset_hash = self.cd.driver.get_hash_of(&qset_bytes);
 
         self.local.qset = normalized_qset;
@@ -83,19 +83,19 @@ impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
 }
 
 impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
-    pub fn get_qset(&self) -> &proto::SCPQuorumSet {
+    pub fn get_qset(&self) -> &scp_proto::SCPQuorumSet {
         &self.local.qset
     }
 
-    pub fn get_qset_hash(&self) -> &proto::SCPHash {
+    pub fn get_qset_hash(&self) -> &scp_proto::SCPHash {
         &self.local.qset_hash
     }
 
-    pub fn get_singleton_qset(&self, node_id: &proto::SCPNodeID) -> proto::SCPQuorumSet {
+    pub fn get_singleton_qset(&self, node_id: &scp_proto::SCPNodeID) -> scp_proto::SCPQuorumSet {
         LocalState::build_singleton_qset(node_id)
     }
 
-    pub fn get_node_id(&self) -> &proto::SCPNodeID {
+    pub fn get_node_id(&self) -> &scp_proto::SCPNodeID {
         &self.local.node_id
     }
 
@@ -103,9 +103,9 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         self.local.is_validator
     }
 
-    pub fn for_all_nodes<F>(qset: &proto::SCPQuorumSet, proc: &mut F) -> bool
+    pub fn for_all_nodes<F>(qset: &scp_proto::SCPQuorumSet, proc: &mut F) -> bool
     where
-        F: FnMut(&proto::SCPNodeID) -> bool,
+        F: FnMut(&scp_proto::SCPNodeID) -> bool,
     {
         for node in qset.validators.iter() {
             if !proc(node) {
@@ -122,7 +122,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         true
     }
 
-    fn is_quorum_slice_internal(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
+    fn is_quorum_slice_internal(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
         let mut threshold_left = qset.threshold;
 
         for validator in qset.validators.iter() {
@@ -146,11 +146,11 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         false
     }
 
-    pub fn is_quorum_slice(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
+    pub fn is_quorum_slice(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
         Self::is_quorum_slice_internal(qset, node_set)
     }
 
-    fn is_vblocking_internal(qset: &proto::SCPQuorumSet, node_set: &[proto::SCPNodeID]) -> bool {
+    fn is_vblocking_internal(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
         // There is no v-blocking set for 0-threshold
         if qset.threshold == 0 {
             return false;
@@ -184,22 +184,22 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         false
     }
 
-    pub fn is_vblocking_nodes(qset: &proto::SCPQuorumSet, nodes: &Vec<proto::SCPNodeID>) -> bool {
+    pub fn is_vblocking_nodes(qset: &scp_proto::SCPQuorumSet, nodes: &Vec<scp_proto::SCPNodeID>) -> bool {
         Self::is_vblocking_internal(qset, nodes)
     }
 
     /// Check if filtered envelopes form a v-blocking set
     #[instrument(skip(filter))]
     pub fn is_vblocking_envelopes<F>(
-        qset: &proto::SCPQuorumSet,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        qset: &scp_proto::SCPQuorumSet,
+        envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
         filter: F,
     ) -> bool
     where
-        F: Fn(&proto::SCPStatement) -> bool,
+        F: Fn(&scp_proto::SCPStatement) -> bool,
     {
         // Collect node IDs where the envelope passes the filter
-        let filtered_nodes: Vec<proto::SCPNodeID> = envs
+        let filtered_nodes: Vec<scp_proto::SCPNodeID> = envs
             .iter()
             .filter_map(|(node_id, envelope)| {
                 if filter(&envelope.statement) {
@@ -216,17 +216,17 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
 
     /// Check if filtered envelopes form a quorum
     pub fn is_quorum<GetStmtQSet, FilterStmts>(
-        qset: &proto::SCPQuorumSet,
-        envelopes: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        qset: &scp_proto::SCPQuorumSet,
+        envelopes: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
         get_stmt_qset: &GetStmtQSet,
         filter: &FilterStmts,
     ) -> bool
     where
-        GetStmtQSet: Fn(&proto::SCPStatement) -> Option<proto::SCPQuorumSet>,
-        FilterStmts: Fn(&proto::SCPStatement) -> bool,
+        GetStmtQSet: Fn(&scp_proto::SCPStatement) -> Option<scp_proto::SCPQuorumSet>,
+        FilterStmts: Fn(&scp_proto::SCPStatement) -> bool,
     {
         // Start with nodes that pass the filter
-        let mut p_nodes: Vec<proto::SCPNodeID> = envelopes
+        let mut p_nodes: Vec<scp_proto::SCPNodeID> = envelopes
             .iter()
             .filter_map(|(node_id, envelope)| {
                 if filter(&envelope.statement) {
@@ -273,10 +273,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     // a set of nodes that agree (but can fail)
     // excluded, if set will be skipped altogether
     pub fn find_closest_v_blocking_nodes(
-        qset: &proto::SCPQuorumSet,
-        nodes: &HashSet<proto::SCPNodeID>,
-        excluded: Option<&proto::SCPNodeID>,
-    ) -> Vec<proto::SCPNodeID> {
+        qset: &scp_proto::SCPQuorumSet,
+        nodes: &HashSet<scp_proto::SCPNodeID>,
+        excluded: Option<&scp_proto::SCPNodeID>,
+    ) -> Vec<scp_proto::SCPNodeID> {
         // Calculate nodes needed to block: total_entries - threshold + 1
         let total_entries = qset.validators.len() + qset.inner_sets.len();
         let mut left_till_block = (total_entries + 1).saturating_sub(qset.threshold as usize);
@@ -305,7 +305,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         }
 
         // Collect results from inner sets, ordered by size
-        let mut res_internals: Vec<Vec<proto::SCPNodeID>> = Vec::new();
+        let mut res_internals: Vec<Vec<scp_proto::SCPNodeID>> = Vec::new();
 
         for inner_qset in qset.inner_sets.iter() {
             let inner_result = Self::find_closest_v_blocking_nodes(inner_qset, nodes, excluded);
@@ -344,16 +344,16 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     /// Find the closest v-blocking set from filtered envelopes
     pub fn find_closest_v_blocking_envelopes<F>(
         &self,
-        qset: &proto::SCPQuorumSet,
-        envs: &HashMap<proto::SCPNodeID, proto::SCPEnvelope>,
+        qset: &scp_proto::SCPQuorumSet,
+        envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
         filter: F,
-        excluded: Option<&proto::SCPNodeID>,
-    ) -> Vec<proto::SCPNodeID>
+        excluded: Option<&scp_proto::SCPNodeID>,
+    ) -> Vec<scp_proto::SCPNodeID>
     where
-        F: Fn(&proto::SCPStatement) -> bool,
+        F: Fn(&scp_proto::SCPStatement) -> bool,
     {
         // Collect nodes that pass the filter into a HashSet
-        let nodes: HashSet<proto::SCPNodeID> = envs
+        let nodes: HashSet<scp_proto::SCPNodeID> = envs
             .iter()
             .filter_map(|(node_id, envelope)| {
                 if filter(&envelope.statement) {
@@ -367,15 +367,15 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         Self::find_closest_v_blocking_nodes(qset, &nodes, excluded)
     }
 
-    pub fn to_json(&self, qset: &proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
+    pub fn to_json(&self, qset: &scp_proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
         Self::to_json_with_formatter(qset, &|node_id| {
             self.cd.driver.to_str_key(node_id, full_keys)
         })
     }
 
-    pub fn to_json_with_formatter<F>(qset: &proto::SCPQuorumSet, formatter: &F) -> serde_json::Value
+    pub fn to_json_with_formatter<F>(qset: &scp_proto::SCPQuorumSet, formatter: &F) -> serde_json::Value
     where
-        F: Fn(&proto::SCPNodeID) -> String,
+        F: Fn(&scp_proto::SCPNodeID) -> String,
     {
         let mut ret = serde_json::Map::new();
         ret.insert(
@@ -409,7 +409,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     pub fn from_json_with(
         &self,
         qset_json: &serde_json::Value,
-    ) -> Result<proto::SCPQuorumSet, String> {
+    ) -> Result<scp_proto::SCPQuorumSet, String> {
         let from_str_key = |s: &str| self.cd.driver.from_str_key(s);
         Self::from_json_with_parser(qset_json, &from_str_key)
     }
@@ -418,9 +418,9 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     pub fn from_json_with_parser<F>(
         qset_json: &serde_json::Value,
         from_str_key: &F,
-    ) -> Result<proto::SCPQuorumSet, String>
+    ) -> Result<scp_proto::SCPQuorumSet, String>
     where
-        F: Fn(&str) -> Result<proto::SCPNodeID, String>,
+        F: Fn(&str) -> Result<scp_proto::SCPNodeID, String>,
     {
         if !qset_json.is_object() {
             return Err("JSON field 'qset' must be an object".to_string());
@@ -469,14 +469,14 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
             }
         }
 
-        Ok(proto::SCPQuorumSet {
+        Ok(scp_proto::SCPQuorumSet {
             threshold,
             validators: VecM(validators),
             inner_sets: VecM(inner_sets),
         })
     }
 
-    pub fn to_string(&self, qset: &proto::SCPQuorumSet) -> String {
+    pub fn to_string(&self, qset: &scp_proto::SCPQuorumSet) -> String {
         let json = self.to_json(qset, false);
         serde_json::to_string(&json).unwrap()
     }

@@ -15,8 +15,8 @@ pub enum DriverCallback {
     },
     NominationTimerExpired {
         slot_index: SlotIndex,
-        value: proto::SCPValue,
-        prev_value: proto::SCPValue,
+        value: scp_proto::SCPValue,
+        prev_value: scp_proto::SCPValue,
     },
 }
 
@@ -44,38 +44,38 @@ impl std::fmt::Display for DriverCallback {
     }
 }
 pub trait Driver: Clone + Debug {
-    fn get_qset(&self, h: &proto::SCPHash) -> Option<proto::SCPQuorumSet>;
-    fn to_short_string(&self, pk: &proto::SCPNodeID) -> String;
-    fn to_str_key(&self, pk: &proto::SCPNodeID, full_key: bool) -> String;
-    fn from_str_key(&self, s: &str) -> Result<proto::SCPNodeID, String>; // XXX: get from KeyUtils.cpp
-    fn get_value_string(&self, value: &proto::SCPValue) -> String;
-    fn get_hash_of(&self, opaque: &[u8]) -> proto::SCPHash;
+    fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet>;
+    fn to_short_string(&self, pk: &scp_proto::SCPNodeID) -> String;
+    fn to_str_key(&self, pk: &scp_proto::SCPNodeID, full_key: bool) -> String;
+    fn from_str_key(&self, s: &str) -> Result<scp_proto::SCPNodeID, String>; // XXX: get from KeyUtils.cpp
+    fn get_value_string(&self, value: &scp_proto::SCPValue) -> String;
+    fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash;
 
     fn get_node_weight(
         &self,
-        node_id: &proto::SCPNodeID,
-        qset: &proto::SCPQuorumSet,
+        node_id: &scp_proto::SCPNodeID,
+        qset: &scp_proto::SCPQuorumSet,
         is_local_node: bool,
     ) -> u64;
     fn compute_hash_node(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
+        slot_index: scp_proto::SCPSlotIndex,
+        prev: &scp_proto::SCPValue,
         is_priority: bool,
-        round_number: proto::SCPCount,
-        node_id: &proto::SCPNodeID,
+        round_number: scp_proto::SCPCount,
+        node_id: &scp_proto::SCPNodeID,
     ) -> u64;
     fn compute_value_hash(
         &self,
-        slot_index: proto::SCPSlotIndex,
-        prev: &proto::SCPValue,
-        round_number: proto::SCPCount,
-        value: &proto::SCPValue,
+        slot_index: scp_proto::SCPSlotIndex,
+        prev: &scp_proto::SCPValue,
+        round_number: scp_proto::SCPCount,
+        value: &scp_proto::SCPValue,
     ) -> u64;
-    fn sign_envelope(&self, env: &mut proto::SCPEnvelope);
+    fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope);
 
-    fn emit_envelope(&self, env: proto::SCPEnvelope);
-    fn compute_timeout(&self, round_number: proto::SCPCount, is_nomination: bool) -> Duration;
+    fn emit_envelope(&self, env: scp_proto::SCPEnvelope);
+    fn compute_timeout(&self, round_number: scp_proto::SCPCount, is_nomination: bool) -> Duration;
     fn start_timer(
         &self,
         slot_index: SlotIndex,
@@ -87,7 +87,7 @@ pub trait Driver: Clone + Debug {
 }
 
 pub trait DriverCb {
-    fn received_envelope(&mut self, env: &proto::SCPEnvelope);
+    fn received_envelope(&mut self, env: &scp_proto::SCPEnvelope);
     fn driver_calling_back(&mut self, cb: DriverCallback);
 }
 

@@ -23,8 +23,8 @@ fn unsigned_div_up(a: u64, b: u64, c: u64) -> (u64, bool) {
 /// If a validator is repeated multiple times its weight is only the weight of
 /// the first occurrence.
 pub fn get_node_weight(
-    node_id: &proto::SCPNodeID,
-    qset: &proto::SCPQuorumSet,
+    node_id: &scp_proto::SCPNodeID,
+    qset: &scp_proto::SCPQuorumSet,
     is_local_node: bool,
 ) -> u64 {
     if is_local_node {

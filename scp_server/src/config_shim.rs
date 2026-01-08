@@ -1,4 +1,4 @@
-use proto::{Ed25519PublicKey, PublicKey, SCPConfig, SCPQuorumSet};
+use scp_proto::{Ed25519PublicKey, PublicKey, SCPConfig, SCPQuorumSet};
 use serde::{Deserialize, Serialize};
 use xdr_common::VecM;
 

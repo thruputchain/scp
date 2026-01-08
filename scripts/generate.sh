@@ -6,6 +6,7 @@ protos=(
   scp_config.x
   scp_control.x
   scp_handle.x
+  scp_types.x
 )
 
 [[ -z $XDRC ]] && XDRC="../../hogd/build/x23/x23c/x23c"

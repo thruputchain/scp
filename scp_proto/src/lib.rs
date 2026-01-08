@@ -16,3 +16,7 @@ pub use scp_control::*;
 #[rustfmt::skip]
 pub mod scp_handle;
 pub use scp_handle::*;
+
+#[rustfmt::skip]
+pub mod scp_types;
+pub use scp_types::*;

@@ -88,7 +88,7 @@ impl Driver for Rc<RefCell<UnitTestDriver>> {
 
     fn to_str_key(&self, pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
         match pk {
-            PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+            SCPPublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
         }
     }
 

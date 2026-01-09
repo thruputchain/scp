@@ -367,7 +367,7 @@ struct HandleKernelState {
     initial_nomination_timeout: Duration,
     increment_nomination_timeout: Duration,
     //
-    secret_key: scp_proto::SecretKey,
+    secret_key: scp_proto::SCPSecretKey,
     //
     validated_values: ValidatedValues,
     known_qsets: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>,
@@ -413,7 +413,7 @@ impl HandleKernel {
         rx_handle_reply: Receiver<HandleReply>,
         tx_switch_timer: UnboundedSender<SwitchTimer>,
         cfg: &scp_proto::SCPConfig,
-        secret_key: &scp_proto::SecretKey,
+        secret_key: &scp_proto::SCPSecretKey,
     ) -> HandleKernel {
         HandleKernel(Arc::new(StdRwLock::new(HandleKernelState {
             tx_handle_request,
@@ -726,7 +726,7 @@ impl Driver for HandleKernel {
 
     fn to_str_key(&self, pk: &scp_proto::SCPNodeID, full_key: bool) -> String {
         match pk {
-            PublicKey::Ed25519 { ed25519 } => {
+            SCPPublicKey::Ed25519 { ed25519 } => {
                 if full_key {
                     hex_full(&ed25519.into_inner()[..])
                 } else {

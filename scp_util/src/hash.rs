@@ -7,13 +7,13 @@ pub fn hash_bytes(bytes: &[u8]) -> scp_proto::SCPHash {
     Sha256::digest(bytes).into()
 }
 
-pub fn hash_xdr<T>(v: &T) -> writer::Result<scp_proto::SHA256Hash>
+pub fn hash_xdr<T>(v: &T) -> writer::Result<scp_proto::SCPSHA256Hash>
 where
     T: WriteXDR + ?Sized,
 {
     let bytes = scp_util::marshal_xdr(v)?;
     let h: [u8; 32] = hash_bytes(bytes.as_slice()).into();
-    Ok(scp_proto::SHA256Hash::from(h))
+    Ok(scp_proto::SCPSHA256Hash::from(h))
 }
 
 pub fn hash_xdr_scp<T>(v: &T) -> writer::Result<scp_proto::SCPHash>

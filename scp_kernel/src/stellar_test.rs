@@ -171,7 +171,7 @@ mod stellar_tests {
         check(&q_set, &good, 4);
     }
 
-    type GenEnvelope = Box<dyn Fn(&scp_proto::SecretKey) -> scp_proto::SCPEnvelope>;
+    type GenEnvelope = Box<dyn Fn(&scp_proto::SCPSecretKey) -> scp_proto::SCPEnvelope>;
 
     fn make_prepare_gen(
         qset_hash: scp_proto::SCPHash,
@@ -181,7 +181,7 @@ mod stellar_tests {
         n_h: scp_proto::SCPCount,
         prepared_prime: Option<scp_proto::SCPBallot>,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
             make_prepare(
                 secret_key,
                 qset_hash,
@@ -203,7 +203,7 @@ mod stellar_tests {
         n_c: scp_proto::SCPCount,
         n_h: scp_proto::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
             make_confirm(
                 secret_key,
                 qset_hash,
@@ -222,7 +222,7 @@ mod stellar_tests {
         commit_ballot: scp_proto::SCPBallot,
         n_h: scp_proto::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SecretKey| {
+        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
             make_externalize(
                 secret_key,
                 qset_hash,
@@ -5754,7 +5754,7 @@ mod stellar_tests {
                             let v1_node_id = nodes[1].node_id().clone();
                             tk.driver().priority_lookup =
                                 Box::new(
-                                    move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 },
+                                    move |n: &SCPPublicKey| if n == &v1_node_id { 1000 } else { 1 },
                                 );
 
                             assert!(tk.nominate(0, &values.x_value, true));
@@ -5786,7 +5786,7 @@ mod stellar_tests {
                             let v1_node_id = nodes[1].node_id().clone();
                             tk.driver().priority_lookup =
                                 Box::new(
-                                    move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 },
+                                    move |n: &SCPPublicKey| if n == &v1_node_id { 1000 } else { 1 },
                                 );
 
                             let nom1 = make_nominate(
@@ -6024,7 +6024,7 @@ mod stellar_tests {
             section!(v1_top_node, "v1 is top node", {
                 let v1_node_id = nodes[1].node_id().clone();
                 tk.driver().priority_lookup =
-                    Box::new(move |n: &PublicKey| if n == &v1_node_id { 1000 } else { 1 });
+                    Box::new(move |n: &SCPPublicKey| if n == &v1_node_id { 1000 } else { 1 });
 
                 // Prepare vote vectors for different combinations
                 #[allow(unused_variables)]
@@ -6182,7 +6182,9 @@ mod stellar_tests {
                         // v0 is the new leader, but we already have a candidate
                         let v0_node_id = nodes[0].node_id().clone();
                         tk.driver().priority_lookup =
-                            Box::new(move |n: &PublicKey| if n == &v0_node_id { 1000 } else { 1 });
+                            Box::new(
+                                move |n: &SCPPublicKey| if n == &v0_node_id { 1000 } else { 1 },
+                            );
 
                         assert!(!tk.nominate(0, &values.k_value, true));
                     }
@@ -6236,7 +6238,7 @@ mod stellar_tests {
                     // a new value from v1
                     let v3_node_id = nodes[3].node_id().clone();
                     tk.driver().priority_lookup =
-                        Box::new(move |n: &PublicKey| if n == &v3_node_id { 1000 } else { 1 });
+                        Box::new(move |n: &SCPPublicKey| if n == &v3_node_id { 1000 } else { 1 });
 
                     // note: value passed in here should be ignored
                     assert!(tk.nominate(0, &values.k_value, true));
@@ -6266,7 +6268,9 @@ mod stellar_tests {
                     section!(v0_new_top_node, "v0 is new top node", {
                         let v0_node_id = nodes[0].node_id().clone();
                         tk.driver().priority_lookup =
-                            Box::new(move |n: &PublicKey| if n == &v0_node_id { 1000 } else { 1 });
+                            Box::new(
+                                move |n: &SCPPublicKey| if n == &v0_node_id { 1000 } else { 1 },
+                            );
 
                         assert!(tk.nominate(0, &values.x_value, true));
                         check_leaders(
@@ -6288,7 +6292,9 @@ mod stellar_tests {
                     section!(v2_new_top_node, "v2 is new top node", {
                         let v2_node_id = nodes[2].node_id().clone();
                         tk.driver().priority_lookup =
-                            Box::new(move |n: &PublicKey| if n == &v2_node_id { 1000 } else { 1 });
+                            Box::new(
+                                move |n: &SCPPublicKey| if n == &v2_node_id { 1000 } else { 1 },
+                            );
 
                         assert!(tk.nominate(0, &values.x_value, true));
                         check_leaders(
@@ -6315,7 +6321,9 @@ mod stellar_tests {
                     section!(v3_new_top_node, "v3 is new top node", {
                         let v3_node_id = nodes[3].node_id().clone();
                         tk.driver().priority_lookup =
-                            Box::new(move |n: &PublicKey| if n == &v3_node_id { 1000 } else { 1 });
+                            Box::new(
+                                move |n: &SCPPublicKey| if n == &v3_node_id { 1000 } else { 1 },
+                            );
 
                         // nothing happens, we don't have any message for v3
                         assert!(!tk.nominate(0, &values.x_value, true));

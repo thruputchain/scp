@@ -1,7 +1,7 @@
 // clang-format off
 %#include "scp.hh"
 
-namespace hogd {
+namespace scp {
 // clang-format on
 
 program SCP_Control
@@ -26,4 +26,4 @@ program SCP_Control
 }
 = 0x9aa93003;
 
-} // namespace hogd
+} // namespace scp

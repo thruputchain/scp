@@ -1,7 +1,7 @@
 // clang-format off
 %#include "scp.hh"
 
-namespace hogd {
+namespace scp {
 // clang-format on
 
 enum SCPValidationLevel {
@@ -45,4 +45,4 @@ program SCP_Handle
 }
 = 0x9aa92002;
 
-} // namespace hogd
+} // namespace scp

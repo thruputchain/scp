@@ -5,11 +5,11 @@
 // clang-format off
 %#include "types.hh"
 
-namespace hogd {
+namespace scp {
 // clang-format on
 
 typedef opaque SCPHash[32];
-typedef PublicKey SCPNodeID;
+typedef SCPPublicKey SCPNodeID;
 
 typedef unsigned int SCPCount;
 typedef unsigned hyper SCPSlotIndex;
@@ -79,7 +79,7 @@ struct SCPStatement {
 
 struct SCPEnvelope {
   SCPStatement statement;
-  Signature signature;
+  SCPSignature signature;
 };
 
 typedef SCPEnvelope SCPEnvelopes<>;
@@ -94,4 +94,4 @@ struct SCPQuorumSet {
 
 typedef SCPQuorumSet *SCPOptQuorumSet;
 
-} // namespace hogd
+} // namespace scp

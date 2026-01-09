@@ -17,7 +17,7 @@ pub async fn start_server(
     handler_sockaddr: SocketAddr,
     bind_controller_sockaddr: SocketAddr,
     cfg: scp_proto::SCPConfig,
-    secret_key: &SecretKey,
+    secret_key: &SCPSecretKey,
     is_validator: bool,
 ) -> SocketAddr {
     let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
@@ -30,7 +30,7 @@ pub async fn start_server(
 pub async fn start_service(
     handle_rpc_client: SCP_Handle_SCP_Handle1_Client,
     cfg: scp_proto::SCPConfig,
-    secret_key: &SecretKey,
+    secret_key: &SCPSecretKey,
     is_validator: bool,
 ) -> ControlService {
     // construct

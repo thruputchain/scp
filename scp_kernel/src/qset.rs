@@ -148,11 +148,11 @@ fn normalize_qset_simplify(
     }
 }
 
-pub fn compare_public_key(l: &scp_proto::PublicKey, r: &scp_proto::PublicKey) -> Ordering {
+pub fn compare_public_key(l: &scp_proto::SCPPublicKey, r: &scp_proto::SCPPublicKey) -> Ordering {
     match (l, r) {
         (
-            scp_proto::PublicKey::Ed25519 { ed25519: l_key },
-            scp_proto::PublicKey::Ed25519 { ed25519: r_key },
+            scp_proto::SCPPublicKey::Ed25519 { ed25519: l_key },
+            scp_proto::SCPPublicKey::Ed25519 { ed25519: r_key },
         ) => l_key.as_ref().cmp(r_key.as_ref()),
     }
 }

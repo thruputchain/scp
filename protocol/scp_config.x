@@ -1,7 +1,7 @@
 // clang-format off
 %#include "scp.hh"
 
-namespace hogd {
+namespace scp {
 // clang-format on
 
 struct SCPConfig {
@@ -14,4 +14,4 @@ struct SCPConfig {
   SCPQuorumSet quorum_set;
 };
 
-} // namespace hogd
+} // namespace scp

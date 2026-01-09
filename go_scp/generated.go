@@ -58,60 +58,60 @@ type SCP_Handle1 interface {
 	Scp_handle_get_quorum_set(context.Context, SCPHash) (SCPOptQuorumSet, error)
 }
 
-type Uint128_xdr struct {
+type SCP_uint128_xdr struct {
 	Highbits uint64
 	Lowbits uint64
 }
 
-type Int128_xdr struct {
+type SCP_int128_xdr struct {
 	Highbits int64
 	Lowbits uint64
 }
 
 // ed25519 sig len is 512 bits
-type Ed25519Signature = [64]byte
+type SCPEd25519Signature = [64]byte
 
 // ed25519 key len is 256 bits
-type Ed25519PublicKey = [32]byte
+type SCPEd25519PublicKey = [32]byte
 
 // ed25519 secret key len is 64 bytes
-type Ed25519SecretKey = [64]byte
+type SCPEd25519SecretKey = [64]byte
 
-type CryptographicScheme int32
+type SCPCryptographicScheme int32
 const (
-	Ed25519 CryptographicScheme = 0
+	Ed25519 SCPCryptographicScheme = 0
 )
 
-type Signature struct {
+type SCPSignature struct {
 	// The union discriminant Scheme selects among the following arms:
 	//   Ed25519:
-	//      Ed25519() *Ed25519Signature
-	Scheme CryptographicScheme
+	//      Ed25519() *SCPEd25519Signature
+	Scheme SCPCryptographicScheme
 	_u interface{}
 }
 
-type PublicKey struct {
+type SCPPublicKey struct {
 	// The union discriminant Scheme selects among the following arms:
 	//   Ed25519:
-	//      Ed25519() *Ed25519PublicKey
-	Scheme CryptographicScheme
+	//      Ed25519() *SCPEd25519PublicKey
+	Scheme SCPCryptographicScheme
 	_u interface{}
 }
 
-type SecretKey struct {
+type SCPSecretKey struct {
 	// The union discriminant Scheme selects among the following arms:
 	//   Ed25519:
-	//      Ed25519() *Ed25519SecretKey
-	Scheme CryptographicScheme
+	//      Ed25519() *SCPEd25519SecretKey
+	Scheme SCPCryptographicScheme
 	_u interface{}
 }
 
 // 256 bit hash
-type SHA256Hash = [32]byte
+type SCPSHA256Hash = [32]byte
 
 type SCPHash = [32]byte
 
-type SCPNodeID = PublicKey
+type SCPNodeID = SCPPublicKey
 
 type SCPCount = uint32
 
@@ -207,7 +207,7 @@ type XdrAnon_SCPStatement_Pledges struct {
 
 type SCPEnvelope struct {
 	Statement SCPStatement
-	Signature Signature
+	Signature SCPSignature
 }
 
 type SCPEnvelopes = []SCPEnvelope
@@ -1970,32 +1970,32 @@ func (c SCP_Handle1_Client) Scp_handle_get_quorum_set(ctx context.Context, a1 SC
 	}
 	return *proc.Res, nil
 }
-type XdrType_Uint128_xdr = *Uint128_xdr
-func (v *Uint128_xdr) XdrPointer() interface{} { return v }
-func (Uint128_xdr) XdrTypeName() string { return "Uint128_xdr" }
-func (v Uint128_xdr) XdrValue() interface{} { return v }
-func (v *Uint128_xdr) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-func (v *Uint128_xdr) XdrRecurse(x XDR, name string) {
+type XdrType_SCP_uint128_xdr = *SCP_uint128_xdr
+func (v *SCP_uint128_xdr) XdrPointer() interface{} { return v }
+func (SCP_uint128_xdr) XdrTypeName() string { return "SCP_uint128_xdr" }
+func (v SCP_uint128_xdr) XdrValue() interface{} { return v }
+func (v *SCP_uint128_xdr) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (v *SCP_uint128_xdr) XdrRecurse(x XDR, name string) {
 	if name != "" {
 		name = x.Sprintf("%s.", name)
 	}
 	x.Marshal(x.Sprintf("%shighbits", name), XDR_uint64(&v.Highbits))
 	x.Marshal(x.Sprintf("%slowbits", name), XDR_uint64(&v.Lowbits))
 }
-func XDR_Uint128_xdr(v *Uint128_xdr) *Uint128_xdr { return v }
-type XdrType_Int128_xdr = *Int128_xdr
-func (v *Int128_xdr) XdrPointer() interface{} { return v }
-func (Int128_xdr) XdrTypeName() string { return "Int128_xdr" }
-func (v Int128_xdr) XdrValue() interface{} { return v }
-func (v *Int128_xdr) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-func (v *Int128_xdr) XdrRecurse(x XDR, name string) {
+func XDR_SCP_uint128_xdr(v *SCP_uint128_xdr) *SCP_uint128_xdr { return v }
+type XdrType_SCP_int128_xdr = *SCP_int128_xdr
+func (v *SCP_int128_xdr) XdrPointer() interface{} { return v }
+func (SCP_int128_xdr) XdrTypeName() string { return "SCP_int128_xdr" }
+func (v SCP_int128_xdr) XdrValue() interface{} { return v }
+func (v *SCP_int128_xdr) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (v *SCP_int128_xdr) XdrRecurse(x XDR, name string) {
 	if name != "" {
 		name = x.Sprintf("%s.", name)
 	}
 	x.Marshal(x.Sprintf("%shighbits", name), XDR_int64(&v.Highbits))
 	x.Marshal(x.Sprintf("%slowbits", name), XDR_uint64(&v.Lowbits))
 }
-func XDR_Int128_xdr(v *Int128_xdr) *Int128_xdr { return v }
+func XDR_SCP_int128_xdr(v *SCP_int128_xdr) *SCP_int128_xdr { return v }
 type _XdrArray_64_opaque [64]byte
 func (v *_XdrArray_64_opaque) GetByteSlice() []byte { return v[:] }
 func (v *_XdrArray_64_opaque) XdrTypeName() string { return "opaque[]" }
@@ -2010,14 +2010,14 @@ func (_XdrArray_64_opaque) XdrArraySize() uint32 {
 	const bound uint32 = 64 // Force error if not const or doesn't fit
 	return bound
 }
-type XdrType_Ed25519Signature struct {
+type XdrType_SCPEd25519Signature struct {
 	*_XdrArray_64_opaque
 }
-func XDR_Ed25519Signature(v *Ed25519Signature) XdrType_Ed25519Signature {
-	return XdrType_Ed25519Signature{(*_XdrArray_64_opaque)(v)}
+func XDR_SCPEd25519Signature(v *SCPEd25519Signature) XdrType_SCPEd25519Signature {
+	return XdrType_SCPEd25519Signature{(*_XdrArray_64_opaque)(v)}
 }
-func (XdrType_Ed25519Signature) XdrTypeName() string { return "Ed25519Signature" }
-func (v XdrType_Ed25519Signature) XdrUnwrap() XdrType { return v._XdrArray_64_opaque }
+func (XdrType_SCPEd25519Signature) XdrTypeName() string { return "SCPEd25519Signature" }
+func (v XdrType_SCPEd25519Signature) XdrUnwrap() XdrType { return v._XdrArray_64_opaque }
 type _XdrArray_32_opaque [32]byte
 func (v *_XdrArray_32_opaque) GetByteSlice() []byte { return v[:] }
 func (v *_XdrArray_32_opaque) XdrTypeName() string { return "opaque[]" }
@@ -2032,268 +2032,268 @@ func (_XdrArray_32_opaque) XdrArraySize() uint32 {
 	const bound uint32 = 32 // Force error if not const or doesn't fit
 	return bound
 }
-type XdrType_Ed25519PublicKey struct {
+type XdrType_SCPEd25519PublicKey struct {
 	*_XdrArray_32_opaque
 }
-func XDR_Ed25519PublicKey(v *Ed25519PublicKey) XdrType_Ed25519PublicKey {
-	return XdrType_Ed25519PublicKey{(*_XdrArray_32_opaque)(v)}
+func XDR_SCPEd25519PublicKey(v *SCPEd25519PublicKey) XdrType_SCPEd25519PublicKey {
+	return XdrType_SCPEd25519PublicKey{(*_XdrArray_32_opaque)(v)}
 }
-func (XdrType_Ed25519PublicKey) XdrTypeName() string { return "Ed25519PublicKey" }
-func (v XdrType_Ed25519PublicKey) XdrUnwrap() XdrType { return v._XdrArray_32_opaque }
-type XdrType_Ed25519SecretKey struct {
+func (XdrType_SCPEd25519PublicKey) XdrTypeName() string { return "SCPEd25519PublicKey" }
+func (v XdrType_SCPEd25519PublicKey) XdrUnwrap() XdrType { return v._XdrArray_32_opaque }
+type XdrType_SCPEd25519SecretKey struct {
 	*_XdrArray_64_opaque
 }
-func XDR_Ed25519SecretKey(v *Ed25519SecretKey) XdrType_Ed25519SecretKey {
-	return XdrType_Ed25519SecretKey{(*_XdrArray_64_opaque)(v)}
+func XDR_SCPEd25519SecretKey(v *SCPEd25519SecretKey) XdrType_SCPEd25519SecretKey {
+	return XdrType_SCPEd25519SecretKey{(*_XdrArray_64_opaque)(v)}
 }
-func (XdrType_Ed25519SecretKey) XdrTypeName() string { return "Ed25519SecretKey" }
-func (v XdrType_Ed25519SecretKey) XdrUnwrap() XdrType { return v._XdrArray_64_opaque }
-var _XdrNames_CryptographicScheme = map[int32]string{
+func (XdrType_SCPEd25519SecretKey) XdrTypeName() string { return "SCPEd25519SecretKey" }
+func (v XdrType_SCPEd25519SecretKey) XdrUnwrap() XdrType { return v._XdrArray_64_opaque }
+var _XdrNames_SCPCryptographicScheme = map[int32]string{
 	int32(Ed25519): "Ed25519",
 }
-var _XdrValues_CryptographicScheme = map[string]int32{
+var _XdrValues_SCPCryptographicScheme = map[string]int32{
 	"Ed25519": int32(Ed25519),
 }
-func (CryptographicScheme) XdrEnumNames() map[int32]string {
-	return _XdrNames_CryptographicScheme
+func (SCPCryptographicScheme) XdrEnumNames() map[int32]string {
+	return _XdrNames_SCPCryptographicScheme
 }
-func (v CryptographicScheme) String() string {
-	if s, ok := _XdrNames_CryptographicScheme[int32(v)]; ok {
+func (v SCPCryptographicScheme) String() string {
+	if s, ok := _XdrNames_SCPCryptographicScheme[int32(v)]; ok {
 		return s
 	}
-	return fmt.Sprintf("CryptographicScheme#%d", v)
+	return fmt.Sprintf("SCPCryptographicScheme#%d", v)
 }
-func (v *CryptographicScheme) Scan(ss fmt.ScanState, _ rune) error {
+func (v *SCPCryptographicScheme) Scan(ss fmt.ScanState, _ rune) error {
 	if tok, err := ss.Token(true, XdrSymChar); err != nil {
 		return err
 	} else {
 		stok := string(tok)
-		if val, ok := _XdrValues_CryptographicScheme[stok]; ok {
-			*v = CryptographicScheme(val)
+		if val, ok := _XdrValues_SCPCryptographicScheme[stok]; ok {
+			*v = SCPCryptographicScheme(val)
 			return nil
-		} else if stok == "CryptographicScheme" {
+		} else if stok == "SCPCryptographicScheme" {
 			if n, err := fmt.Fscanf(ss, "#%d", (*int32)(v));
 				n == 1 && err == nil {
 				return nil
 			}
 		}
-		return XdrError(fmt.Sprintf("%s is not a valid CryptographicScheme.", stok))
+		return XdrError(fmt.Sprintf("%s is not a valid SCPCryptographicScheme.", stok))
 	}
 }
-func (v CryptographicScheme) GetU32() uint32 { return uint32(v) }
-func (v *CryptographicScheme) SetU32(n uint32) { *v = CryptographicScheme(n) }
-func (v *CryptographicScheme) XdrPointer() interface{} { return v }
-func (CryptographicScheme) XdrTypeName() string { return "CryptographicScheme" }
-func (v CryptographicScheme) XdrValue() interface{} { return v }
-func (v *CryptographicScheme) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-type XdrType_CryptographicScheme = *CryptographicScheme
-func XDR_CryptographicScheme(v *CryptographicScheme) *CryptographicScheme { return v }
-var _XdrTags_Signature = map[int32]bool{
+func (v SCPCryptographicScheme) GetU32() uint32 { return uint32(v) }
+func (v *SCPCryptographicScheme) SetU32(n uint32) { *v = SCPCryptographicScheme(n) }
+func (v *SCPCryptographicScheme) XdrPointer() interface{} { return v }
+func (SCPCryptographicScheme) XdrTypeName() string { return "SCPCryptographicScheme" }
+func (v SCPCryptographicScheme) XdrValue() interface{} { return v }
+func (v *SCPCryptographicScheme) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+type XdrType_SCPCryptographicScheme = *SCPCryptographicScheme
+func XDR_SCPCryptographicScheme(v *SCPCryptographicScheme) *SCPCryptographicScheme { return v }
+var _XdrTags_SCPSignature = map[int32]bool{
 	XdrToI32(Ed25519): true,
 }
-func (_ Signature) XdrValidTags() map[int32]bool {
-	return _XdrTags_Signature
+func (_ SCPSignature) XdrValidTags() map[int32]bool {
+	return _XdrTags_SCPSignature
 }
-func (u *Signature) Ed25519() *Ed25519Signature {
+func (u *SCPSignature) Ed25519() *SCPEd25519Signature {
 	switch u.Scheme {
 	case Ed25519:
-		if v, ok := u._u.(*Ed25519Signature); ok {
+		if v, ok := u._u.(*SCPEd25519Signature); ok {
 			return v
 		} else {
-			var zero Ed25519Signature
+			var zero SCPEd25519Signature
 			u._u = &zero
 			return &zero
 		}
 	default:
-		XdrPanic("Signature.Ed25519 accessed when Scheme == %v", u.Scheme)
+		XdrPanic("SCPSignature.Ed25519 accessed when Scheme == %v", u.Scheme)
 		return nil
 	}
 }
-func (u Signature) XdrValid() bool {
+func (u SCPSignature) XdrValid() bool {
 	switch u.Scheme {
 	case Ed25519:
 		return true
 	}
 	return false
 }
-func (u *Signature) XdrUnionTag() XdrNum32 {
-	return XDR_CryptographicScheme(&u.Scheme)
+func (u *SCPSignature) XdrUnionTag() XdrNum32 {
+	return XDR_SCPCryptographicScheme(&u.Scheme)
 }
-func (u *Signature) XdrUnionTagName() string {
+func (u *SCPSignature) XdrUnionTagName() string {
 	return "Scheme"
 }
-func (u *Signature) XdrUnionBody() XdrType {
+func (u *SCPSignature) XdrUnionBody() XdrType {
 	switch u.Scheme {
 	case Ed25519:
-		return XDR_Ed25519Signature(u.Ed25519())
+		return XDR_SCPEd25519Signature(u.Ed25519())
 	}
 	return nil
 }
-func (u *Signature) XdrUnionBodyName() string {
+func (u *SCPSignature) XdrUnionBodyName() string {
 	switch u.Scheme {
 	case Ed25519:
 		return "Ed25519"
 	}
 	return ""
 }
-type XdrType_Signature = *Signature
-func (v *Signature) XdrPointer() interface{} { return v }
-func (Signature) XdrTypeName() string { return "Signature" }
-func (v Signature) XdrValue() interface{} { return v }
-func (v *Signature) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-func (u *Signature) XdrRecurse(x XDR, name string) {
+type XdrType_SCPSignature = *SCPSignature
+func (v *SCPSignature) XdrPointer() interface{} { return v }
+func (SCPSignature) XdrTypeName() string { return "SCPSignature" }
+func (v SCPSignature) XdrValue() interface{} { return v }
+func (v *SCPSignature) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (u *SCPSignature) XdrRecurse(x XDR, name string) {
 	if name != "" {
 		name = x.Sprintf("%s.", name)
 	}
-	XDR_CryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
+	XDR_SCPCryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
 	switch u.Scheme {
 	case Ed25519:
-		x.Marshal(x.Sprintf("%sed25519", name), XDR_Ed25519Signature(u.Ed25519()))
+		x.Marshal(x.Sprintf("%sed25519", name), XDR_SCPEd25519Signature(u.Ed25519()))
 		return
 	}
-	XdrPanic("invalid Scheme (%v) in Signature", u.Scheme)
+	XdrPanic("invalid Scheme (%v) in SCPSignature", u.Scheme)
 }
-func XDR_Signature(v *Signature) *Signature { return v}
-var _XdrTags_PublicKey = map[int32]bool{
+func XDR_SCPSignature(v *SCPSignature) *SCPSignature { return v}
+var _XdrTags_SCPPublicKey = map[int32]bool{
 	XdrToI32(Ed25519): true,
 }
-func (_ PublicKey) XdrValidTags() map[int32]bool {
-	return _XdrTags_PublicKey
+func (_ SCPPublicKey) XdrValidTags() map[int32]bool {
+	return _XdrTags_SCPPublicKey
 }
-func (u *PublicKey) Ed25519() *Ed25519PublicKey {
+func (u *SCPPublicKey) Ed25519() *SCPEd25519PublicKey {
 	switch u.Scheme {
 	case Ed25519:
-		if v, ok := u._u.(*Ed25519PublicKey); ok {
+		if v, ok := u._u.(*SCPEd25519PublicKey); ok {
 			return v
 		} else {
-			var zero Ed25519PublicKey
+			var zero SCPEd25519PublicKey
 			u._u = &zero
 			return &zero
 		}
 	default:
-		XdrPanic("PublicKey.Ed25519 accessed when Scheme == %v", u.Scheme)
+		XdrPanic("SCPPublicKey.Ed25519 accessed when Scheme == %v", u.Scheme)
 		return nil
 	}
 }
-func (u PublicKey) XdrValid() bool {
+func (u SCPPublicKey) XdrValid() bool {
 	switch u.Scheme {
 	case Ed25519:
 		return true
 	}
 	return false
 }
-func (u *PublicKey) XdrUnionTag() XdrNum32 {
-	return XDR_CryptographicScheme(&u.Scheme)
+func (u *SCPPublicKey) XdrUnionTag() XdrNum32 {
+	return XDR_SCPCryptographicScheme(&u.Scheme)
 }
-func (u *PublicKey) XdrUnionTagName() string {
+func (u *SCPPublicKey) XdrUnionTagName() string {
 	return "Scheme"
 }
-func (u *PublicKey) XdrUnionBody() XdrType {
+func (u *SCPPublicKey) XdrUnionBody() XdrType {
 	switch u.Scheme {
 	case Ed25519:
-		return XDR_Ed25519PublicKey(u.Ed25519())
+		return XDR_SCPEd25519PublicKey(u.Ed25519())
 	}
 	return nil
 }
-func (u *PublicKey) XdrUnionBodyName() string {
+func (u *SCPPublicKey) XdrUnionBodyName() string {
 	switch u.Scheme {
 	case Ed25519:
 		return "Ed25519"
 	}
 	return ""
 }
-type XdrType_PublicKey = *PublicKey
-func (v *PublicKey) XdrPointer() interface{} { return v }
-func (PublicKey) XdrTypeName() string { return "PublicKey" }
-func (v PublicKey) XdrValue() interface{} { return v }
-func (v *PublicKey) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-func (u *PublicKey) XdrRecurse(x XDR, name string) {
+type XdrType_SCPPublicKey = *SCPPublicKey
+func (v *SCPPublicKey) XdrPointer() interface{} { return v }
+func (SCPPublicKey) XdrTypeName() string { return "SCPPublicKey" }
+func (v SCPPublicKey) XdrValue() interface{} { return v }
+func (v *SCPPublicKey) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (u *SCPPublicKey) XdrRecurse(x XDR, name string) {
 	if name != "" {
 		name = x.Sprintf("%s.", name)
 	}
-	XDR_CryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
+	XDR_SCPCryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
 	switch u.Scheme {
 	case Ed25519:
-		x.Marshal(x.Sprintf("%sed25519", name), XDR_Ed25519PublicKey(u.Ed25519()))
+		x.Marshal(x.Sprintf("%sed25519", name), XDR_SCPEd25519PublicKey(u.Ed25519()))
 		return
 	}
-	XdrPanic("invalid Scheme (%v) in PublicKey", u.Scheme)
+	XdrPanic("invalid Scheme (%v) in SCPPublicKey", u.Scheme)
 }
-func XDR_PublicKey(v *PublicKey) *PublicKey { return v}
-var _XdrTags_SecretKey = map[int32]bool{
+func XDR_SCPPublicKey(v *SCPPublicKey) *SCPPublicKey { return v}
+var _XdrTags_SCPSecretKey = map[int32]bool{
 	XdrToI32(Ed25519): true,
 }
-func (_ SecretKey) XdrValidTags() map[int32]bool {
-	return _XdrTags_SecretKey
+func (_ SCPSecretKey) XdrValidTags() map[int32]bool {
+	return _XdrTags_SCPSecretKey
 }
-func (u *SecretKey) Ed25519() *Ed25519SecretKey {
+func (u *SCPSecretKey) Ed25519() *SCPEd25519SecretKey {
 	switch u.Scheme {
 	case Ed25519:
-		if v, ok := u._u.(*Ed25519SecretKey); ok {
+		if v, ok := u._u.(*SCPEd25519SecretKey); ok {
 			return v
 		} else {
-			var zero Ed25519SecretKey
+			var zero SCPEd25519SecretKey
 			u._u = &zero
 			return &zero
 		}
 	default:
-		XdrPanic("SecretKey.Ed25519 accessed when Scheme == %v", u.Scheme)
+		XdrPanic("SCPSecretKey.Ed25519 accessed when Scheme == %v", u.Scheme)
 		return nil
 	}
 }
-func (u SecretKey) XdrValid() bool {
+func (u SCPSecretKey) XdrValid() bool {
 	switch u.Scheme {
 	case Ed25519:
 		return true
 	}
 	return false
 }
-func (u *SecretKey) XdrUnionTag() XdrNum32 {
-	return XDR_CryptographicScheme(&u.Scheme)
+func (u *SCPSecretKey) XdrUnionTag() XdrNum32 {
+	return XDR_SCPCryptographicScheme(&u.Scheme)
 }
-func (u *SecretKey) XdrUnionTagName() string {
+func (u *SCPSecretKey) XdrUnionTagName() string {
 	return "Scheme"
 }
-func (u *SecretKey) XdrUnionBody() XdrType {
+func (u *SCPSecretKey) XdrUnionBody() XdrType {
 	switch u.Scheme {
 	case Ed25519:
-		return XDR_Ed25519SecretKey(u.Ed25519())
+		return XDR_SCPEd25519SecretKey(u.Ed25519())
 	}
 	return nil
 }
-func (u *SecretKey) XdrUnionBodyName() string {
+func (u *SCPSecretKey) XdrUnionBodyName() string {
 	switch u.Scheme {
 	case Ed25519:
 		return "Ed25519"
 	}
 	return ""
 }
-type XdrType_SecretKey = *SecretKey
-func (v *SecretKey) XdrPointer() interface{} { return v }
-func (SecretKey) XdrTypeName() string { return "SecretKey" }
-func (v SecretKey) XdrValue() interface{} { return v }
-func (v *SecretKey) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
-func (u *SecretKey) XdrRecurse(x XDR, name string) {
+type XdrType_SCPSecretKey = *SCPSecretKey
+func (v *SCPSecretKey) XdrPointer() interface{} { return v }
+func (SCPSecretKey) XdrTypeName() string { return "SCPSecretKey" }
+func (v SCPSecretKey) XdrValue() interface{} { return v }
+func (v *SCPSecretKey) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (u *SCPSecretKey) XdrRecurse(x XDR, name string) {
 	if name != "" {
 		name = x.Sprintf("%s.", name)
 	}
-	XDR_CryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
+	XDR_SCPCryptographicScheme(&u.Scheme).XdrMarshal(x, x.Sprintf("%sscheme", name))
 	switch u.Scheme {
 	case Ed25519:
-		x.Marshal(x.Sprintf("%sed25519", name), XDR_Ed25519SecretKey(u.Ed25519()))
+		x.Marshal(x.Sprintf("%sed25519", name), XDR_SCPEd25519SecretKey(u.Ed25519()))
 		return
 	}
-	XdrPanic("invalid Scheme (%v) in SecretKey", u.Scheme)
+	XdrPanic("invalid Scheme (%v) in SCPSecretKey", u.Scheme)
 }
-func XDR_SecretKey(v *SecretKey) *SecretKey { return v}
-type XdrType_SHA256Hash struct {
+func XDR_SCPSecretKey(v *SCPSecretKey) *SCPSecretKey { return v}
+type XdrType_SCPSHA256Hash struct {
 	*_XdrArray_32_opaque
 }
-func XDR_SHA256Hash(v *SHA256Hash) XdrType_SHA256Hash {
-	return XdrType_SHA256Hash{(*_XdrArray_32_opaque)(v)}
+func XDR_SCPSHA256Hash(v *SCPSHA256Hash) XdrType_SCPSHA256Hash {
+	return XdrType_SCPSHA256Hash{(*_XdrArray_32_opaque)(v)}
 }
-func (XdrType_SHA256Hash) XdrTypeName() string { return "SHA256Hash" }
-func (v XdrType_SHA256Hash) XdrUnwrap() XdrType { return v._XdrArray_32_opaque }
+func (XdrType_SCPSHA256Hash) XdrTypeName() string { return "SCPSHA256Hash" }
+func (v XdrType_SCPSHA256Hash) XdrUnwrap() XdrType { return v._XdrArray_32_opaque }
 type XdrType_SCPHash struct {
 	*_XdrArray_32_opaque
 }
@@ -2303,13 +2303,13 @@ func XDR_SCPHash(v *SCPHash) XdrType_SCPHash {
 func (XdrType_SCPHash) XdrTypeName() string { return "SCPHash" }
 func (v XdrType_SCPHash) XdrUnwrap() XdrType { return v._XdrArray_32_opaque }
 type XdrType_SCPNodeID struct {
-	XdrType_PublicKey
+	XdrType_SCPPublicKey
 }
 func XDR_SCPNodeID(v *SCPNodeID) XdrType_SCPNodeID {
-	return XdrType_SCPNodeID{XDR_PublicKey(v)}
+	return XdrType_SCPNodeID{XDR_SCPPublicKey(v)}
 }
 func (XdrType_SCPNodeID) XdrTypeName() string { return "SCPNodeID" }
-func (v XdrType_SCPNodeID) XdrUnwrap() XdrType { return v.XdrType_PublicKey }
+func (v XdrType_SCPNodeID) XdrUnwrap() XdrType { return v.XdrType_SCPPublicKey }
 type XdrType_SCPCount struct {
 	XdrType_uint32
 }
@@ -2826,7 +2826,7 @@ func (v *SCPEnvelope) XdrRecurse(x XDR, name string) {
 		name = x.Sprintf("%s.", name)
 	}
 	x.Marshal(x.Sprintf("%sstatement", name), XDR_SCPStatement(&v.Statement))
-	x.Marshal(x.Sprintf("%ssignature", name), XDR_Signature(&v.Signature))
+	x.Marshal(x.Sprintf("%ssignature", name), XDR_SCPSignature(&v.Signature))
 }
 func XDR_SCPEnvelope(v *SCPEnvelope) *SCPEnvelope { return v }
 type _XdrVec_unbounded_SCPEnvelope []SCPEnvelope

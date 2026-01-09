@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use xdr_common::VecM;
 
 pub fn make_envelope(
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     slot_index: scp_proto::SCPSlotIndex,
     mut statement: scp_proto::SCPStatement,
 ) -> Result<scp_proto::SCPEnvelope, scp_util::SigningError> {
@@ -17,7 +17,7 @@ pub fn make_envelope(
 }
 
 pub fn make_externalize(
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     commit_ballot: scp_proto::SCPBallot,
@@ -38,7 +38,7 @@ pub fn make_externalize(
 }
 
 pub fn make_confirm(
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     prepare_counter: scp_proto::SCPCount,
@@ -63,7 +63,7 @@ pub fn make_confirm(
 }
 
 pub fn make_prepare(
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     ballot: scp_proto::SCPBallot,
@@ -90,7 +90,7 @@ pub fn make_prepare(
 }
 
 pub fn make_nominate(
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     mut votes: Vec<scp_proto::SCPValue>,
@@ -121,7 +121,7 @@ pub fn make_nominate(
 // Verification functions - compare actual envelope with expected envelope
 pub fn verify_prepare(
     actual: &scp_proto::SCPEnvelope,
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     ballot: scp_proto::SCPBallot,
@@ -147,7 +147,7 @@ pub fn verify_prepare(
 
 pub fn verify_confirm(
     actual: &scp_proto::SCPEnvelope,
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     prepare_counter: scp_proto::SCPCount,
@@ -171,7 +171,7 @@ pub fn verify_confirm(
 
 pub fn verify_externalize(
     actual: &scp_proto::SCPEnvelope,
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     commit_ballot: scp_proto::SCPBallot,
@@ -185,7 +185,7 @@ pub fn verify_externalize(
 
 pub fn verify_nominate(
     actual: &scp_proto::SCPEnvelope,
-    secret_key: &scp_proto::SecretKey,
+    secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
     slot_index: scp_proto::SCPSlotIndex,
     votes: Vec<scp_proto::SCPValue>,
@@ -239,7 +239,7 @@ impl Default for TestValues {
 }
 
 pub struct TestNode {
-    pub secret_key: scp_proto::SecretKey,
+    pub secret_key: scp_proto::SCPSecretKey,
 }
 
 impl TestNode {

@@ -17,12 +17,12 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let v: scp_proto::uint128_xdr = scp_proto::uint128_xdr {
+        let v: scp_proto::SCP_uint128_xdr = scp_proto::SCP_uint128_xdr {
             highbits: 1,
             lowbits: 2,
         };
         let bytes = serialize_txs::encode(&v).expect("encode failed");
-        let w: scp_proto::uint128_xdr = serialize_txs::decode(&bytes).expect("decode failed");
+        let w: scp_proto::SCP_uint128_xdr = serialize_txs::decode(&bytes).expect("decode failed");
         assert!(v == w, "unequal");
     }
 
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn roundtrip_into() {
-        let v: scp_proto::uint128_xdr = scp_proto::uint128_xdr {
+        let v: scp_proto::SCP_uint128_xdr = scp_proto::SCP_uint128_xdr {
             highbits: 1,
             lowbits: 2,
         };
@@ -45,7 +45,7 @@ mod tests {
         let n = serialize_txs::encode_into(&v, as_maybe_uninit(buf.0.as_mut_slice()))
             .expect("encode failed");
         assert!(n == 16, "size");
-        let w: scp_proto::uint128_xdr =
+        let w: scp_proto::SCP_uint128_xdr =
             serialize_txs::decode(&buf.as_slice()[..16]).expect("decode failed");
         assert!(v == w, "unequal");
     }

@@ -36,7 +36,7 @@ use ::serde_arrays;
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
-pub struct uint128_xdr {
+pub struct SCP_uint128_xdr {
     pub highbits: u64,
     pub lowbits: u64,
 }
@@ -45,7 +45,7 @@ pub struct uint128_xdr {
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
-pub struct int128_xdr {
+pub struct SCP_int128_xdr {
     pub highbits: i64,
     pub lowbits: u64,
 }
@@ -59,16 +59,16 @@ pub struct int128_xdr {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
-pub struct Ed25519Signature {
+pub struct SCPEd25519Signature {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     inner: [u8; 64 as usize],
 }
-impl From<[u8; 64 as usize]> for Ed25519Signature {
+impl From<[u8; 64 as usize]> for SCPEd25519Signature {
     fn from(_inner: [u8; 64 as usize]) -> Self {
         Self { inner: _inner }
     }
 }
-impl Ed25519Signature {
+impl SCPEd25519Signature {
     pub fn into_inner(self) -> [u8; 64 as usize] {
         self.inner
     }
@@ -77,31 +77,31 @@ impl Ed25519Signature {
     }
 }
 
-impl Deref for Ed25519Signature {
+impl Deref for SCPEd25519Signature {
     type Target = [u8; 64 as usize];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
-impl DerefMut for Ed25519Signature {
+impl DerefMut for SCPEd25519Signature {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
-impl AsRef<[u8]> for Ed25519Signature {
+impl AsRef<[u8]> for SCPEd25519Signature {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_slice()
     }
 }
-impl<'a> From<&'a [u8; 64]> for &'a Ed25519Signature {
+impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519Signature {
     fn from(arr: &[u8; 64]) -> Self {
-        let ptr = arr as *const [u8; 64] as *const Ed25519Signature;
+        let ptr = arr as *const [u8; 64] as *const SCPEd25519Signature;
         unsafe { &*ptr }
     }
 }
 #[cfg(feature = "xdrs")]
-impl<'r> ReadXDR<'r> for &'r Ed25519Signature {
+impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
     fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
         let arr: &[u8; 64] = xdrs::read_xdr(r)?;
         let val = Self::from(arr);
@@ -118,16 +118,16 @@ impl<'r> ReadXDR<'r> for &'r Ed25519Signature {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]
-pub struct Ed25519PublicKey {
+pub struct SCPEd25519PublicKey {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     inner: [u8; 32 as usize],
 }
-impl From<[u8; 32 as usize]> for Ed25519PublicKey {
+impl From<[u8; 32 as usize]> for SCPEd25519PublicKey {
     fn from(_inner: [u8; 32 as usize]) -> Self {
         Self { inner: _inner }
     }
 }
-impl Ed25519PublicKey {
+impl SCPEd25519PublicKey {
     pub fn into_inner(self) -> [u8; 32 as usize] {
         self.inner
     }
@@ -136,31 +136,31 @@ impl Ed25519PublicKey {
     }
 }
 
-impl Deref for Ed25519PublicKey {
+impl Deref for SCPEd25519PublicKey {
     type Target = [u8; 32 as usize];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
-impl DerefMut for Ed25519PublicKey {
+impl DerefMut for SCPEd25519PublicKey {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
-impl AsRef<[u8]> for Ed25519PublicKey {
+impl AsRef<[u8]> for SCPEd25519PublicKey {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_slice()
     }
 }
-impl<'a> From<&'a [u8; 32]> for &'a Ed25519PublicKey {
+impl<'a> From<&'a [u8; 32]> for &'a SCPEd25519PublicKey {
     fn from(arr: &[u8; 32]) -> Self {
-        let ptr = arr as *const [u8; 32] as *const Ed25519PublicKey;
+        let ptr = arr as *const [u8; 32] as *const SCPEd25519PublicKey;
         unsafe { &*ptr }
     }
 }
 #[cfg(feature = "xdrs")]
-impl<'r> ReadXDR<'r> for &'r Ed25519PublicKey {
+impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
     fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
         let arr: &[u8; 32] = xdrs::read_xdr(r)?;
         let val = Self::from(arr);
@@ -176,16 +176,16 @@ impl<'r> ReadXDR<'r> for &'r Ed25519PublicKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
-pub struct Ed25519SecretKey {
+pub struct SCPEd25519SecretKey {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     inner: [u8; 64 as usize],
 }
-impl From<[u8; 64 as usize]> for Ed25519SecretKey {
+impl From<[u8; 64 as usize]> for SCPEd25519SecretKey {
     fn from(_inner: [u8; 64 as usize]) -> Self {
         Self { inner: _inner }
     }
 }
-impl Ed25519SecretKey {
+impl SCPEd25519SecretKey {
     pub fn into_inner(self) -> [u8; 64 as usize] {
         self.inner
     }
@@ -194,31 +194,31 @@ impl Ed25519SecretKey {
     }
 }
 
-impl Deref for Ed25519SecretKey {
+impl Deref for SCPEd25519SecretKey {
     type Target = [u8; 64 as usize];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
-impl DerefMut for Ed25519SecretKey {
+impl DerefMut for SCPEd25519SecretKey {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
-impl AsRef<[u8]> for Ed25519SecretKey {
+impl AsRef<[u8]> for SCPEd25519SecretKey {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_slice()
     }
 }
-impl<'a> From<&'a [u8; 64]> for &'a Ed25519SecretKey {
+impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519SecretKey {
     fn from(arr: &[u8; 64]) -> Self {
-        let ptr = arr as *const [u8; 64] as *const Ed25519SecretKey;
+        let ptr = arr as *const [u8; 64] as *const SCPEd25519SecretKey;
         unsafe { &*ptr }
     }
 }
 #[cfg(feature = "xdrs")]
-impl<'r> ReadXDR<'r> for &'r Ed25519SecretKey {
+impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
     fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
         let arr: &[u8; 64] = xdrs::read_xdr(r)?;
         let val = Self::from(arr);
@@ -232,12 +232,12 @@ impl<'r> ReadXDR<'r> for &'r Ed25519SecretKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(i32)]
-pub enum CryptographicScheme {
+pub enum SCPCryptographicScheme {
     Ed25519 = 0 as i32,
 }
-pub use CryptographicScheme::*;
+pub use SCPCryptographicScheme::*;
 
-impl TryFrom<i32> for CryptographicScheme {
+impl TryFrom<i32> for SCPCryptographicScheme {
     type Error = ();
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
@@ -252,10 +252,10 @@ impl TryFrom<i32> for CryptographicScheme {
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
-pub enum Signature {
+pub enum SCPSignature {
     // case Ed25519:
-    //   Ed25519Signature ed25519;
-    Ed25519 { ed25519: Ed25519Signature } = CryptographicScheme::Ed25519 as i32,
+    //   SCPEd25519Signature ed25519;
+    Ed25519 { ed25519: SCPEd25519Signature } = SCPCryptographicScheme::Ed25519 as i32,
     
 }
 
@@ -263,10 +263,10 @@ pub enum Signature {
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
-pub enum PublicKey {
+pub enum SCPPublicKey {
     // case Ed25519:
-    //   Ed25519PublicKey ed25519;
-    Ed25519 { ed25519: Ed25519PublicKey } = CryptographicScheme::Ed25519 as i32,
+    //   SCPEd25519PublicKey ed25519;
+    Ed25519 { ed25519: SCPEd25519PublicKey } = SCPCryptographicScheme::Ed25519 as i32,
     
 }
 
@@ -274,10 +274,10 @@ pub enum PublicKey {
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
-pub enum SecretKey {
+pub enum SCPSecretKey {
     // case Ed25519:
-    //   Ed25519SecretKey ed25519;
-    Ed25519 { ed25519: Ed25519SecretKey } = CryptographicScheme::Ed25519 as i32,
+    //   SCPEd25519SecretKey ed25519;
+    Ed25519 { ed25519: SCPEd25519SecretKey } = SCPCryptographicScheme::Ed25519 as i32,
     
 }
 
@@ -289,16 +289,16 @@ pub enum SecretKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]
-pub struct SHA256Hash {
+pub struct SCPSHA256Hash {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     inner: [u8; 32 as usize],
 }
-impl From<[u8; 32 as usize]> for SHA256Hash {
+impl From<[u8; 32 as usize]> for SCPSHA256Hash {
     fn from(_inner: [u8; 32 as usize]) -> Self {
         Self { inner: _inner }
     }
 }
-impl SHA256Hash {
+impl SCPSHA256Hash {
     pub fn into_inner(self) -> [u8; 32 as usize] {
         self.inner
     }
@@ -307,31 +307,31 @@ impl SHA256Hash {
     }
 }
 
-impl Deref for SHA256Hash {
+impl Deref for SCPSHA256Hash {
     type Target = [u8; 32 as usize];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
-impl DerefMut for SHA256Hash {
+impl DerefMut for SCPSHA256Hash {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
-impl AsRef<[u8]> for SHA256Hash {
+impl AsRef<[u8]> for SCPSHA256Hash {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_slice()
     }
 }
-impl<'a> From<&'a [u8; 32]> for &'a SHA256Hash {
+impl<'a> From<&'a [u8; 32]> for &'a SCPSHA256Hash {
     fn from(arr: &[u8; 32]) -> Self {
-        let ptr = arr as *const [u8; 32] as *const SHA256Hash;
+        let ptr = arr as *const [u8; 32] as *const SCPSHA256Hash;
         unsafe { &*ptr }
     }
 }
 #[cfg(feature = "xdrs")]
-impl<'r> ReadXDR<'r> for &'r SHA256Hash {
+impl<'r> ReadXDR<'r> for &'r SCPSHA256Hash {
     fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
         let arr: &[u8; 32] = xdrs::read_xdr(r)?;
         let val = Self::from(arr);
@@ -345,7 +345,7 @@ impl<'r> ReadXDR<'r> for &'r SHA256Hash {
 // XDR internals below this point
 //
 
-impl Signature {
+impl SCPSignature {
     pub fn scheme(&self) -> i32 {
         match self {
             
@@ -354,7 +354,7 @@ impl Signature {
     }
 }
 
-impl PublicKey {
+impl SCPPublicKey {
     pub fn scheme(&self) -> i32 {
         match self {
             
@@ -363,7 +363,7 @@ impl PublicKey {
     }
 }
 
-impl SecretKey {
+impl SCPSecretKey {
     pub fn scheme(&self) -> i32 {
         match self {
             

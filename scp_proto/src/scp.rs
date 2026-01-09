@@ -34,7 +34,7 @@ use xdr_common::*;
 
 pub type SCPHash = [u8; 32 as usize];
 
-pub type SCPNodeID = PublicKey;
+pub type SCPNodeID = SCPPublicKey;
 
 pub type SCPCount = u32;
 
@@ -184,7 +184,7 @@ pub struct SCPStatement {
 #[repr(C)]
 pub struct SCPEnvelope {
     pub statement: SCPStatement,
-    pub signature: Signature,
+    pub signature: SCPSignature,
 }
 
 pub type SCPEnvelopes = VecM::<SCPEnvelope>;

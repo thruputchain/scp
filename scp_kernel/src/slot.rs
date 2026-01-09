@@ -283,12 +283,12 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         &mut self,
         statement: scp_proto::SCPStatement,
     ) -> scp_proto::SCPEnvelope {
-        use scp_proto::{Ed25519Signature, Signature};
+        use scp_proto::{SCPEd25519Signature, SCPSignature};
 
         let mut envelope = scp_proto::SCPEnvelope {
             statement: statement,
-            signature: Signature::Ed25519 {
-                ed25519: Ed25519Signature::new([0u8; 64]),
+            signature: SCPSignature::Ed25519 {
+                ed25519: SCPEd25519Signature::new([0u8; 64]),
             },
         };
 

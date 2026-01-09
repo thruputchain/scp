@@ -35,8 +35,8 @@ pub fn parse_node_id_from_hex(hex_str: &str) -> Result<scp_proto::SCPNodeID, Str
             .map_err(|_| format!("Invalid hex character in position {}", i * 2))?;
     }
 
-    let ed25519_key = Ed25519PublicKey::from(bytes);
-    Ok(PublicKey::Ed25519 {
+    let ed25519_key = SCPEd25519PublicKey::from(bytes);
+    Ok(SCPPublicKey::Ed25519 {
         ed25519: ed25519_key,
     })
 }
@@ -92,6 +92,6 @@ pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
 
 pub fn to_str_key(pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
     match pk {
-        PublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+        SCPPublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
     }
 }

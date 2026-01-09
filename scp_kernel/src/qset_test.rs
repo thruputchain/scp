@@ -10,18 +10,18 @@ fn vecm<T>(vec: Vec<T>) -> VecM<T> {
 }
 
 // Helper function to create public keys like the C++ version
-fn make_public_key(i: i32) -> PublicKey {
+fn make_public_key(i: i32) -> SCPPublicKey {
     let seed_string = format!("NODE_SEED_{}", i);
     let hash = Sha256::digest(seed_string.as_bytes());
     let hash_bytes: [u8; 32] = hash.into();
-    let ed25519_key = Ed25519PublicKey::from(hash_bytes);
-    PublicKey::Ed25519 {
+    let ed25519_key = SCPEd25519PublicKey::from(hash_bytes);
+    SCPPublicKey::Ed25519 {
         ed25519: ed25519_key,
     }
 }
 
 // Helper function to create a singleton quorum set
-fn make_singleton(key: PublicKey) -> SCPQuorumSet {
+fn make_singleton(key: SCPPublicKey) -> SCPQuorumSet {
     SCPQuorumSet {
         threshold: 1,
         validators: vecm(vec![key]),
@@ -30,7 +30,7 @@ fn make_singleton(key: PublicKey) -> SCPQuorumSet {
 }
 
 // Helper function to create keys and sort them like the C++ version
-fn create_sorted_keys(count: usize) -> Vec<PublicKey> {
+fn create_sorted_keys(count: usize) -> Vec<SCPPublicKey> {
     let mut keys = Vec::new();
     for i in 0..count {
         keys.push(make_public_key(i as i32));
@@ -192,7 +192,7 @@ fn test_nested_quorum_sets() {
     let keys = create_sorted_keys(10);
 
     // Test deep nesting
-    let test_nesting_level = |keys: &[PublicKey],
+    let test_nesting_level = |keys: &[SCPPublicKey],
                               nesting_level: usize,
                               expected_sanity: bool,
                               expected_normalized_sanity: bool| {

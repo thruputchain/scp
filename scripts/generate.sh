@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -xeuo pipefail
+
+SCRIPT_DIR=$(dirname $(readlink -f "$0"))
+
 # XDR files in protocol/ from which to generate rust
 protos=(
   scp.x
@@ -23,3 +27,5 @@ generate() {
 for proto in "${protos[@]}"; do
   generate "protocol/${proto}" "scp_proto"
 done
+
+$SCRIPT_DIR/go_generate.sh

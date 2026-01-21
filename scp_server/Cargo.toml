@@ -3,6 +3,9 @@ name = "scp_server"
 version = "1.0.0"
 edition = "2024"
 
+[features]
+info_callbacks = []
+
 [[bin]]
 name = "scpd"
 path = "src/main.rs"

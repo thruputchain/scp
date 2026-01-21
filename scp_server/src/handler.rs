@@ -323,12 +323,19 @@ pub enum HandleRequest {
     GetQuorumSet(SCPHash),
     //
     ValueExternalized(SlotIndex, SCPValue),
+    #[allow(dead_code)]
     StartedBallotProto(SlotIndex, SCPBallot),
+    #[allow(dead_code)]
     AcceptedBallotPrepared(SlotIndex, SCPBallot),
+    #[allow(dead_code)]
     ConfirmedBallotPrepared(SlotIndex, SCPBallot),
+    #[allow(dead_code)]
     AcceptedCommit(SlotIndex, SCPBallot),
+    #[allow(dead_code)]
     BallotDidHearFromQuorum(SlotIndex, SCPBallot),
+    #[allow(dead_code)]
     NominatingValue(SlotIndex, SCPValue),
+    #[allow(dead_code)]
     UpdatedCandidateValue(SlotIndex, SCPValue),
 }
 
@@ -593,6 +600,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn started_ballot_proto(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    #[cfg(feature = "info_callbacks")]
     fn started_ballot_proto(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
@@ -609,6 +619,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn accepted_ballot_prepared(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    #[cfg(feature = "info_callbacks")]
     fn accepted_ballot_prepared(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
@@ -625,6 +638,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn confirmed_ballot_prepared(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    #[cfg(feature = "info_callbacks")]
     fn confirmed_ballot_prepared(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
@@ -641,6 +657,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn accepted_commit(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    #[cfg(feature = "info_callbacks")]
     fn accepted_commit(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
@@ -654,6 +673,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn ballot_did_hear_from_quorum(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    #[cfg(feature = "info_callbacks")]
     fn ballot_did_hear_from_quorum(&self, slot_index: SlotIndex, ballot: &scp_proto::SCPBallot) {
         self.lock()
             .tx_handle_request
@@ -670,6 +692,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn nominating_value(&self, _: SlotIndex, _: &scp_proto::SCPValue) {}
+    #[cfg(feature = "info_callbacks")]
     fn nominating_value(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         self.lock()
             .tx_handle_request
@@ -683,6 +708,9 @@ impl ConsensusNotify for HandleKernel {
         }
     }
 
+    #[cfg(not(feature = "info_callbacks"))]
+    fn updated_candidate_value(&self, _: SlotIndex, _: &scp_proto::SCPValue) {}
+    #[cfg(feature = "info_callbacks")]
     fn updated_candidate_value(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         self.lock()
             .tx_handle_request

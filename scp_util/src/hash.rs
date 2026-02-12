@@ -7,7 +7,7 @@ pub fn hash_bytes(bytes: &[u8]) -> scp_proto::SCPHash {
     Sha256::digest(bytes).into()
 }
 
-pub fn hash_xdr<T>(v: &T) -> writer::Result<scp_proto::SCPSHA256Hash>
+pub fn hash_xdr<T>(v: &T) -> writer::WriteResult<scp_proto::SCPSHA256Hash>
 where
     T: WriteXDR + ?Sized,
 {
@@ -16,7 +16,7 @@ where
     Ok(scp_proto::SCPSHA256Hash::from(h))
 }
 
-pub fn hash_xdr_scp<T>(v: &T) -> writer::Result<scp_proto::SCPHash>
+pub fn hash_xdr_scp<T>(v: &T) -> writer::WriteResult<scp_proto::SCPHash>
 where
     T: WriteXDR + ?Sized,
 {

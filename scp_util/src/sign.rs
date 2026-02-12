@@ -1,6 +1,6 @@
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use thiserror::Error;
-use xdrs::serialize_txs;
+use xdrs::txs;
 use xdrs::write_xdr::WriteXDR;
 
 /// Creates an ed25519_dalek::SigningKey from a scp_proto::SCPEd25519SecretKey
@@ -63,13 +63,13 @@ pub fn sign_bytes(secret_key: &scp_proto::SCPSecretKey, msg: &[u8]) -> scp_proto
 #[derive(Copy, Clone, Debug, Error)]
 pub enum SigningError {
     #[error("encoding error")]
-    EncodingError(xdrs::serialize::writer::Error),
+    EncodingError(xdrs::serialize::writer::WriteError),
 }
 
 #[derive(Debug, Error)]
 pub enum VerifyingError {
     #[error("encoding error")]
-    EncodingError(xdrs::serialize::writer::Error),
+    EncodingError(xdrs::serialize::writer::WriteError),
 
     #[error("verifying error")]
     VerifyingError(SignatureError),
@@ -82,7 +82,7 @@ pub fn sign_xdr<T>(
 where
     T: WriteXDR + ?Sized,
 {
-    let x = serialize_txs::encode(v).map_err(|e| SigningError::EncodingError(e))?;
+    let x = txs::encode(v).map_err(|e| SigningError::EncodingError(e))?;
     Ok(sign_bytes(secret_key, x.as_slice()))
 }
 
@@ -94,6 +94,6 @@ pub fn verify_xdr<T>(
 where
     T: WriteXDR + ?Sized,
 {
-    let x = serialize_txs::encode(v).map_err(|e| VerifyingError::EncodingError(e))?;
+    let x = txs::encode(v).map_err(|e| VerifyingError::EncodingError(e))?;
     verify_bytes(public_key, x.as_slice(), signature).map_err(|e| VerifyingError::VerifyingError(e))
 }

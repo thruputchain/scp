@@ -119,7 +119,7 @@ async fn main() {
         scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
     ));
 
-    let control_server = RpcServer::new(control_service_map, control_listener);
+    let control_server = RpcServer::new(control_listener, control_service_map);
     control_server.start().await;
 
     future::pending::<()>().await;

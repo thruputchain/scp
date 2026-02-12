@@ -13,31 +13,16 @@ xdrs = []
 
 [dependencies]
 scp_proto = { path = "../scp_proto" }
+ed25519-dalek = "3.0.0-pre.0"
+thiserror = "2.0"
+sha2 = "0.10"
+base64 = "0.22"
 
-[dependencies.xdr_common]
-git = "ssh://git@github.com/groundhogchain/xdr_common.git"
-
-[dependencies.xdrs]
-git = "ssh://git@github.com/groundhogchain/xdrs.git"
-features = ["alloc", "derive", "cxs", "txs", "strict"]
+xdr-common = { workspace = true }
+xdrs = { workspace = true }
 
 [dependencies.serde]
 optional = true
 version = "1.0.219"
 default-features = false
 features = ["derive"]
-
-[dependencies.ed25519-dalek]
-version = "3.0.0-pre.0"
-
-[dependencies.thiserror]
-version = "2.0"
-
-[dependencies.sha2]
-version = "0.10"
-
-[dependencies.groundhog_scp]
-git = "ssh://git@github.com/groundhogchain/protocol-rs.git"
-
-[dependencies.base64]
-version = "0.22"

@@ -1,14 +1,13 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: e159036f245540d9573617a3662096ea6df08cf8
+// Generated from xdrc commit: 708ebf9bf535633eea730b810b2fb07494dca14e
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
-#![allow(unexpected_cfgs)]
 #![allow(unused_variables)]
 #![allow(clippy::unnecessary_cast)]
 
@@ -16,22 +15,22 @@ use crate::*;
 use core::option::Option;
 use core::ops::{Deref, DerefMut};
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 use std::io::{Read, Write};
-
-#[cfg(feature="xdrs")]
+#[cfg(feature = "xdrs")]
 use xdrs::*;
-#[cfg(feature="spec")]
+#[cfg(feature = "spec")]
 use xdrs::xdr_repr::*;
 
 
 #[cfg(feature = "serde")]
-use ::serde::{Serialize, Deserialize};
+use ::serde::{{Serialize, Deserialize}};
 #[cfg(feature = "serde")]
 use ::serde_arrays;
 
 
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -41,6 +40,7 @@ pub struct SCP_uint128_xdr {
     pub lowbits: u64,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -59,8 +59,9 @@ pub struct SCP_int128_xdr {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct SCPEd25519Signature {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays::hex"))]
     inner: [u8; 64 as usize],
 }
 impl From<[u8; 64 as usize]> for SCPEd25519Signature {
@@ -101,13 +102,15 @@ impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519Signature {
     }
 }
 #[cfg(feature = "xdrs")]
+
 impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
-    fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
-        let arr: &[u8; 64] = xdrs::read_xdr(r)?;
-        let val = Self::from(arr);
-        Ok(val)
-    }
+  fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
+      let arr: &[u8; 64] = xdrs::read_xdr(r)?;
+      let val = Self::from(arr);
+      Ok(val)
+  }
 }
+
 
 
 // 
@@ -118,8 +121,9 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct SCPEd25519PublicKey {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays::hex"))]
     inner: [u8; 32 as usize],
 }
 impl From<[u8; 32 as usize]> for SCPEd25519PublicKey {
@@ -160,13 +164,15 @@ impl<'a> From<&'a [u8; 32]> for &'a SCPEd25519PublicKey {
     }
 }
 #[cfg(feature = "xdrs")]
+
 impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
-    fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
-        let arr: &[u8; 32] = xdrs::read_xdr(r)?;
-        let val = Self::from(arr);
-        Ok(val)
-    }
+  fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
+      let arr: &[u8; 32] = xdrs::read_xdr(r)?;
+      let val = Self::from(arr);
+      Ok(val)
+  }
 }
+
 
 
 // 
@@ -176,8 +182,9 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct SCPEd25519SecretKey {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays::hex"))]
     inner: [u8; 64 as usize],
 }
 impl From<[u8; 64 as usize]> for SCPEd25519SecretKey {
@@ -218,15 +225,18 @@ impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519SecretKey {
     }
 }
 #[cfg(feature = "xdrs")]
+
 impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
-    fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
-        let arr: &[u8; 64] = xdrs::read_xdr(r)?;
-        let val = Self::from(arr);
-        Ok(val)
-    }
+  fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
+      let arr: &[u8; 64] = xdrs::read_xdr(r)?;
+      let val = Self::from(arr);
+      Ok(val)
+  }
 }
 
 
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -235,8 +245,6 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
 pub enum SCPCryptographicScheme {
     Ed25519 = 0 as i32,
 }
-pub use SCPCryptographicScheme::*;
-
 impl TryFrom<i32> for SCPCryptographicScheme {
     type Error = ();
     fn try_from(value: i32) -> Result<Self, Self::Error> {
@@ -249,6 +257,7 @@ impl TryFrom<i32> for SCPCryptographicScheme {
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
@@ -260,6 +269,7 @@ pub enum SCPSignature {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
@@ -271,6 +281,7 @@ pub enum SCPPublicKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "xdrs", derive(ReadXDR, WriteXDR))]
 #[cfg_attr(feature = "spec", derive(XDR))]
 #[repr(i32)]
@@ -289,8 +300,9 @@ pub enum SCPSecretKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct SCPSHA256Hash {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays::hex"))]
     inner: [u8; 32 as usize],
 }
 impl From<[u8; 32 as usize]> for SCPSHA256Hash {
@@ -331,13 +343,15 @@ impl<'a> From<&'a [u8; 32]> for &'a SCPSHA256Hash {
     }
 }
 #[cfg(feature = "xdrs")]
+
 impl<'r> ReadXDR<'r> for &'r SCPSHA256Hash {
-    fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
-        let arr: &[u8; 32] = xdrs::read_xdr(r)?;
-        let val = Self::from(arr);
-        Ok(val)
-    }
+  fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
+      let arr: &[u8; 32] = xdrs::read_xdr(r)?;
+      let val = Self::from(arr);
+      Ok(val)
+  }
 }
+
 
 
 

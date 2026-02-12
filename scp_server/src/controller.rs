@@ -36,6 +36,56 @@ impl ControlService {
     async fn lock_mut(&self) -> TokioRwLockWriteGuard<'_, ControlServiceState> {
         self.0.write().await
     }
+
+    pub async fn control_set_qset(
+        &self,
+        qset: SCPQuorumSet,
+    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::SetKnownQSet(qset))
+            .await
+            .unwrap();
+        if let ControlReply::SetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+            Ok(optq)
+        } else {
+            panic!("bug")
+        }
+    }
+
+    pub async fn control_nominate(
+        &self,
+        slot_index: SCPSlotIndex,
+        value: SCPValue,
+        prev_value: SCPValue,
+    ) -> Result<bool, ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::Nominate(slot_index, value, prev_value))
+            .await
+            .unwrap();
+        if let ControlReply::Nominate(r) = x.rx_reply.recv().await.unwrap() {
+            Ok(r)
+        } else {
+            panic!("bug")
+        }
+    }
+
+    pub async fn control_received_envelope(
+        &self,
+        env: SCPEnvelope,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::ReceivedEnvelope(env))
+            .await
+            .unwrap();
+        if let ControlReply::ReceivedEnvelope() = x.rx_reply.recv().await.unwrap() {
+            Ok(())
+        } else {
+            panic!("bug")
+        }
+    }
 }
 
 pub enum ControlRequest {
@@ -58,32 +108,30 @@ pub enum ControlReply {
     RemoveKnownQSet(Option<SCPQuorumSet>),
 }
 
+use rpc_driver::ClientHandle;
+
 #[async_trait]
 impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
-    async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
+    async fn scp_control_null(
+        &self,
+        _: &Arc<ClientHandle>,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_control_nominate(
         &self,
+        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
         value: SCPValue,
         prev_value: SCPValue,
     ) -> Result<bool, ::rpc_driver::ProgramError> {
-        let mut x = self.lock_mut().await;
-        x.tx_request
-            .send(ControlRequest::Nominate(slot_index, value, prev_value))
-            .await
-            .unwrap();
-        if let ControlReply::Nominate(r) = x.rx_reply.recv().await.unwrap() {
-            Ok(r)
-        } else {
-            panic!("bug")
-        }
+        self.control_nominate(slot_index, value, prev_value).await
     }
 
     async fn scp_control_stop_nomination(
         &self,
+        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -100,6 +148,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_update_local_quorum_set(
         &self,
+        _: &Arc<ClientHandle>,
         qset: SCPQuorumSet,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -116,38 +165,23 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_received_envelope(
         &self,
+        _: &Arc<ClientHandle>,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        let mut x = self.lock_mut().await;
-        x.tx_request
-            .send(ControlRequest::ReceivedEnvelope(env))
-            .await
-            .unwrap();
-        if let ControlReply::ReceivedEnvelope() = x.rx_reply.recv().await.unwrap() {
-            Ok(())
-        } else {
-            panic!("bug")
-        }
+        self.control_received_envelope(env).await
     }
 
     async fn scp_control_set_qset(
         &self,
+        _: &Arc<ClientHandle>,
         qset: SCPQuorumSet,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
-        let mut x = self.lock_mut().await;
-        x.tx_request
-            .send(ControlRequest::SetKnownQSet(qset))
-            .await
-            .unwrap();
-        if let ControlReply::SetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
-            Ok(optq)
-        } else {
-            panic!("bug")
-        }
+        self.control_set_qset(qset).await
     }
 
     async fn scp_control_get_qset(
         &self,
+        _: &Arc<ClientHandle>,
         qhash: SCPHash,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -164,6 +198,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_remove_qset(
         &self,
+        _: &Arc<ClientHandle>,
         qhash: SCPHash,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;

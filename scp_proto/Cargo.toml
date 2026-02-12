@@ -7,20 +7,15 @@ edition = "2021"
 crate-type = ["rlib"]
 
 [features]
-default = ["alloc", "std", "xdrs"]
-alloc = ["xdrs", "xdrs/alloc"]
-std = ["alloc"]
+default = ["xdrs"]
+std = []
 xdrs = []
+serde = []
+spec = []
 
 [dependencies]
 async-trait = "0.1.89"
 
-[dependencies.xdrs]
-workspace = true
-features = ["derive", "xdr_common", "extras", "int128_xdr", "ns", "alloc"]
-
-[dependencies.xdr_common]
-workspace = true
-
-[dependencies.rpc_driver]
-workspace = true
+xdrs = { workspace = true }
+xdr-common = { workspace = true }
+rpc_driver = { workspace = true }

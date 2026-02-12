@@ -113,7 +113,7 @@ async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
         scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
     ));
 
-    RpcServer::new(service_map, listener).start().await;
+    RpcServer::new(listener, service_map).start().await;
 
     sockaddr
 }
@@ -131,7 +131,7 @@ pub async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
         Box::new(svc),
     )));
 
-    RpcServer::new(service_map, listener).start().await;
+    RpcServer::new(listener, service_map).start().await;
 
     sockaddr
 }

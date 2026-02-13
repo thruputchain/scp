@@ -2,22 +2,27 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
     runs-on: self-hosted
-    
+    env:
+      CARGO_REGISTRIES_GROUNDHOG_TOKEN: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
+      CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: cargo:token
+      # hog ci overwrites the .cargo directory
+      CARGO_REGISTRIES_GROUNDHOG_INDEX: sparse+https://groundhog.dev/crates/api/v1/crates/
+      CARGO_REGISTRIES_GROUNDHOG_SOURCE: sparse+https://groundhog.dev/crates/api/v1/crates/
     steps:
-     - name: Clean up .gitconfig
-       run: |
+      - name: Clean up .gitconfig
+        run: |
           echo "Cleaning up .gitconfig"
           rm -f /home/hogci/.gitconfig
-     - uses: webfactory/ssh-agent@v0.9.1
-       with:
-        ssh-private-key: |
+      - uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
             ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
             ${{ secrets.SCP_TO_PROTOCOL_KEY }}
@@ -25,11 +30,11 @@ jobs:
             ${{ secrets.SCP_TO_XDRS_KEY }}
             ${{ secrets.SCP_TO_XDR_RPC_KEY }}
             ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
-     - name: Checkout repository
-       uses: actions/checkout@v4
-      
-     - name: Run hog schedule
-       run: |
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run hog schedule
+        run: |
           # For pull requests, use the PR branch name (github.head_ref)
           # For push/workflow_dispatch, use the branch from github.ref_name
           BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
@@ -39,6 +44,8 @@ jobs:
             --key=github_repo --value=${{ github.repository }} \
             --key=git_commit --value=${{ github.sha }} \
             --key=git_branch --value=$BRANCH_NAME \
+            --key=cargo_registry_global_credential_providers --value=${{ env.CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS }} \
+            --key=cargo_registry_token --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_TOKEN }} \
+            --key=cargo_registry_index --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_INDEX }} \
+            --key=cargo_registry_source --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_SOURCE }} \
             ./scripts/schedules/ci.toml
-
-

@@ -1,4 +1,5 @@
 use crate::*;
+use tracing::debug;
 
 pub struct StellarKernel<C: Consensus, D: Driver> {
     cd: ConsensusDriver<C, D>,
@@ -13,6 +14,10 @@ impl<C: Consensus, D: Driver> StellarKernel<C, D> {
         consensus: C,
         driver: D,
     ) -> StellarKernel<C, D> {
+        debug!(
+            "initializing SCP with local node id {}",
+            driver.to_short_string(&node_id)
+        );
         let driver_clone = driver.clone();
         StellarKernel {
             cd: ConsensusDriver { consensus, driver },

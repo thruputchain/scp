@@ -122,7 +122,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         true
     }
 
-    fn is_quorum_slice_internal(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
+    fn is_quorum_slice_internal(
+        qset: &scp_proto::SCPQuorumSet,
+        node_set: &[scp_proto::SCPNodeID],
+    ) -> bool {
         let mut threshold_left = qset.threshold;
 
         for validator in qset.validators.iter() {
@@ -146,11 +149,17 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         false
     }
 
-    pub fn is_quorum_slice(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
+    pub fn is_quorum_slice(
+        qset: &scp_proto::SCPQuorumSet,
+        node_set: &[scp_proto::SCPNodeID],
+    ) -> bool {
         Self::is_quorum_slice_internal(qset, node_set)
     }
 
-    fn is_vblocking_internal(qset: &scp_proto::SCPQuorumSet, node_set: &[scp_proto::SCPNodeID]) -> bool {
+    fn is_vblocking_internal(
+        qset: &scp_proto::SCPQuorumSet,
+        node_set: &[scp_proto::SCPNodeID],
+    ) -> bool {
         // There is no v-blocking set for 0-threshold
         if qset.threshold == 0 {
             return false;
@@ -184,7 +193,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         false
     }
 
-    pub fn is_vblocking_nodes(qset: &scp_proto::SCPQuorumSet, nodes: &Vec<scp_proto::SCPNodeID>) -> bool {
+    pub fn is_vblocking_nodes(
+        qset: &scp_proto::SCPQuorumSet,
+        nodes: &Vec<scp_proto::SCPNodeID>,
+    ) -> bool {
         Self::is_vblocking_internal(qset, nodes)
     }
 
@@ -373,7 +385,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         })
     }
 
-    pub fn to_json_with_formatter<F>(qset: &scp_proto::SCPQuorumSet, formatter: &F) -> serde_json::Value
+    pub fn to_json_with_formatter<F>(
+        qset: &scp_proto::SCPQuorumSet,
+        formatter: &F,
+    ) -> serde_json::Value
     where
         F: Fn(&scp_proto::SCPNodeID) -> String,
     {

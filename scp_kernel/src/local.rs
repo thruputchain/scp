@@ -71,8 +71,18 @@ pub struct LocalProtoMut<'a, C: Consensus, D: Driver> {
 impl<'a, C: Consensus, D: Driver> LocalProtoMut<'a, C, D> {
     #[instrument(skip_all)]
     pub fn update_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
+        debug!(
+            "local, update_quorum_set, qset: {}",
+            serde_json::to_string_pretty(qset).unwrap()
+        );
+
         let mut normalized_qset = qset.clone();
         normalize_qset(&mut normalized_qset, None);
+
+        debug!(
+            "local, update_quorum_set, normalized qset: {}",
+            serde_json::to_string_pretty(&normalized_qset).unwrap()
+        );
 
         let qset_bytes = scp_util::marshal_xdr(&normalized_qset).unwrap();
         let qset_hash = self.cd.driver.get_hash_of(&qset_bytes);

@@ -272,8 +272,20 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         let mut my_qset = self.slot_proto().local_proto().get_qset().clone();
         let local_id = self.slot_proto().local_proto().get_node_id().clone();
 
+        debug!(
+            "nomination, updating round leaders, my local node id: {}, my qset: {}",
+            self.driver().to_short_string(&local_id),
+            serde_json::to_string_pretty(&my_qset).unwrap()
+        );
+
         // Normalize qset (excludes self)
         crate::qset::normalize_qset(&mut my_qset, Some(&local_id));
+
+        debug!(
+            "nomination, updating round leaders, normalizaed, my local node id: {}, my qset: {}",
+            self.driver().to_short_string(&local_id),
+            serde_json::to_string_pretty(&my_qset).unwrap()
+        );
 
         // Count maximum leader count (includes self)
         let mut max_leader_count = 1;
@@ -294,6 +306,13 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             // Check all nodes in quorum set for higher priority
             LocalProto::<C, D>::for_all_nodes(&my_qset, &mut |cur| {
                 let weight = self.get_node_priority(cur, &my_qset);
+
+                debug!(
+                    "nomination, updating round leaders, node id: {}, weight: {}",
+                    self.driver().to_short_string(cur),
+                    weight
+                );
+
                 if weight > top_priority {
                     top_priority = weight;
                     new_round_leaders.clear();

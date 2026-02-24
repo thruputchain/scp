@@ -7,13 +7,21 @@ edition = "2021"
 crate-type = ["rlib"]
 
 [features]
-default = ["xdrs"]
+default = ["xdrs", "serde"]
 std = []
 xdrs = []
-serde = []
+serde = ["dep:serde", "dep:serde_arrays", "dep:serde_with", "xdrs/serde", "serde_arrays/alloc"]
 spec = []
 
+[dependencies.serde]
+optional = true
+version = "1.0.219"
+default-features = false
+features = ["derive"]
+
 [dependencies]
+serde_arrays = { package = "groundhog-serde_arrays", version = "0.2.0", registry = "groundhog", optional = true, default-features = false }
+serde_with = { version = "3.16.1", optional = true, features = [] }
 async-trait = "0.1.89"
 
 xdrs = { workspace = true }

@@ -12,7 +12,7 @@ pub struct NominationState {
     latest_nominations: HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>, // N
     last_envelope: Option<scp_proto::SCPEnvelope>, // last envelope emitted by this node
     round_leaders: HashSet<scp_proto::SCPNodeID>, // nodes from quorum set that have the highest priority this round
-    nomination_started: bool,                 // true if 'nominate' was called
+    nomination_started: bool,                     // true if 'nominate' was called
     latest_composite_candidate: Option<scp_proto::SCPValue>, // the latest (if any) candidate value
     previous_value: Option<scp_proto::SCPValue>,  // the value from the previous slot
     timer_exp_count: i32, // the number of times the timer has expired; used for the quorum endpoint
@@ -213,8 +213,9 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 let should_update = match &self.nomination().last_envelope {
                     None => true,
                     Some(last_env) => {
-                        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: last_nom } =
-                            &last_env.statement.pledges
+                        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                            nominate: last_nom,
+                        } = &last_env.statement.pledges
                         {
                             Self::is_newer_statement(last_nom, &nominate)
                         } else {
@@ -343,7 +344,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    pub fn get_node_priority(&self, node_id: &scp_proto::SCPNodeID, qset: &scp_proto::SCPQuorumSet) -> u64 {
+    pub fn get_node_priority(
+        &self,
+        node_id: &scp_proto::SCPNodeID,
+        qset: &scp_proto::SCPQuorumSet,
+    ) -> u64 {
         let is_local = node_id == self.slot_proto().local_proto().get_node_id();
         let weight = self.driver().get_node_weight(node_id, qset, is_local);
 
@@ -626,10 +631,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         previous_value: &scp_proto::SCPValue,
         timed_out: bool,
     ) -> bool {
-        // debug!(
-        //     "nomination state: {}",
-        //     serde_json::to_string_pretty(&self.get_json_info()).unwrap()
-        // );
+        debug!(
+            "nomination state: {}",
+            serde_json::to_string_pretty(&self.get_json_info()).unwrap()
+        );
 
         // No need to continue nominating, as per the whitepaper:
         // "As soon as `v` has a candidate value, however, it must cease
@@ -663,6 +668,12 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         self.nomination_mut().previous_value = Some(previous_value.clone());
         self.nomination_mut().round_number += 1;
 
+        debug!(
+            "nomination, starting nomination round {}, previous value: {}",
+            self.nomination().round_number,
+            hex_abbrev(previous_value)
+        );
+
         self.update_round_leaders();
 
         let timeout = self
@@ -677,6 +688,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 {
                     if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
                         if self.nomination_mut().votes.insert(new_vote.clone()) {
+                            debug!(
+                                "nomination, successfully added vote from other leader for value {}",
+                                hex_abbrev(&new_vote)
+                            );
                             updated = true;
                             self.consensus()
                                 .nominating_value(self.slot_proto().index(), &new_vote);
@@ -691,7 +706,15 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         if self.nomination().round_leaders.contains(&local_node_id)
             && self.nomination().votes.is_empty()
         {
+            debug!(
+                "nomination, local node is leader, no votes yet, adding vote for value {}",
+                hex_abbrev(value)
+            );
             if self.nomination_mut().votes.insert(value.clone()) {
+                debug!(
+                    "nomination, local node is leader, no votes yet, successfully added vote for value {}",
+                    hex_abbrev(value)
+                );
                 updated = true;
                 self.consensus()
                     .nominating_value(self.slot_proto().index(), value);
@@ -888,7 +911,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         true
     }
 
-    pub fn get_latest_message(&self, node_id: &scp_proto::SCPNodeID) -> Option<scp_proto::SCPEnvelope> {
+    pub fn get_latest_message(
+        &self,
+        node_id: &scp_proto::SCPNodeID,
+    ) -> Option<scp_proto::SCPEnvelope> {
         self.nomination().latest_nominations.get(node_id).cloned()
     }
 

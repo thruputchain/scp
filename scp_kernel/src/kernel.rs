@@ -15,8 +15,9 @@ impl<C: Consensus, D: Driver> StellarKernel<C, D> {
         driver: D,
     ) -> StellarKernel<C, D> {
         debug!(
-            "initializing SCP with local node id {}",
-            driver.to_short_string(&node_id)
+            "initializing SCP with local node id {} and qset {}",
+            driver.to_short_string(&node_id),
+            serde_json::to_string_pretty(&qset).unwrap()
         );
         let driver_clone = driver.clone();
         StellarKernel {

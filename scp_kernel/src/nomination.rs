@@ -272,12 +272,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         let mut my_qset = self.slot_proto().local_proto().get_qset().clone();
         let local_id = self.slot_proto().local_proto().get_node_id().clone();
 
-        debug!(
-            "nomination, updating round leaders, my local node id: {}, my qset: {}",
-            self.driver().to_short_string(&local_id),
-            serde_json::to_string_pretty(&my_qset).unwrap()
-        );
-
         // Normalize qset (excludes self)
         crate::qset::normalize_qset(&mut my_qset, Some(&local_id));
 
@@ -306,13 +300,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             // Check all nodes in quorum set for higher priority
             LocalProto::<C, D>::for_all_nodes(&my_qset, &mut |cur| {
                 let weight = self.get_node_priority(cur, &my_qset);
-
-                debug!(
-                    "nomination, updating round leaders, node id: {}, weight: {}",
-                    self.driver().to_short_string(cur),
-                    weight
-                );
-
                 if weight > top_priority {
                     top_priority = weight;
                     new_round_leaders.clear();
@@ -687,12 +674,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         self.nomination_mut().previous_value = Some(previous_value.clone());
         self.nomination_mut().round_number += 1;
 
-        debug!(
-            "nomination, starting nomination round {}, previous value: {}",
-            self.nomination().round_number,
-            hex_abbrev(previous_value)
-        );
-
         self.update_round_leaders();
 
         let timeout = self
@@ -707,10 +688,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 {
                     if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
                         if self.nomination_mut().votes.insert(new_vote.clone()) {
-                            debug!(
-                                "nomination, successfully added vote from other leader for value {}",
-                                hex_abbrev(&new_vote)
-                            );
                             updated = true;
                             self.consensus()
                                 .nominating_value(self.slot_proto().index(), &new_vote);
@@ -730,10 +707,6 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 hex_abbrev(value)
             );
             if self.nomination_mut().votes.insert(value.clone()) {
-                debug!(
-                    "nomination, local node is leader, no votes yet, successfully added vote for value {}",
-                    hex_abbrev(value)
-                );
                 updated = true;
                 self.consensus()
                     .nominating_value(self.slot_proto().index(), value);

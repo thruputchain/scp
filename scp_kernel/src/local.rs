@@ -22,9 +22,19 @@ impl LocalState {
         qset: scp_proto::SCPQuorumSet,
         get_hash_of: impl Fn(&[u8]) -> scp_proto::SCPHash,
     ) -> LocalState {
+        debug!(
+            "local, new, qset: {}",
+            serde_json::to_string_pretty(&qset).unwrap()
+        );
+
         // Normalize the quorum set (equivalent to normalizeQSet(mQSet) in C++)
         let mut normalized_qset = qset;
         normalize_qset(&mut normalized_qset, None);
+
+        debug!(
+            "local, new, normalized qset: {}",
+            serde_json::to_string_pretty(&normalized_qset).unwrap()
+        );
 
         // Calculate hash of the normalized quorum set (equivalent to mQSetHash = driver.getHashOf(...))
         let qset_bytes = scp_util::marshal_xdr(&normalized_qset).unwrap();

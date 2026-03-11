@@ -15,6 +15,7 @@ git checkout -q {{ .git_commit }}
 source ./scripts/prepare_env.sh > prepare_env.log 2>&1 || (cat prepare_env.log && exit 1)
 
 cargo fetch
+cargo fmt --check
 cargo build --offline --locked
 cargo test --offline --locked
 

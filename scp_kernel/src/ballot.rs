@@ -16,7 +16,7 @@ pub struct BallotState {
     commit: Option<scp_proto::SCPBallot>,         // c
     value_override: Option<scp_proto::SCPValue>,  // z
     latest_envelopes: HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>, // M
-    phase: Phase,                             // phi
+    phase: Phase,                                 // phi
 
     msg_level: i64,       // number of messages triggered in one run
     timer_exp_count: i64, // number of times the timer has expired; used for the quorum endpoint
@@ -94,10 +94,15 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    pub fn is_newer_statement(older: &scp_proto::SCPStatement, newer: &scp_proto::SCPStatement) -> bool {
+    pub fn is_newer_statement(
+        older: &scp_proto::SCPStatement,
+        newer: &scp_proto::SCPStatement,
+    ) -> bool {
         if discriminant(&older.pledges) != discriminant(&newer.pledges) {
             older.pledges.stmt_type() < newer.pledges.stmt_type()
-        } else if newer.pledges.stmt_type() == scp_proto::SCPStatementType::SCP_ST_EXTERNALIZE as i32 {
+        } else if newer.pledges.stmt_type()
+            == scp_proto::SCPStatementType::SCP_ST_EXTERNALIZE as i32
+        {
             false
         } else {
             match (&older.pledges, &newer.pledges) {
@@ -723,7 +728,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    fn get_prepare_candidates(&self, hint: &scp_proto::SCPStatement) -> HashSet<scp_proto::SCPBallot> {
+    fn get_prepare_candidates(
+        &self,
+        hint: &scp_proto::SCPStatement,
+    ) -> HashSet<scp_proto::SCPBallot> {
         let mut hint_ballots = HashSet::new();
 
         match &hint.pledges {
@@ -970,7 +978,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    fn set_confirm_prepared(&mut self, new_c: &scp_proto::SCPBallot, new_h: &scp_proto::SCPBallot) -> bool {
+    fn set_confirm_prepared(
+        &mut self,
+        new_c: &scp_proto::SCPBallot,
+        new_h: &scp_proto::SCPBallot,
+    ) -> bool {
         trace!(
             slot_index = self.slot_proto().index(),
             new_h = ?new_h,
@@ -1472,10 +1484,12 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 counter: confirm.n_h,
                 value: confirm.ballot.value.clone(),
             },
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => scp_proto::SCPBallot {
-                counter: externalize.n_h,
-                value: externalize.commit.value.clone(),
-            },
+            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                scp_proto::SCPBallot {
+                    counter: externalize.n_h,
+                    value: externalize.commit.value.clone(),
+                }
+            }
             _ => panic!("bug"),
         };
 
@@ -1517,7 +1531,9 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                         _ => panic!("bug"),
                     }
                 },
-                &|st: &scp_proto::SCPStatement| -> bool { Self::commit_predicate(&ballot, cur, st) },
+                &|st: &scp_proto::SCPStatement| -> bool {
+                    Self::commit_predicate(&ballot, cur, st)
+                },
             )
         };
 
@@ -1581,7 +1597,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 }
             }
 
-            let mut all_counters_sorted: Vec<scp_proto::SCPCount> = all_counters.into_iter().collect();
+            let mut all_counters_sorted: Vec<scp_proto::SCPCount> =
+                all_counters.into_iter().collect();
             all_counters_sorted.sort();
 
             // If we got to here, implicitly there _was_ a v-blocking subset
@@ -1622,10 +1639,12 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 counter: confirm.n_h,
                 value: confirm.ballot.value.clone(),
             },
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => scp_proto::SCPBallot {
-                counter: externalize.n_h,
-                value: externalize.commit.value.clone(),
-            },
+            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+                scp_proto::SCPBallot {
+                    counter: externalize.n_h,
+                    value: externalize.commit.value.clone(),
+                }
+            }
             _ => panic!("bug"),
         };
 
@@ -1688,7 +1707,9 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // with the statement.
     // note: the companion hash for an EXTERNALIZE statement does
     // not match the hash of the QSet, but the hash of commitQuorumSetHash
-    fn get_companion_quorum_set_hash_from_statement(st: &scp_proto::SCPStatement) -> scp_proto::SCPHash {
+    fn get_companion_quorum_set_hash_from_statement(
+        st: &scp_proto::SCPStatement,
+    ) -> scp_proto::SCPHash {
         match &st.pledges {
             scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                 prepare.quorum_set_hash.clone()

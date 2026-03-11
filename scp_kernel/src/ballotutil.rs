@@ -38,7 +38,10 @@ pub fn are_ballots_less_and_incompatible(
     (compare_ballots(left, right) != Ordering::Greater) && !are_ballots_compatible(left, right)
 }
 
-pub fn are_ballots_less_and_compatible(left: &scp_proto::SCPBallot, right: &scp_proto::SCPBallot) -> bool {
+pub fn are_ballots_less_and_compatible(
+    left: &scp_proto::SCPBallot,
+    right: &scp_proto::SCPBallot,
+) -> bool {
     (compare_ballots(left, right) != Ordering::Greater) && are_ballots_compatible(left, right)
 }
 

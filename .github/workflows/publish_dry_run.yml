@@ -51,4 +51,4 @@ jobs:
         uses: ./actions/cargo-publish-dry-run
         with:
           skip-clippy: true
-          cargo-hack-feature-options: '--feature-powerset --ignore-unknown-features'
+          cargo-hack-feature-options: '--feature-powerset'

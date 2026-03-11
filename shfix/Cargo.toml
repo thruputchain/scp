@@ -1,7 +1,15 @@
 [package]
 name = "shfix"
-version = "1.0.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Proc macros for SCP"
 
 [lib]
 proc-macro = true

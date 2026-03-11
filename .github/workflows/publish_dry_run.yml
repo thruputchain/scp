@@ -50,5 +50,5 @@ jobs:
       - name: publish dry run
         uses: ./actions/cargo-publish-dry-run
         with:
-          skip-clippy: true
+          skip-clippy: false
           cargo-hack-feature-options: '--feature-powerset'

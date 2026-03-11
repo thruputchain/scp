@@ -54,7 +54,7 @@ jobs:
       - name: dry run
         uses: ./actions/cargo-publish-dry-run
         with:
-          skip-clippy: true
+          skip-clippy: false
           cargo-hack-feature-options: '--feature-powerset'
 
       - name: tag commit with version

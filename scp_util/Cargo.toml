@@ -1,8 +1,15 @@
 [package]
 name = "scp_util"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "SCP protocol manipulation utilities"
-version = "1.0.0"
-edition = "2024"
 
 [lib]
 crate-type = ["rlib"]
@@ -12,7 +19,7 @@ default = ["xdrs"]
 xdrs = []
 
 [dependencies]
-scp_proto = { path = "../scp_proto" }
+scp_proto = { workspace = true }
 ed25519-dalek = "3.0.0-pre.0"
 thiserror = "2.0"
 sha2 = "0.10"

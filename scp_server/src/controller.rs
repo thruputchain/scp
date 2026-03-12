@@ -357,10 +357,7 @@ impl ControlKernel {
             }
         });
 
-        let slot_timers = self
-            .armed_timers
-            .entry(slot_index)
-            .or_default();
+        let slot_timers = self.armed_timers.entry(slot_index).or_default();
         if slot_timers.insert(timer, cancel_tx).is_some() {
             panic!("there should be no prior timer")
         }

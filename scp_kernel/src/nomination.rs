@@ -807,26 +807,23 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         &last_envelope.statement.pledges,
                     )
                 {
-                        // Enough time has passed & we have some information on this node.
-                        // We'll examine the information to determine the state of this node.
-                        let mut not_equal = false;
-                        let is_subset = Self::is_subset(
-                            &other_nom.accepted,
-                            &my_nom.accepted,
-                            &mut not_equal,
-                        );
+                    // Enough time has passed & we have some information on this node.
+                    // We'll examine the information to determine the state of this node.
+                    let mut not_equal = false;
+                    let is_subset =
+                        Self::is_subset(&other_nom.accepted, &my_nom.accepted, &mut not_equal);
 
-                        if is_subset {
-                            if not_equal {
-                                // If there's some values that I've accepted that
-                                // they haven't, they are slow.
-                                state = QuorumInfoNodeState::Delayed;
-                            }
-                            // else remains AGREE
-                        } else {
-                            // If they have accepted a value that I haven't,
-                            // it's likely that I'll never accept it.
-                            state = QuorumInfoNodeState::Disagree;
+                    if is_subset {
+                        if not_equal {
+                            // If there's some values that I've accepted that
+                            // they haven't, they are slow.
+                            state = QuorumInfoNodeState::Delayed;
+                        }
+                        // else remains AGREE
+                    } else {
+                        // If they have accepted a value that I haven't,
+                        // it's likely that I'll never accept it.
+                        state = QuorumInfoNodeState::Disagree;
                     }
                 }
             }

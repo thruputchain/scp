@@ -461,10 +461,7 @@ impl HandleKernel {
         l: ValidationLevel,
     ) {
         let mut state = self.lock_mut();
-        let x = state
-            .validated_values
-            .entry(slot_index)
-            .or_default();
+        let x = state.validated_values.entry(slot_index).or_default();
         x.insert(v, l);
     }
 

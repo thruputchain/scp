@@ -223,7 +223,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
         let statement = &env.statement;
 
-        !matches!(Self::check_valid(self, statement, ours, env), EnvelopeState::Invalid)
+        !matches!(
+            Self::check_valid(self, statement, ours, env),
+            EnvelopeState::Invalid
+        )
     }
 
     #[instrument(skip_all)]
@@ -370,12 +373,19 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
             Some(w) => {
                 if w.is_empty() {
-                    self.ballot_state().current.as_ref().map(|cv| cv.value.clone())
+                    self.ballot_state()
+                        .current
+                        .as_ref()
+                        .map(|cv| cv.value.clone())
                 } else {
                     Some(w.clone())
                 }
             }
-            None => self.ballot_state().current.as_ref().map(|cv| cv.value.clone()),
+            None => self
+                .ballot_state()
+                .current
+                .as_ref()
+                .map(|cv| cv.value.clone()),
         };
         match v {
             Some(w) => {
@@ -491,9 +501,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // `bump_to_ballot` should be never called once we committed
         assert!(self.ballot_state().phase != Phase::Externalize);
 
-        if check
-            && let Some(current) = &self.ballot_state().current
-        {
+        if check && let Some(current) = &self.ballot_state().current {
             assert!(compare_ballots(&ballot, current) != Ordering::Less);
         }
 
@@ -536,9 +544,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             slot_index,
             Timer::Ballot,
             timeout,
-            DriverCallback::BallotTimerExpired {
-                slot_index,
-            },
+            DriverCallback::BallotTimerExpired { slot_index },
         );
     }
 
@@ -1683,12 +1689,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         st: &scp_proto::SCPStatement,
     ) -> scp_proto::SCPHash {
         match &st.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                prepare.quorum_set_hash
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                confirm.quorum_set_hash
-            }
+            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => prepare.quorum_set_hash,
+            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => confirm.quorum_set_hash,
             scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
                 externalize.commit_quorum_set_hash
             }

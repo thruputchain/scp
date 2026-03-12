@@ -21,7 +21,7 @@ generate() {
   proto=${1:?}
   package=${2:?}
   name=$(basename "${proto}" .x)
-  $XDRC --rust --rust-feature xdrs --rust-feature serde -o "${package}/src/${name}.rs" "${proto}"
+  $XDRC --rust --rust-feature xdrs --rust-feature serde --rust-no-feature spec -o "${package}/src/${name}.rs" "${proto}"
 }
 
 for proto in "${protos[@]}"; do

@@ -16,7 +16,6 @@ crate-type = ["rlib"]
 
 [features]
 std = []
-spec = []
 
 [dependencies]
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

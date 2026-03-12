@@ -18,8 +18,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(feature = "std")]
 use std::io::{Read, Write};
 use xdrs::*;
-#[cfg(feature = "spec")]
-use xdrs::xdr_repr::*;
+
 
 
 use ::serde::{{Serialize, Deserialize}};
@@ -29,7 +28,7 @@ use ::serde_arrays;
 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SCP_uint128_xdr {
@@ -39,7 +38,7 @@ pub struct SCP_uint128_xdr {
 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SCP_int128_xdr {
@@ -52,7 +51,7 @@ pub struct SCP_int128_xdr {
 // ed25519 key len is 256 bits
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
@@ -113,7 +112,7 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
 // ed25519 secret key len is 64 bytes
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]
@@ -173,7 +172,7 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
 // 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(transparent)]
@@ -232,7 +231,7 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
 #[repr(i32)]
@@ -253,7 +252,7 @@ impl TryFrom<i32> for SCPCryptographicScheme {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[repr(i32)]
 pub enum SCPSignature {
     // case Ed25519:
@@ -265,7 +264,7 @@ pub enum SCPSignature {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[repr(i32)]
 pub enum SCPPublicKey {
     // case Ed25519:
@@ -277,7 +276,7 @@ pub enum SCPPublicKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[repr(i32)]
 pub enum SCPSecretKey {
     // case Ed25519:
@@ -290,7 +289,7 @@ pub enum SCPSecretKey {
 // 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Default, Copy)]
 #[repr(transparent)]

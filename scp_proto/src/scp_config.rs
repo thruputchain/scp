@@ -18,8 +18,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(feature = "std")]
 use std::io::{Read, Write};
 use xdrs::*;
-#[cfg(feature = "spec")]
-use xdrs::xdr_repr::*;
+
 
 
 use ::serde::{{Serialize, Deserialize}};
@@ -31,7 +30,7 @@ use ::serde_arrays;
 
 #[derive(Serialize, Deserialize)]
 #[derive(ReadXDR, WriteXDR)]
-#[cfg_attr(feature = "spec", derive(XDR))]
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SCPConfig {

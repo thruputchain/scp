@@ -18,8 +18,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(feature = "std")]
 use std::io::{Read, Write};
 use xdrs::*;
-#[cfg(feature = "spec")]
-use xdrs::xdr_repr::*;
+
 
 
 use ::serde::{{Serialize, Deserialize}};

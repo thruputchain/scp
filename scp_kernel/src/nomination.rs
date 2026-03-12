@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::{Level, debug, enabled, instrument, trace};
 use xdr_common::VecM;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NominationState {
     round_number: scp_proto::SCPCount,
     votes: HashSet<scp_proto::SCPValue>,      // X
@@ -20,19 +20,7 @@ pub struct NominationState {
 
 impl NominationState {
     pub fn new() -> Self {
-        NominationState {
-            round_number: 0,
-            votes: HashSet::new(),
-            accepted: HashSet::new(),
-            candidates: HashSet::new(),
-            latest_nominations: HashMap::new(),
-            last_envelope: None,
-            round_leaders: HashSet::new(),
-            nomination_started: false,
-            latest_composite_candidate: None,
-            previous_value: None,
-            timer_exp_count: 0,
-        }
+        Self::default()
     }
 }
 
@@ -476,7 +464,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
     #[allow(dead_code)]
     fn dbg_state_to_str(&self) -> String {
-        let mut s = format!("latest_envelopes: {{\n");
+        let mut s = "latest_envelopes: {\n".to_string();
         for (node_id, env) in &self.nomination().latest_nominations {
             s.push_str(&format!(
                 "   {} -> {}\n",
@@ -484,7 +472,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 self.slot_proto().cd.envelope_to_str(env, false)
             ));
         }
-        s.push_str("}");
+        s.push('}');
         s
     }
 
@@ -547,13 +535,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                             self.nomination_mut().accepted.insert(v.clone());
                             self.nomination_mut().votes.insert(v.clone());
                             modified = true;
-                        } else {
+                        } else if let Some(valid_value) = self.extract_valid_value(v) {
                             // The value made it pretty far: see if we can vote for a variation
                             // that we consider valid
-                            if let Some(valid_value) = self.extract_valid_value(v) {
-                                if self.nomination_mut().votes.insert(valid_value) {
-                                    modified = true;
-                                }
+                            if self.nomination_mut().votes.insert(valid_value) {
+                                modified = true;
                             }
                         }
                     }
@@ -583,15 +569,14 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 // Only take round leader votes if we're still looking for candidates
                 if self.nomination().candidates.is_empty()
                     && self.nomination().round_leaders.contains(&st.node_id)
+                    && let Some(new_vote) = self.get_new_value_from_nomination(nom)
                 {
-                    if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
-                        if self.nomination_mut().votes.insert(new_vote.clone()) {
-                            modified = true;
-                            self.consensus()
-                                .nominating_value(self.slot_proto().index(), &new_vote);
-                        } else {
-                            panic!("bug")
-                        }
+                    if self.nomination_mut().votes.insert(new_vote.clone()) {
+                        modified = true;
+                        self.consensus()
+                            .nominating_value(self.slot_proto().index(), &new_vote);
+                    } else {
+                        panic!("bug")
                     }
                 }
 
@@ -682,18 +667,15 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
         // Add a few more values from other leaders
         for leader in self.nomination().round_leaders.clone().iter() {
-            if let Some(latest_nomination) = self.nomination().latest_nominations.get(leader) {
-                if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
+            if let Some(latest_nomination) = self.nomination().latest_nominations.get(leader)
+                && let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
                     &latest_nomination.statement.pledges
-                {
-                    if let Some(new_vote) = self.get_new_value_from_nomination(nom) {
-                        if self.nomination_mut().votes.insert(new_vote.clone()) {
-                            updated = true;
-                            self.consensus()
-                                .nominating_value(self.slot_proto().index(), &new_vote);
-                        }
-                    }
-                }
+                && let Some(new_vote) = self.get_new_value_from_nomination(nom)
+                && self.nomination_mut().votes.insert(new_vote.clone())
+            {
+                updated = true;
+                self.consensus()
+                    .nominating_value(self.slot_proto().index(), &new_vote);
             }
         }
 
@@ -720,7 +702,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             Timer::Nomination,
             timeout,
             DriverCallback::NominationTimerExpired {
-                slot_index: slot_index,
+                slot_index,
                 value: value.clone(),
                 prev_value: previous_value.clone(),
             },
@@ -736,15 +718,13 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     pub fn driver_calling_back(&mut self, cb: DriverCallback) {
-        match cb {
-            DriverCallback::NominationTimerExpired {
-                slot_index: _,
-                value,
-                prev_value,
-            } => {
-                let _ = self.nominate(&value, &prev_value, true);
-            }
-            _ => {}
+        if let DriverCallback::NominationTimerExpired {
+            slot_index: _,
+            value,
+            prev_value,
+        } = cb
+        {
+            let _ = self.nominate(&value, &prev_value, true);
         }
     }
 
@@ -815,39 +795,35 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 }
             }
             Some(other_envelope) => {
-                if enough_time_has_passed {
-                    if let Some(ref last_envelope) = self.nomination().last_envelope {
-                        // Enough time has passed & we have some information on this node.
-                        // We'll examine the information to determine the state of this node.
-                        if let (
-                            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
-                                nominate: other_nom,
-                            },
-                            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom },
-                        ) = (
-                            &other_envelope.statement.pledges,
-                            &last_envelope.statement.pledges,
-                        ) {
-                            let mut not_equal = false;
-                            let is_subset = Self::is_subset(
-                                &other_nom.accepted,
-                                &my_nom.accepted,
-                                &mut not_equal,
-                            );
+                if enough_time_has_passed
+                    && let Some(ref last_envelope) = self.nomination().last_envelope
+                    && let (
+                        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                            nominate: other_nom,
+                        },
+                        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom },
+                    ) = (
+                        &other_envelope.statement.pledges,
+                        &last_envelope.statement.pledges,
+                    )
+                {
+                    // Enough time has passed & we have some information on this node.
+                    // We'll examine the information to determine the state of this node.
+                    let mut not_equal = false;
+                    let is_subset =
+                        Self::is_subset(&other_nom.accepted, &my_nom.accepted, &mut not_equal);
 
-                            if is_subset {
-                                if not_equal {
-                                    // If there's some values that I've accepted that
-                                    // they haven't, they are slow.
-                                    state = QuorumInfoNodeState::Delayed;
-                                }
-                                // else remains AGREE
-                            } else {
-                                // If they have accepted a value that I haven't,
-                                // it's likely that I'll never accept it.
-                                state = QuorumInfoNodeState::Disagree;
-                            }
+                    if is_subset {
+                        if not_equal {
+                            // If there's some values that I've accepted that
+                            // they haven't, they are slow.
+                            state = QuorumInfoNodeState::Delayed;
                         }
+                        // else remains AGREE
+                    } else {
+                        // If they have accepted a value that I haven't,
+                        // it's likely that I'll never accept it.
+                        state = QuorumInfoNodeState::Disagree;
                     }
                 }
             }
@@ -891,13 +867,12 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     {
         for (node_id, envelope) in &self.nomination().latest_nominations {
             // only return messages for self if the slot is fully validated
-            if force_self
+            if (force_self
                 || node_id != self.slot_proto().local_proto().get_node_id()
-                || self.slot_proto().is_fully_validated()
+                || self.slot_proto().is_fully_validated())
+                && !f(envelope)
             {
-                if !f(envelope) {
-                    return false;
-                }
+                return false;
             }
         }
         true

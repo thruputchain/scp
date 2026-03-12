@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
+#![allow(clippy::match_single_binding)]
 
 #[rustfmt::skip]
 pub mod scp;

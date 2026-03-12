@@ -1,7 +1,7 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: 708ebf9bf535633eea730b810b2fb07494dca14e
+// Generated from xdrc commit: 2696fbbb9386179cc9913c691fce5654f491da71
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -17,15 +17,11 @@ use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "std")]
 use std::io::{Read, Write};
-#[cfg(feature = "xdrs")]
 use xdrs::*;
-#[cfg(feature = "spec")]
-use xdrs::xdr_repr::*;
 
 
-#[cfg(feature = "serde")]
+
 use ::serde::{{Serialize, Deserialize}};
-#[cfg(feature = "serde")]
 use ::serde_arrays;
 
 

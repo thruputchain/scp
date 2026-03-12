@@ -14,10 +14,6 @@ description = "SCP protocol manipulation utilities"
 [lib]
 crate-type = ["rlib"]
 
-[features]
-default = ["xdrs"]
-xdrs = []
-
 [dependencies]
 scp_proto = { workspace = true }
 ed25519-dalek = "3.0.0-pre.0"

@@ -22,20 +22,20 @@ pub struct SCPQuorumSetShim {
 pub type SCPNodeIDShim = [u8; 32];
 
 impl SCPConfigShim {
-    pub fn to_scp_config(self) -> SCPConfig {
+    pub fn into_scp_config(self) -> SCPConfig {
         SCPConfig {
             max_timeout_ms: self.max_timeout_ms,
             initial_ballot_timeout_ms: self.initial_ballot_timeout_ms,
             increment_ballot_timeout_ms: self.increment_ballot_timeout_ms,
             initial_nomination_timeout_ms: self.initial_nomination_timeout_ms,
             increment_nomination_timeout_ms: self.increment_nomination_timeout_ms,
-            quorum_set: self.quorum_set.to_scp_quorum_set(),
+            quorum_set: self.quorum_set.into_scp_quorum_set(),
         }
     }
 }
 
 impl SCPQuorumSetShim {
-    pub fn to_scp_quorum_set(self) -> SCPQuorumSet {
+    pub fn into_scp_quorum_set(self) -> SCPQuorumSet {
         SCPQuorumSet {
             threshold: self.threshold,
             validators: VecM::try_from(
@@ -50,7 +50,7 @@ impl SCPQuorumSetShim {
             inner_sets: VecM::try_from(
                 self.inner_sets
                     .into_iter()
-                    .map(|inner_set| inner_set.to_scp_quorum_set())
+                    .map(|inner_set| inner_set.into_scp_quorum_set())
                     .collect::<Vec<_>>(),
             )
             .expect("Failed to create VecM"),

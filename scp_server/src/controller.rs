@@ -88,6 +88,7 @@ impl ControlService {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum ControlRequest {
     Nominate(SCPSlotIndex, SCPValue, SCPValue),
     StopNomination(SCPSlotIndex),
@@ -261,6 +262,7 @@ pub struct ControlKernel {
 }
 
 impl ControlKernel {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         tokio_handle: tokio::runtime::Handle,
         rx_request: Receiver<ControlRequest>,
@@ -313,12 +315,8 @@ impl ControlKernel {
 
     fn flush_timer_switches(&mut self) {
         loop {
-            if let Some(v) = match self.rx_switch_timer.try_recv() {
-                Ok(v) => Some(v),
-                Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => panic!("bug"),
-            } {
-                match v {
+            match self.rx_switch_timer.try_recv() {
+                Ok(v) => match v {
                     SwitchTimer::StartTimer(slot_index, timer, timeout, cb) => {
                         self.start_timer(slot_index, timer, timeout, cb);
                     }
@@ -332,9 +330,9 @@ impl ControlKernel {
                             .proto()
                             .purge_slots(slot_index + 1, slot_index + 1);
                     }
-                }
-            } else {
-                break;
+                },
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => panic!("bug"),
             }
         }
     }
@@ -363,29 +361,26 @@ impl ControlKernel {
             }
         });
 
-        let slot_timers = self
-            .armed_timers
-            .entry(slot_index)
-            .or_insert_with(HashMap::new);
-        if let Some(_) = slot_timers.insert(timer, cancel_tx) {
+        let slot_timers = self.armed_timers.entry(slot_index).or_default();
+        if slot_timers.insert(timer, cancel_tx).is_some() {
             panic!("there should be no prior timer")
         }
     }
 
     fn stop_timer(&mut self, slot_index: SlotIndex, timer: Timer) {
-        if let Some(slot_timers) = self.armed_timers.get_mut(&slot_index) {
-            if let Some(cancel_tx) = slot_timers.remove(&timer) {
-                let _ = cancel_tx.send(());
-            }
+        if let Some(slot_timers) = self.armed_timers.get_mut(&slot_index)
+            && let Some(cancel_tx) = slot_timers.remove(&timer)
+        {
+            let _ = cancel_tx.send(());
         }
     }
 
     fn stop_timers_not_above(&mut self, not_above: SlotIndex) {
         let mut to_stop = vec![];
         for (slot_index, timers) in &self.armed_timers {
-            if slot_index <= &not_above {
-                for (timer, _) in timers {
-                    to_stop.push((slot_index.clone(), timer.clone()));
+            if *slot_index <= not_above {
+                for timer in timers.keys() {
+                    to_stop.push((*slot_index, *timer));
                 }
             }
         }

@@ -21,7 +21,7 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
             let mut unfolded_fn = input_fn.clone();
             let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
             unfolded_fn.sig.ident = syn::Ident::new(&name, input_fn.sig.ident.span());
-            unfolded_fn.block = Box::new(block);
+            *unfolded_fn.block = block;
             output.extend(quote! { #unfolded_fn });
         }
     }
@@ -37,7 +37,7 @@ struct Rewritten<Q> {
 }
 
 // rewrites each individual statement
-fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
+fn rewrite_stmts(stmts: &[Stmt]) -> Vec<Rewritten<Stmt>> {
     let mut rewritten = Vec::new();
 
     for stmt in stmts {
@@ -71,7 +71,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                                 stmt_macro,
                                 Block {
                                     // empty block
-                                    brace_token: section_block.brace_token.clone(),
+                                    brace_token: section_block.brace_token,
                                     stmts: vec![],
                                 },
                             ),
@@ -83,7 +83,7 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
                                 stmt_macro,
                                 Block {
                                     // empty block
-                                    brace_token: section_block.brace_token.clone(),
+                                    brace_token: section_block.brace_token,
                                     stmts: vec![],
                                 },
                             ),
@@ -103,13 +103,13 @@ fn rewrite_stmts(stmts: &Vec<Stmt>) -> Vec<Rewritten<Stmt>> {
 }
 
 fn lift_blocks_to_stmts(
-    id: &String,
+    id: &str,
     stmt_macro: &StmtMacro,
     rewritten_block: Rewritten<Block>,
 ) -> Vec<(Vec<String>, Stmt)> {
     let mut rw_stmts = vec![];
     for (rw_path, rw_block) in rewritten_block.exclusive {
-        let mut path = vec![id.clone()];
+        let mut path = vec![id.to_owned()];
         path.extend(rw_path);
         rw_stmts.push((path, lift_block_to_stmt(stmt_macro, rw_block)));
     }
@@ -121,9 +121,9 @@ fn lift_block_to_stmt(stmt_macro: &StmtMacro, block: Block) -> Stmt {
         Expr::Block(ExprBlock {
             attrs: stmt_macro.attrs.clone(),
             label: None,
-            block: block,
+            block,
         }),
-        stmt_macro.semi_token.clone(),
+        stmt_macro.semi_token,
     )
 }
 
@@ -148,7 +148,7 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
                     label: expr_block.label.clone(),
                     block: b,
                 });
-                new_expr_closure.body = Box::new(expr_block);
+                *new_expr_closure.body = expr_block;
                 (p, new_local)
             })
             .collect();
@@ -166,10 +166,10 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
             label: expr_block.label.clone(),
             block: rw_block.fixed,
         });
-        new_expr_closure.body = Box::new(expr_block);
+        *new_expr_closure.body = expr_block;
 
         Rewritten {
-            exclusive: exclusive,
+            exclusive,
             fixed: new_fixed,
         }
     } else {
@@ -180,7 +180,7 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
     }
 }
 
-fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block> {
+fn rewrite_block(description: Option<&str>, block: &Block) -> Rewritten<Block> {
     let rewritten_stmts = rewrite_stmts(&block.stmts);
 
     // println!(
@@ -211,7 +211,7 @@ fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block
     };
     new_fixed_stmts.extend(fixed_stmts);
     let block_fixed = Block {
-        brace_token: block.brace_token.clone(),
+        brace_token: block.brace_token,
         stmts: new_fixed_stmts,
     };
 
@@ -227,7 +227,7 @@ fn rewrite_block(description: Option<&String>, block: &Block) -> Rewritten<Block
         block_unfoldings.push((
             path.clone(),
             Block {
-                brace_token: block.brace_token.clone(),
+                brace_token: block.brace_token,
                 stmts: new_stmts,
             },
         ));
@@ -246,7 +246,7 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> (Vec<(SectionPath, Vec<Stmt>)>, Ve
     } else {
         let last = stmts.last().unwrap();
 
-        let fixed_prefix = grab_fixed(&stmts);
+        let fixed_prefix = grab_fixed(stmts);
 
         // unfoldings with last stmt activated
         let mut unfolded = vec![];
@@ -267,7 +267,7 @@ fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> (Vec<(SectionPath, Vec<Stmt>)>, Ve
             unfolded.push(unfolding);
         }
 
-        return (unfolded, fixed_prefix.iter().cloned().cloned().collect());
+        (unfolded, fixed_prefix.iter().cloned().cloned().collect())
     }
 }
 
@@ -302,7 +302,7 @@ fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, B
             Ok(SectionArgs {
                 ident,
                 description,
-                block: block,
+                block,
             })
         }
     }
@@ -314,12 +314,11 @@ fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, B
 }
 
 fn parse_local_closure(local: &Local) -> Option<(&ExprBlock, &Block)> {
-    if let Some(local_init) = &local.init {
-        if let Expr::Closure(expr_closure) = &*local_init.expr {
-            if let Expr::Block(expr_block) = &*expr_closure.body {
-                return Some((expr_block, &expr_block.block));
-            }
-        }
+    if let Some(local_init) = &local.init
+        && let Expr::Closure(expr_closure) = &*local_init.expr
+        && let Expr::Block(expr_block) = &*expr_closure.body
+    {
+        return Some((expr_block, &expr_block.block));
     }
     None
 }
@@ -330,7 +329,7 @@ fn _rewritten_stmts_to_str(stmts: &[Rewritten<Stmt>]) -> String {
         let fixed = &rw.fixed;
         r.push_str(&format!("fixed({}) ", quote! { #fixed }));
         for (path, stmt) in &rw.exclusive {
-            r.push_str(&format!("exclusive("));
+            r.push_str("exclusive(");
             r.push_str(&format!("{}: {}", path.join("_"), quote! { #stmt }));
             r.push_str(") ");
         }
@@ -347,7 +346,7 @@ fn _unfolded_stmts_to_str(u: &[(SectionPath, Vec<Stmt>)]) -> String {
     r
 }
 
-fn _stmts_to_str(stmts: &Vec<Stmt>) -> String {
+fn _stmts_to_str(stmts: &[Stmt]) -> String {
     stmts
         .iter()
         .map(|s| format!("{}", quote! { #s }))

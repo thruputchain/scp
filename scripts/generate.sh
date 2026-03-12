@@ -13,7 +13,7 @@ protos=(
   scp_types.x
 )
 
-[[ -z $XDRC ]] && XDRC="../../hogd/build/x23/x23c/x23c"
+[[ -z $XDRC ]] && XDRC="../../hogd/vscode/x23/x23c/x23c"
 
 echo "-- Using XDRC=${XDRC} --" >&2
 
@@ -21,7 +21,7 @@ generate() {
   proto=${1:?}
   package=${2:?}
   name=$(basename "${proto}" .x)
-  $XDRC --rust -o "${package}/src/${name}.rs" "${proto}"
+  $XDRC --rust --rust-feature xdrs --rust-feature serde --rust-no-feature spec -o "${package}/src/${name}.rs" "${proto}"
 }
 
 for proto in "${protos[@]}"; do

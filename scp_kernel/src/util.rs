@@ -41,7 +41,7 @@ pub fn parse_node_id_from_hex(hex_str: &str) -> Result<scp_proto::SCPNodeID, Str
     })
 }
 
-pub fn get_hash_of_vec<F>(get_hash_of: F, v: &Vec<BytesM>) -> scp_proto::SCPHash
+pub fn get_hash_of_vec<F>(get_hash_of: F, v: &[BytesM]) -> scp_proto::SCPHash
 where
     F: Fn(&[u8]) -> scp_proto::SCPHash,
 {
@@ -81,12 +81,12 @@ where
 pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
     let mut s = "[".to_string();
     for (i, n) in ns.iter().enumerate() {
-        s.push_str(&format!("{}", to_str_key(n, false)));
+        s.push_str(&to_str_key(n, false));
         if i + 1 < ns.len() {
             s.push_str(", ");
         }
     }
-    s.push_str("]");
+    s.push(']');
     s
 }
 

@@ -3,10 +3,8 @@ use core::net::SocketAddr;
 use futures::future;
 use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
 use scp_kernel as _;
-use tokio;
 use tokio::net::TcpListener;
 use tracing::info;
-use tracing_subscriber;
 use xdr_common::*;
 
 mod config_shim;
@@ -93,7 +91,7 @@ async fn main() {
     let config_shim: SCPConfigShim = serde_json::from_str(&config_json)
         .unwrap_or_else(|e| panic!("Failed to parse config JSON: {}", e));
 
-    let cfg = config_shim.to_scp_config();
+    let cfg = config_shim.into_scp_config();
 
     // handle client
 

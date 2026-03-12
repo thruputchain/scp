@@ -25,8 +25,8 @@ pub struct BallotState {
     last_envelope_emit: Option<scp_proto::SCPEnvelope>, // last envelope emitted by this node
 }
 
-impl BallotState {
-    pub fn new() -> Self {
+impl Default for BallotState {
+    fn default() -> Self {
         BallotState {
             heard_from_quorum: false,
             current: None,
@@ -42,6 +42,12 @@ impl BallotState {
             last_envelope_gen: None,
             last_envelope_emit: None,
         }
+    }
+}
+
+impl BallotState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -217,11 +223,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
         let statement = &env.statement;
 
-        if let EnvelopeState::Invalid = Self::check_valid(self, statement, ours, env) {
-            false
-        } else {
-            true
-        }
+        !matches!(
+            Self::check_valid(self, statement, ours, env),
+            EnvelopeState::Invalid
+        )
     }
 
     #[instrument(skip_all)]
@@ -235,16 +240,13 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
 
         let validation_result = self.validate_values(statement);
-        match validation_result {
-            ValidationLevel::Invalid => {
-                if ours {
-                    error!(env = ?env, "invalid value from self, skipping   e: {}", self.0.cd.envelope_to_str(env, false))
-                } else {
-                    trace!(slot_index = self.slot_proto().index(), "invalid value")
-                }
-                return EnvelopeState::Invalid;
+        if validation_result == ValidationLevel::Invalid {
+            if ours {
+                error!(env = ?env, "invalid value from self, skipping   e: {}", self.0.cd.envelope_to_str(env, false))
+            } else {
+                trace!(slot_index = self.slot_proto().index(), "invalid value")
             }
-            _ => {}
+            return EnvelopeState::Invalid;
         }
 
         // check if validity has changed since the call into the app
@@ -270,14 +272,14 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     return EnvelopeState::Valid;
                 }
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
 
         if ours {
             error!(env = ?env, "externalize statement with invalid value from self, skipping   e: {}", self.0.cd.envelope_to_str(env, false));
         }
 
-        return EnvelopeState::Invalid;
+        EnvelopeState::Invalid
     }
 
     pub fn is_statement_sane(&self, statement: &scp_proto::SCPStatement, ours: bool) -> bool {
@@ -301,14 +303,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     trace!(statement = ?statement, "malformed PREPARE message");
                     return false;
                 }
-                match (&prepare.prepared_prime, &prepare.prepared) {
-                    (Some(pp), Some(p)) => {
-                        if !are_ballots_less_and_incompatible(pp, p) {
-                            trace!(statement = ?statement, "malformed PREPARE message");
-                            return false;
-                        }
-                    }
-                    _ => {}
+                if let (Some(pp), Some(p)) = (&prepare.prepared_prime, &prepare.prepared)
+                    && !are_ballots_less_and_incompatible(pp, p)
+                {
+                    trace!(statement = ?statement, "malformed PREPARE message");
+                    return false;
                 }
                 if prepare.n_h != 0 {
                     match &prepare.prepared {
@@ -325,20 +324,19 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     }
                 }
                 // c != 0 -> c <= h <= b
-                if prepare.n_c != 0 {
-                    if !(prepare.n_h != 0
+                if prepare.n_c != 0
+                    && !(prepare.n_h != 0
                         && prepare.ballot.counter >= prepare.n_h
                         && prepare.n_h >= prepare.n_c)
-                    {
-                        trace!(statement = ?statement, "malformed PREPARE message");
-                        return false;
-                    }
+                {
+                    trace!(statement = ?statement, "malformed PREPARE message");
+                    return false;
                 }
-                return true;
+                true
             }
             scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                 // c <= h <= b
-                if confirm.ballot.counter <= 0 {
+                if confirm.ballot.counter == 0 {
                     trace!(statement = ?statement, "malformed CONFIRM message");
                     return false;
                 }
@@ -350,10 +348,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     trace!(statement = ?statement, "malformed CONFIRM message");
                     return false;
                 }
-                return true;
+                true
             }
             scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
-                if externalize.commit.counter <= 0 {
+                if externalize.commit.counter == 0 {
                     trace!(statement = ?statement, "malformed EXTERNALIZE message");
                     return false;
                 }
@@ -361,7 +359,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     trace!(statement = ?statement, "malformed EXTERNALIZE message");
                     return false;
                 }
-                return true;
+                true
             }
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: _ } => {
                 panic!("unreachable");
@@ -375,34 +373,31 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
             Some(w) => {
                 if w.is_empty() {
-                    match &self.ballot_state().current {
-                        Some(cv) => Some(cv.value.clone()),
-                        None => None,
-                    }
+                    self.ballot_state()
+                        .current
+                        .as_ref()
+                        .map(|cv| cv.value.clone())
                 } else {
                     Some(w.clone())
                 }
             }
-            None => match &self.ballot_state().current {
-                Some(cv) => Some(cv.value.clone()),
-                None => None,
-            },
+            None => self
+                .ballot_state()
+                .current
+                .as_ref()
+                .map(|cv| cv.value.clone()),
         };
         match v {
             Some(w) => {
                 if w.is_empty() {
-                    return false;
+                    false
+                } else if n == 0 {
+                    self.bump_state(w, true)
                 } else {
-                    if n == 0 {
-                        return self.bump_state(w, true);
-                    } else {
-                        return self.bump_state_n(w, n);
-                    }
+                    self.bump_state_n(w, n)
                 }
             }
-            None => {
-                return false;
-            }
+            None => false,
         }
     }
 
@@ -421,7 +416,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     fn bump_state_n(&mut self, value: scp_proto::SCPValue, n: u32) -> bool {
-        return match self.ballot_state().phase {
+        match self.ballot_state().phase {
             Phase::Prepare | Phase::Confirm => {
                 let newv = match &self.ballot_state().value_override {
                     Some(v) => v.clone(),
@@ -444,7 +439,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 updated
             }
             Phase::Externalize | Phase::Num => false,
-        };
+        }
     }
 
     /// updates the local state based to the specified ballot
@@ -463,10 +458,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             }
             Some(current) => {
                 assert!(compare_ballots(current, &new_ballot) != Ordering::Greater);
-                if let Some(commit) = &self.ballot_state().commit {
-                    if !are_ballots_compatible(commit, &new_ballot) {
-                        return false;
-                    }
+                if let Some(commit) = &self.ballot_state().commit
+                    && !are_ballots_compatible(commit, &new_ballot)
+                {
+                    return false;
                 }
                 match compare_ballots(current, &new_ballot) {
                     Ordering::Less => {
@@ -506,11 +501,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // `bump_to_ballot` should be never called once we committed
         assert!(self.ballot_state().phase != Phase::Externalize);
 
-        if check {
-            match &self.ballot_state().current {
-                Some(current) => assert!(compare_ballots(&ballot, current) != Ordering::Less),
-                None => {}
-            }
+        if check && let Some(current) = &self.ballot_state().current {
+            assert!(compare_ballots(&ballot, current) != Ordering::Less);
         }
 
         let got_bumped = match &self.ballot_state().current {
@@ -518,14 +510,11 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             None => true,
         };
 
-        match &self.ballot_state().current {
-            None => {
-                self.slot_proto()
-                    .cd
-                    .consensus
-                    .started_ballot_proto(self.slot_proto().index(), &ballot);
-            }
-            Some(_) => {}
+        if self.ballot_state().current.is_none() {
+            self.slot_proto()
+                .cd
+                .consensus
+                .started_ballot_proto(self.slot_proto().index(), &ballot);
         }
 
         self.ballot_state_mut().current = Some(ballot);
@@ -533,12 +522,12 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         // we have to clear some fields (and recompute them based on latest
         // messages)
         // invariant: h.value = b.value
-        if let Some(high) = &self.ballot_state().high {
-            if !are_ballots_compatible(self.ballot_state().current.as_ref().unwrap(), high) {
-                self.ballot_state_mut().high = None;
-                // invariant: c set only when h is set
-                self.ballot_state_mut().commit = None;
-            }
+        if let Some(high) = &self.ballot_state().high
+            && !are_ballots_compatible(self.ballot_state().current.as_ref().unwrap(), high)
+        {
+            self.ballot_state_mut().high = None;
+            // invariant: c set only when h is set
+            self.ballot_state_mut().commit = None;
         }
 
         if got_bumped {
@@ -555,9 +544,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             slot_index,
             Timer::Ballot,
             timeout,
-            DriverCallback::BallotTimerExpired {
-                slot_index: slot_index,
-            },
+            DriverCallback::BallotTimerExpired { slot_index },
         );
     }
 
@@ -567,9 +554,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     }
 
     pub fn driver_calling_back(&mut self, cb: DriverCallback) {
-        match cb {
-            DriverCallback::BallotTimerExpired { slot_index: _ } => self.timer_expired(),
-            _ => {}
+        if let DriverCallback::BallotTimerExpired { slot_index: _ } = cb {
+            self.timer_expired();
         }
     }
 
@@ -585,7 +571,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let pledges = match typ {
             scp_proto::SCPStatementType::SCP_ST_PREPARE => {
                 let mut prepare = scp_proto::SCPStatementPrepare {
-                    quorum_set_hash: self.slot_proto().local_proto().get_qset_hash().clone(),
+                    quorum_set_hash: *self.slot_proto().local_proto().get_qset_hash(),
                     ballot: scp_proto::SCPBallot {
                         counter: 0,
                         value: Default::default(),
@@ -625,7 +611,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     n_prepared: self.ballot_state().prepared.as_ref().unwrap().counter,
                     n_commit: self.ballot_state().commit.as_ref().unwrap().counter,
                     n_h: self.ballot_state().high.as_ref().unwrap().counter,
-                    quorum_set_hash: self.slot_proto().local_proto().get_qset_hash().clone(),
+                    quorum_set_hash: *self.slot_proto().local_proto().get_qset_hash(),
                 };
 
                 scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm }
@@ -635,7 +621,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 let externalize = scp_proto::SCPStatementExternalize {
                     commit: self.ballot_state().commit.as_ref().unwrap().clone(),
                     n_h: self.ballot_state().high.as_ref().unwrap().counter,
-                    commit_quorum_set_hash: self.slot_proto().local_proto().get_qset_hash().clone(),
+                    commit_quorum_set_hash: *self.slot_proto().local_proto().get_qset_hash(),
                 };
 
                 scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize }
@@ -786,15 +772,15 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                         if are_ballots_less_and_compatible(&prepare.ballot, &top_vote) {
                             candidates.insert(prepare.ballot.clone());
                         }
-                        if let Some(ref prepared) = prepare.prepared {
-                            if are_ballots_less_and_compatible(prepared, &top_vote) {
-                                candidates.insert(prepared.clone());
-                            }
+                        if let Some(ref prepared) = prepare.prepared
+                            && are_ballots_less_and_compatible(prepared, &top_vote)
+                        {
+                            candidates.insert(prepared.clone());
                         }
-                        if let Some(ref prepared_prime) = prepare.prepared_prime {
-                            if are_ballots_less_and_compatible(prepared_prime, &top_vote) {
-                                candidates.insert(prepared_prime.clone());
-                            }
+                        if let Some(ref prepared_prime) = prepare.prepared_prime
+                            && are_ballots_less_and_compatible(prepared_prime, &top_vote)
+                        {
+                            candidates.insert(prepared_prime.clone());
                         }
                     }
                     scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
@@ -1058,10 +1044,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             let ballot = cur.unwrap();
 
             // only consider it if we can potentially raise h
-            if let Some(ref high) = self.ballot_state().high {
-                if compare_ballots(high, ballot) != Ordering::Less {
-                    break;
-                }
+            if let Some(ref high) = self.ballot_state().high
+                && compare_ballots(high, ballot) != Ordering::Less
+            {
+                break;
             }
 
             let ratified = self.federated_ratify(|st: &scp_proto::SCPStatement| -> bool {
@@ -1251,13 +1237,13 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 // only consider the ballot if it may help us increase
                 // p (note: at this point, p ~ c)
                 if !are_ballots_less_and_compatible(
-                    &self.ballot_state().prepared.as_ref().unwrap(),
+                    self.ballot_state().prepared.as_ref().unwrap(),
                     &ballot,
                 ) {
                     continue;
                 }
                 assert!(are_ballots_compatible(
-                    &self.ballot_state().commit.as_ref().unwrap(),
+                    self.ballot_state().commit.as_ref().unwrap(),
                     &ballot
                 ));
             }
@@ -1265,10 +1251,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             // if we already prepared this ballot, don't bother checking again
 
             // if ballot <= p' ballot is neither a candidate for p nor p'
-            if let Some(ref prepared_prime) = self.ballot_state().prepared_prime {
-                if compare_ballots(&ballot, prepared_prime) != Ordering::Greater {
-                    continue;
-                }
+            if let Some(ref prepared_prime) = self.ballot_state().prepared_prime
+                && compare_ballots(&ballot, prepared_prime) != Ordering::Greater
+            {
+                continue;
             }
 
             if let Some(ref prepared) = self.ballot_state().prepared {
@@ -1378,11 +1364,9 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         for envelope in self.ballot_state().latest_envelopes.values() {
             match &envelope.statement.pledges {
                 scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                    if are_ballots_compatible(ballot, &prepare.ballot) {
-                        if prepare.n_c != 0 {
-                            res.insert(prepare.n_c);
-                            res.insert(prepare.n_h);
-                        }
+                    if are_ballots_compatible(ballot, &prepare.ballot) && prepare.n_c != 0 {
+                        res.insert(prepare.n_c);
+                        res.insert(prepare.n_h);
                     }
                 }
                 scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
@@ -1438,10 +1422,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         if self.ballot_state().phase == Phase::Prepare {
             self.ballot_state_mut().phase = Phase::Confirm;
 
-            if let Some(current) = &self.ballot_state().current {
-                if !are_ballots_less_and_compatible(h, current) {
-                    self.bump_to_ballot(h.clone(), false);
-                }
+            if let Some(current) = &self.ballot_state().current
+                && !are_ballots_less_and_compatible(h, current)
+            {
+                self.bump_to_ballot(h.clone(), false);
             }
 
             self.ballot_state_mut().prepared_prime = None;
@@ -1493,10 +1477,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             _ => panic!("bug"),
         };
 
-        if self.ballot_state().phase == Phase::Confirm {
-            if !are_ballots_compatible(&ballot, self.ballot_state().high.as_ref().unwrap()) {
-                return false;
-            }
+        if self.ballot_state().phase == Phase::Confirm
+            && !are_ballots_compatible(&ballot, self.ballot_state().high.as_ref().unwrap())
+        {
+            return false;
         }
 
         let pred = |cur: &Interval| -> bool {
@@ -1504,15 +1488,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                 &|st: &scp_proto::SCPStatement| -> bool {
                     match &st.pledges {
                         scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                            if are_ballots_compatible(&ballot, &prepare.ballot) {
-                                if prepare.n_c != 0 {
-                                    prepare.n_c <= cur.lo && cur.hi <= prepare.n_h
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
+                            are_ballots_compatible(&ballot, &prepare.ballot)
+                                && prepare.n_c != 0
+                                && prepare.n_c <= cur.lo
+                                && cur.hi <= prepare.n_h
                         }
                         scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                             if are_ballots_compatible(&ballot, &confirm.ballot) {
@@ -1548,20 +1527,19 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         let mut candidate = Interval { lo: 0, hi: 0 };
         Self::find_extended_interval(&mut candidate, &boundaries, pred);
 
-        if candidate.lo != 0 {
-            if self.ballot_state().phase != Phase::Confirm
-                || candidate.hi > self.ballot_state().high.as_ref().unwrap().counter
-            {
-                let c = scp_proto::SCPBallot {
-                    counter: candidate.lo,
-                    value: ballot.value.clone(),
-                };
-                let h = scp_proto::SCPBallot {
-                    counter: candidate.hi,
-                    value: ballot.value.clone(),
-                };
-                return self.set_accept_commit(&c, &h);
-            }
+        if candidate.lo != 0
+            && (self.ballot_state().phase != Phase::Confirm
+                || candidate.hi > self.ballot_state().high.as_ref().unwrap().counter)
+        {
+            let c = scp_proto::SCPBallot {
+                counter: candidate.lo,
+                value: ballot.value.clone(),
+            };
+            let h = scp_proto::SCPBallot {
+                counter: candidate.hi,
+                value: ballot.value.clone(),
+            };
+            return self.set_accept_commit(&c, &h);
         }
 
         false
@@ -1711,14 +1689,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         st: &scp_proto::SCPStatement,
     ) -> scp_proto::SCPHash {
         match &st.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                prepare.quorum_set_hash.clone()
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                confirm.quorum_set_hash.clone()
-            }
+            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => prepare.quorum_set_hash,
+            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => confirm.quorum_set_hash,
             scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
-                externalize.commit_quorum_set_hash.clone()
+                externalize.commit_quorum_set_hash
             }
             _ => panic!("bug"),
         }
@@ -1834,13 +1808,12 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     {
         for (node_id, envelope) in &self.ballot_state().latest_envelopes {
             // only return messages for self if the slot is fully validated
-            if force_self
+            if (force_self
                 || node_id != self.slot_proto().local_proto().get_node_id()
-                || self.slot_proto().is_fully_validated()
+                || self.slot_proto().is_fully_validated())
+                && !f(envelope)
             {
-                if !f(envelope) {
-                    return false;
-                }
+                return false;
             }
         }
         true
@@ -1910,64 +1883,61 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             return state;
         }
 
-        let envelope_opt = self.ballot_state().latest_envelopes.get(n);
+        if let Some(envelope) = self.ballot_state().latest_envelopes.get(n) {
+            if let Some(last_envelope_emit) = &self.ballot_state().last_envelope_emit {
+                let st = &envelope.statement;
+                let externalized = matches!(
+                    st.pledges,
+                    scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
+                );
 
-        if envelope_opt.is_none() {
-            if self.ballot_state().timer_exp_count >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
-                || self_already_moved_on
-            {
-                state = QuorumInfoNodeState::Missing;
-            } else {
-                // It's too soon to start calling this node MISSING.
-                state = QuorumInfoNodeState::NoInfo;
-            }
-        } else if let Some(last_envelope_emit) = &self.ballot_state().last_envelope_emit {
-            let envelope = envelope_opt.unwrap();
-            let st = &envelope.statement;
-            let externalized = matches!(
-                st.pledges,
-                scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
-            );
+                let confirmed_commit = match &st.pledges {
+                    scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                        confirm.ballot.counter == u32::MAX
+                    }
+                    _ => false,
+                };
 
-            let confirmed_commit = match &st.pledges {
-                scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                    confirm.ballot.counter == u32::MAX
+                if self.ballot_state().phase == Phase::Externalize
+                    && (!externalized || !confirmed_commit)
+                    && self_already_moved_on
+                {
+                    // We have already externalized and moved onto the next slot.
+                    // However, this node hasn't externalized yet.
+                    state = QuorumInfoNodeState::Delayed;
                 }
-                _ => false,
-            };
 
-            if self.ballot_state().phase == Phase::Externalize
-                && (!externalized || !confirmed_commit)
-                && self_already_moved_on
-            {
-                // We have already externalized and moved onto the next slot.
-                // However, this node hasn't externalized yet.
-                state = QuorumInfoNodeState::Delayed;
+                let self_accepted_confirm = self.ballot_state().phase == Phase::Confirm
+                    || self.ballot_state().phase == Phase::Externalize;
+
+                let other_accepted_confirm = matches!(
+                    st.pledges,
+                    scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { .. }
+                        | scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
+                );
+
+                let self_st = &last_envelope_emit.statement;
+
+                if self_accepted_confirm
+                    && other_accepted_confirm
+                    && !are_ballots_compatible(
+                        &Self::get_working_ballot(st),
+                        &Self::get_working_ballot(self_st),
+                    )
+                {
+                    // n has accepted to commit a different value than mine!
+                    // Even if this node has been marked something else,
+                    // we will overwrite it since this is bad.
+                    state = QuorumInfoNodeState::Disagree;
+                }
             }
-
-            let self_accepted_confirm = self.ballot_state().phase == Phase::Confirm
-                || self.ballot_state().phase == Phase::Externalize;
-
-            let other_accepted_confirm = matches!(
-                st.pledges,
-                scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { .. }
-                    | scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { .. }
-            );
-
-            let self_st = &last_envelope_emit.statement;
-
-            if self_accepted_confirm
-                && other_accepted_confirm
-                && !are_ballots_compatible(
-                    &Self::get_working_ballot(st),
-                    &Self::get_working_ballot(self_st),
-                )
-            {
-                // n has accepted to commit a different value than mine!
-                // Even if this node has been marked something else,
-                // we will overwrite it since this is bad.
-                state = QuorumInfoNodeState::Disagree;
-            }
+        } else if self.ballot_state().timer_exp_count >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
+            || self_already_moved_on
+        {
+            state = QuorumInfoNodeState::Missing;
+        } else {
+            // It's too soon to start calling this node MISSING.
+            state = QuorumInfoNodeState::NoInfo;
         }
 
         state
@@ -1988,14 +1958,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         };
         let mut q_set_hash = scp_proto::SCPHash::default();
 
-        let envelope_opt = self.ballot_state().latest_envelopes.get(id);
-        if envelope_opt.is_none() {
-            ret["phase"] = serde_json::Value::String("unknown".to_string());
-            if id == self.slot_proto().local_proto().get_node_id() {
-                q_set_hash = *self.slot_proto().local_proto().get_qset_hash();
-            }
-        } else {
-            let envelope = envelope_opt.unwrap();
+        if let Some(envelope) = self.ballot_state().latest_envelopes.get(id) {
             let st = &envelope.statement;
 
             match &st.pledges {
@@ -2017,15 +1980,17 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             // use the companion set here even for externalize to capture
             // the view of the quorum set during consensus
             q_set_hash = Self::get_companion_quorum_set_hash_from_statement(st);
+        } else {
+            ret["phase"] = serde_json::Value::String("unknown".to_string());
+            if id == self.slot_proto().local_proto().get_node_id() {
+                q_set_hash = *self.slot_proto().local_proto().get_qset_hash();
+            }
         }
 
-        let q_set = self.driver().get_qset(&q_set_hash);
-        if q_set.is_none() {
+        let Some(q_set) = self.driver().get_qset(&q_set_hash) else {
             ret["phase"] = serde_json::Value::String("expired".to_string());
             return ret;
-        }
-
-        let q_set = q_set.unwrap();
+        };
         let local_proto = self.slot_proto().local_proto();
         let f = local_proto.find_closest_v_blocking_envelopes(
             &q_set,

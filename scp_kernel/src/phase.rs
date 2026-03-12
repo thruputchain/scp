@@ -1,5 +1,3 @@
-
-
 #[derive(Debug, PartialEq)]
 pub enum Phase {
     Prepare,

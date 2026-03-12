@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver};
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::info;
@@ -314,21 +314,25 @@ impl ControlKernel {
     }
 
     fn flush_timer_switches(&mut self) {
-        while let Ok(v) = self.rx_switch_timer.try_recv() {
-            match v {
-                SwitchTimer::StartTimer(slot_index, timer, timeout, cb) => {
-                    self.start_timer(slot_index, timer, timeout, cb);
-                }
-                SwitchTimer::StopTimer(slot_index, timer) => {
-                    self.stop_timer(slot_index, timer);
-                }
-                SwitchTimer::SlotExternalized(slot_index) => {
-                    self.stop_timers_not_above(slot_index);
-                    // purge slots not above slot_index
-                    self.kernel
-                        .proto()
-                        .purge_slots(slot_index + 1, slot_index + 1);
-                }
+        loop {
+            match self.rx_switch_timer.try_recv() {
+                Ok(v) => match v {
+                    SwitchTimer::StartTimer(slot_index, timer, timeout, cb) => {
+                        self.start_timer(slot_index, timer, timeout, cb);
+                    }
+                    SwitchTimer::StopTimer(slot_index, timer) => {
+                        self.stop_timer(slot_index, timer);
+                    }
+                    SwitchTimer::SlotExternalized(slot_index) => {
+                        self.stop_timers_not_above(slot_index);
+                        // purge slots not above slot_index
+                        self.kernel
+                            .proto()
+                            .purge_slots(slot_index + 1, slot_index + 1);
+                    }
+                },
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => panic!("bug"),
             }
         }
     }

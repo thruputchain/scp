@@ -616,7 +616,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -938,7 +938,7 @@ dependencies = [
  "hyper",
  "libc",
  "pin-project-lite",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -1376,7 +1376,7 @@ dependencies = [
  "async-trait",
  "thiserror",
  "tokio",
- "xdrs",
+ "xdrs 0.4.0",
 ]
 
 [[package]]
@@ -1426,7 +1426,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scp_kernel"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -1441,25 +1441,25 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
- "xdr-common",
+ "xdr-common 0.5.0",
 ]
 
 [[package]]
 name = "scp_proto"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "groundhog-serde_arrays",
  "rpc_driver",
  "serde",
  "serde_with",
- "xdr-common",
- "xdrs",
+ "xdr-common 0.5.0",
+ "xdrs 0.5.0",
 ]
 
 [[package]]
 name = "scp_server"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "clap",
@@ -1475,12 +1475,12 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "xdr-common",
+ "xdr-common 0.5.0",
 ]
 
 [[package]]
 name = "scp_util"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1488,8 +1488,8 @@ dependencies = [
  "serde",
  "sha2 0.10.9",
  "thiserror",
- "xdr-common",
- "xdrs",
+ "xdr-common 0.5.0",
+ "xdrs 0.5.0",
 ]
 
 [[package]]
@@ -1605,7 +1605,7 @@ dependencies = [
 
 [[package]]
 name = "shfix"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2294,6 +2294,16 @@ checksum = "13589a02c1c2081bcd0dea281ddb5f5acc92f83c9c7c339fde54689160bd3f89"
 dependencies = [
  "escape-bytes",
  "hex",
+]
+
+[[package]]
+name = "xdr-common"
+version = "0.5.0"
+source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+checksum = "5f37325215270fa9b7a3aa00b09d6aa5c9d23e520a89e0f5ebddb07eecb032af"
+dependencies = [
+ "escape-bytes",
+ "hex",
  "serde",
  "serde_with",
 ]
@@ -2311,12 +2321,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "xdr-repr"
-version = "0.4.0"
+name = "xdr-derive"
+version = "0.5.0"
 source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
-checksum = "db68a82d361ca9ad49b6ad4b473f92786b3e8431e1719f19b45c351709bbf5ed"
+checksum = "2b094c7ca2f5cf454287d2270cf61eb81570f83c4c5a1e11100c61979bee589e"
 dependencies = [
- "xdr-common",
+ "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.115",
+]
+
+[[package]]
+name = "xdr-repr"
+version = "0.5.0"
+source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+checksum = "b6bac715ccc7daced76441e4801e79960360cdaf1e1956b37447c455b33e95c8"
+dependencies = [
+ "xdr-common 0.5.0",
 ]
 
 [[package]]
@@ -2326,8 +2348,19 @@ source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
 checksum = "e15cec8a548a8842bec9f95894bcc2d08b7cfbf47cdef10fcf3bc936c515175e"
 dependencies = [
  "thiserror",
- "xdr-common",
- "xdr-derive",
+ "xdr-common 0.4.0",
+ "xdr-derive 0.4.0",
+]
+
+[[package]]
+name = "xdrs"
+version = "0.5.0"
+source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+checksum = "d84dbebd0fbc1229f3daef973bdc0bafca67fe8f7ed9597b6ec53cbc0028748f"
+dependencies = [
+ "thiserror",
+ "xdr-common 0.5.0",
+ "xdr-derive 0.5.0",
  "xdr-repr",
 ]
 

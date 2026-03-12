@@ -3,7 +3,7 @@ resolver = "3"
 members = ["shfix", "scp_proto", "scp_util", "scp_kernel", "scp_server"]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 authors = ["Groundhog Team"]
 license = "Apache-2.0"
@@ -16,17 +16,17 @@ categories = ["blockchain"]
 
 # These version numbers need to be kept in sync with the workspace package version number
 [workspace.dependencies]
-shfix = { path = "shfix", version = "=1.0.0", registry = "groundhog" }
-scp_proto = { path = "scp_proto", version = "=1.0.0", registry = "groundhog" }
-scp_util = { path = "scp_util", version = "=1.0.0", registry = "groundhog" }
-scp_kernel = { path = "scp_kernel", version = "=1.0.0", registry = "groundhog" }
-scp_server = { path = "scp_server", version = "=1.0.0", registry = "groundhog" }
+shfix = { path = "shfix", version = "=1.0.1", registry = "groundhog" }
+scp_proto = { path = "scp_proto", version = "=1.0.1", registry = "groundhog" }
+scp_util = { path = "scp_util", version = "=1.0.1", registry = "groundhog" }
+scp_kernel = { path = "scp_kernel", version = "=1.0.1", registry = "groundhog" }
+scp_server = { path = "scp_server", version = "=1.0.1", registry = "groundhog" }
 
-xdrs = { registry = "groundhog", version = "0.4.0", features = [
+xdrs = { registry = "groundhog", version = "0.5.0", features = [
     "int128",
     "derive",
     "ns",
     "alloc",
 ] }
-xdr-common = { version = "0.4.0", registry = "groundhog", features = ["alloc"] }
+xdr-common = { version = "0.5.0", registry = "groundhog", features = ["alloc"] }
 rpc_driver = { version = "0.3.0", registry = "groundhog" }

@@ -215,7 +215,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
 
     pub fn is_vblocking_nodes(
         qset: &scp_proto::SCPQuorumSet,
-        nodes: &Vec<scp_proto::SCPNodeID>,
+        nodes: &[scp_proto::SCPNodeID],
     ) -> bool {
         Self::is_vblocking_internal(qset, nodes)
     }
@@ -318,10 +318,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         // Check validators first
         for validator in qset.validators.iter() {
             // Skip excluded node
-            if let Some(ex) = excluded {
-                if validator == ex {
-                    continue;
-                }
+            if let Some(ex) = excluded
+                && validator == ex
+            {
+                continue;
             }
 
             if !nodes.contains(validator) {

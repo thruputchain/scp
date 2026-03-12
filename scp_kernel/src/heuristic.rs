@@ -13,8 +13,8 @@ fn unsigned_div_up(a: u64, b: u64, c: u64) -> (u64, bool) {
     let a: u128 = a.into();
     let b: u128 = b.into();
     let c: u128 = c.into();
-    let x = (a * b + c - 1) / c;
-    (x as u64, x > u128::MAX)
+    let x = (a * b).div_ceil(c);
+    (x as u64, false)
 }
 
 /// Returns the weight of the node within the qset normalized between 0-u64::MAX.

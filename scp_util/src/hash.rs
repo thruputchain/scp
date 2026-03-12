@@ -12,7 +12,7 @@ where
     T: WriteXDR + ?Sized,
 {
     let bytes = scp_util::marshal_xdr(v)?;
-    let h: [u8; 32] = hash_bytes(bytes.as_slice()).into();
+    let h: [u8; 32] = hash_bytes(bytes.as_slice());
     Ok(scp_proto::SCPSHA256Hash::from(h))
 }
 

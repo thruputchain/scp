@@ -62,6 +62,7 @@ pub fn make_confirm(
     make_envelope(secret_key, slot_index, statement)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn make_prepare(
     secret_key: &scp_proto::SCPSecretKey,
     qset_hash: scp_proto::SCPHash,
@@ -119,6 +120,7 @@ pub fn make_nominate(
 }
 
 // Verification functions - compare actual envelope with expected envelope
+#[allow(clippy::too_many_arguments)]
 pub fn verify_prepare(
     actual: &scp_proto::SCPEnvelope,
     secret_key: &scp_proto::SCPSecretKey,
@@ -145,6 +147,7 @@ pub fn verify_prepare(
     assert_eq!(expected.statement, actual.statement,);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn verify_confirm(
     actual: &scp_proto::SCPEnvelope,
     secret_key: &scp_proto::SCPSecretKey,

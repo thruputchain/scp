@@ -123,8 +123,7 @@ fn normalize_qset_simplify(
     let mut unprocessed = qset.inner_sets.0.clone();
     qset.inner_sets.0.clear();
 
-    while unprocessed.len() > 0 {
-        let mut inner_set = unprocessed.pop().unwrap();
+    while let Some(mut inner_set) = unprocessed.pop() {
         normalize_qset_simplify(&mut inner_set, id_to_remove);
         if qset.threshold == 1 && inner_set.threshold == 1 {
             for inner_inner_set in inner_set.inner_sets.0 {
@@ -142,7 +141,7 @@ fn normalize_qset_simplify(
 
     // simplify quorum set if needed
     // (threshold=1, no validators, 1 inner set)
-    if qset.threshold == 1 && qset.validators.len() == 0 && qset.inner_sets.len() == 1 {
+    if qset.threshold == 1 && qset.validators.is_empty() && qset.inner_sets.len() == 1 {
         let inner_set = qset.inner_sets.0.pop().unwrap().clone();
         *qset = inner_set;
     }

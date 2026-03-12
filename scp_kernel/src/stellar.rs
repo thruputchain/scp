@@ -85,7 +85,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
                     result.push_str(&format!("'{}'", self.driver.get_value_string(accepted)));
                 }
 
-                result.push_str("}");
+                result.push('}');
             }
         }
 
@@ -96,7 +96,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
     pub fn node_ids_to_str(&self, ns: &[scp_proto::SCPNodeID]) -> String {
         let mut s = "[".to_string();
         for (i, n) in ns.iter().enumerate() {
-            s.push_str(&format!("{}", self.driver.to_str_key(n, false)));
+            s.push_str(&self.driver.to_str_key(n, false));
             if i + 1 < ns.len() {
                 s.push_str(", ");
             }
@@ -134,14 +134,14 @@ pub struct StellarProto<'a, C: Consensus, D: Driver> {
 impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn local_proto(&self) -> LocalProto<'_, C, D> {
         LocalProto {
-            cd: &self.cd,
+            cd: self.cd,
             local: &self.state.local,
         }
     }
 
     pub fn local_proto_mut(&mut self) -> LocalProtoMut<'_, C, D> {
         LocalProtoMut {
-            cd: &self.cd,
+            cd: self.cd,
             local: &mut self.state.local,
         }
     }
@@ -149,11 +149,11 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn slot_proto_or_create(&mut self, slot_index: SlotIndex) -> SlotProto<'_, C, D> {
         let is_validator = self.is_validator();
         let known_slots = &mut self.state.known_slots;
-        if !known_slots.contains_key(&slot_index) {
-            known_slots.insert(slot_index, SlotState::new(slot_index, is_validator));
-        };
+        known_slots
+            .entry(slot_index)
+            .or_insert_with(|| SlotState::new(slot_index, is_validator));
         SlotProto {
-            cd: &self.cd,
+            cd: self.cd,
             local_state: &mut self.state.local,
             slot_state: known_slots.get_mut(&slot_index).unwrap(),
         }
@@ -164,7 +164,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
             .known_slots
             .get_mut(&slot_index)
             .map(|slot| SlotProto {
-                cd: &self.cd,
+                cd: self.cd,
                 local_state: &mut self.state.local,
                 slot_state: slot,
             })
@@ -235,8 +235,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         let mut slot_indices: Vec<SlotIndex> = self.state.known_slots.keys().cloned().collect();
         slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
 
-        let mut count = 0;
-        for slot_index in slot_indices {
+        for (count, slot_index) in slot_indices.into_iter().enumerate() {
             if count >= limit {
                 break;
             }
@@ -244,7 +243,6 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
             if let Some(mut slot_proto) = self.slot_proto(slot_index) {
                 ret.insert(slot_index.to_string(), slot_proto.get_json_info(full_keys));
             }
-            count += 1;
         }
 
         serde_json::Value::Object(ret)
@@ -481,10 +479,10 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         slot_indices.sort_by(|a, b| b.cmp(a)); // Sort in descending order
 
         for slot_index in slot_indices {
-            if let Some(mut slot) = self.slot_proto(slot_index) {
-                if let Some(envelope) = slot.get_latest_message(id) {
-                    return Some(envelope);
-                }
+            if let Some(mut slot) = self.slot_proto(slot_index)
+                && let Some(envelope) = slot.get_latest_message(id)
+            {
+                return Some(envelope);
             }
         }
         None

@@ -8,7 +8,6 @@ use core::net::SocketAddr;
 use rpc_driver::*;
 use scp_kernel::*;
 use scp_proto::*;
-use tokio;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 

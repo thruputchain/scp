@@ -52,10 +52,8 @@ pub struct UnitTestDriver {
     pub quorum_sets: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>,
 }
 
-impl UnitTestDriver {
-    const MAX_TIMEOUT: Duration = Duration::from_millis((30 * 60) * 1000);
-
-    pub fn new() -> Self {
+impl Default for UnitTestDriver {
+    fn default() -> Self {
         Self {
             initial_ballot_timeout_ms: 1000,
             increment_ballot_timeout_ms: 1000,
@@ -63,6 +61,14 @@ impl UnitTestDriver {
             increment_nomination_timeout_ms: 1000,
             quorum_sets: HashMap::new(),
         }
+    }
+}
+
+impl UnitTestDriver {
+    const MAX_TIMEOUT: Duration = Duration::from_millis((30 * 60) * 1000);
+
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn store_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
@@ -97,7 +103,7 @@ impl Driver for Rc<RefCell<UnitTestDriver>> {
     } // XXX: get from KeyUtils.cpp
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        format!("{}", hex_abbrev(&value.0))
+        hex_abbrev(&value.0)
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {

@@ -29,7 +29,7 @@ pub struct HistoricalStatement {
 impl SlotState {
     pub fn new(slot_index: SlotIndex, is_validator: bool) -> Self {
         SlotState {
-            slot_index: slot_index,
+            slot_index,
             nomination: NominationState::new(),
             ballot: BallotState::new(),
             statements_history: Vec::new(),
@@ -108,16 +108,16 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     ) -> scp_proto::SCPHash {
         match &statement.pledges {
             scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                prepare.quorum_set_hash.clone()
+                prepare.quorum_set_hash
             }
             scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                confirm.quorum_set_hash.clone()
+                confirm.quorum_set_hash
             }
             scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
-                externalize.commit_quorum_set_hash.clone()
+                externalize.commit_quorum_set_hash
             }
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
-                nominate.quorum_set_hash.clone()
+                nominate.quorum_set_hash
             }
         }
     }
@@ -128,7 +128,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     ) -> (Vec<scp_proto::SCPValue>, Vec<scp_proto::SCPValue>) {
         match &statement.pledges {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => (
-                NominationProto::<C, D>::get_statement_values(&statement),
+                NominationProto::<C, D>::get_statement_values(statement),
                 vec![],
             ),
             _ => {
@@ -286,7 +286,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         use scp_proto::{SCPEd25519Signature, SCPSignature};
 
         let mut envelope = scp_proto::SCPEnvelope {
-            statement: statement,
+            statement,
             signature: SCPSignature::Ed25519 {
                 ed25519: SCPEd25519Signature::new([0u8; 64]),
             },

@@ -312,6 +312,7 @@ impl HandleClient {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum HandleRequest {
     EmitEnvelope(SCPEnvelope),
     // validations are handled by the ValidateClient path
@@ -463,7 +464,7 @@ impl HandleKernel {
         let x = state
             .validated_values
             .entry(slot_index)
-            .or_insert_with(HashMap::new);
+            .or_default();
         x.insert(v, l);
     }
 
@@ -769,7 +770,7 @@ impl Driver for HandleKernel {
     }
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        format!("{}", hex_abbrev(&value.0))
+        hex_abbrev(&value.0).to_string()
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {

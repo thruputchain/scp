@@ -43,6 +43,7 @@ impl std::fmt::Display for DriverCallback {
         //
     }
 }
+#[allow(clippy::wrong_self_convention)]
 pub trait Driver: Clone + Debug {
     fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &scp_proto::SCPNodeID) -> String;

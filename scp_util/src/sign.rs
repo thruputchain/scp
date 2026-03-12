@@ -8,7 +8,7 @@ fn signing_key_from_secret_key(secret_key: &scp_proto::SCPEd25519SecretKey) -> S
     // Ed25519SecretKey contains 64 bytes, but SigningKey expects 32 bytes
     // The first 32 bytes are the secret key, the last 32 bytes are typically the public key
     let secret_bytes: &[u8; 32] = &secret_key[..32].try_into().unwrap();
-    SigningKey::from_bytes(&secret_bytes)
+    SigningKey::from_bytes(secret_bytes)
 }
 
 fn verifying_key_from_public_key(public_key: &scp_proto::SCPEd25519PublicKey) -> VerifyingKey {
@@ -82,7 +82,7 @@ pub fn sign_xdr<T>(
 where
     T: WriteXDR + ?Sized,
 {
-    let x = txs::encode(v).map_err(|e| SigningError::EncodingError(e))?;
+    let x = txs::encode(v).map_err(SigningError::EncodingError)?;
     Ok(sign_bytes(secret_key, x.as_slice()))
 }
 
@@ -94,6 +94,6 @@ pub fn verify_xdr<T>(
 where
     T: WriteXDR + ?Sized,
 {
-    let x = txs::encode(v).map_err(|e| VerifyingError::EncodingError(e))?;
-    verify_bytes(public_key, x.as_slice(), signature).map_err(|e| VerifyingError::VerifyingError(e))
+    let x = txs::encode(v).map_err(VerifyingError::EncodingError)?;
+    verify_bytes(public_key, x.as_slice(), signature).map_err(VerifyingError::VerifyingError)
 }

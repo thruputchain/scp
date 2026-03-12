@@ -147,8 +147,8 @@ impl TestDriver {
             increment_ballot_timeout_ms: 1000,
             initial_nomination_timeout_ms: 1000,
             increment_nomination_timeout_ms: 1000,
-            priority_lookup: priority_lookup,
-            hash_value_calculator: hash_value_calculator,
+            priority_lookup,
+            hash_value_calculator,
             quorum_sets: HashMap::new(),
             envelopes: Vec::new(),
             externalized_values: HashMap::new(),
@@ -222,7 +222,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
     } // XXX: get from KeyUtils.cpp
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        format!("{}", hex_abbrev(&value.0))
+        hex_abbrev(&value.0)
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {
@@ -373,7 +373,7 @@ impl ConsensusNotify for Rc<RefCell<TestDriver>> {
         self.borrow_mut()
             .heard_from_quorums
             .entry(slot_index)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(ballot.clone());
     }
 

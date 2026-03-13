@@ -109,20 +109,14 @@ pub enum ControlReply {
     RemoveKnownQSet(Option<SCPQuorumSet>),
 }
 
-use rpc_driver::ClientHandle;
-
 #[async_trait]
 impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
-    async fn scp_control_null(
-        &self,
-        _: &Arc<ClientHandle>,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_control_nominate(
         &self,
-        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
         value: SCPValue,
         prev_value: SCPValue,
@@ -132,7 +126,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_stop_nomination(
         &self,
-        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -149,7 +142,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_update_local_quorum_set(
         &self,
-        _: &Arc<ClientHandle>,
         qset: SCPQuorumSet,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -166,7 +158,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_received_envelope(
         &self,
-        _: &Arc<ClientHandle>,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.control_received_envelope(env).await
@@ -174,7 +165,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_set_qset(
         &self,
-        _: &Arc<ClientHandle>,
         qset: SCPQuorumSet,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
         self.control_set_qset(qset).await
@@ -182,7 +172,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_get_qset(
         &self,
-        _: &Arc<ClientHandle>,
         qhash: SCPHash,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
@@ -199,7 +188,6 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     async fn scp_control_remove_qset(
         &self,
-        _: &Arc<ClientHandle>,
         qhash: SCPHash,
     ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;

@@ -1,7 +1,7 @@
 use clap::Parser;
 use core::net::SocketAddr;
 use futures::future;
-use rpc_driver::{RpcServer, connect_client, server_state::ServiceMap};
+use rpc_driver::{RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
 use tokio::net::TcpListener;
 use tracing::info;

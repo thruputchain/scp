@@ -70,20 +70,14 @@ impl TestHandler {
     }
 }
 
-use rpc_driver::ClientHandle;
-
 #[async_trait]
 impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
-    async fn scp_handle_null(
-        &self,
-        _: &Arc<ClientHandle>,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    async fn scp_handle_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_get_quorum_set(
         &self,
-        _: &Arc<ClientHandle>,
         h: SCPHash,
     ) -> Result<Option<SCPQuorumSet>, ::rpc_driver::ProgramError> {
         Ok(self.0.lock().await.quorum_sets.get(&h).cloned())
@@ -91,7 +85,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_emit_envelope(
         &self,
-        _: &Arc<ClientHandle>,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         println!(
@@ -107,7 +100,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_validate_ballot_value(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
@@ -116,7 +108,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_validate_nomination_value(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
@@ -125,7 +116,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_extract_valid_value(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
@@ -134,7 +124,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_combine_candidates(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         mut values: SCPValues,
     ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
@@ -148,7 +137,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_value_externalized(
         &self,
-        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -179,7 +167,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_nominating_value(
         &self,
-        _: &Arc<ClientHandle>,
         slot_index: SCPSlotIndex,
         value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -192,7 +179,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_updated_candidate_value(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -201,7 +187,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_started_ballot_proto(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -210,7 +195,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_accepted_ballot_prepared(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -219,7 +203,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_confirmed_ballot_prepared(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -228,7 +211,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_accepted_commit(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {
@@ -237,7 +219,6 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
 
     async fn scp_handle_ballot_did_hear_from_quorum(
         &self,
-        _: &Arc<ClientHandle>,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
     ) -> Result<(), ::rpc_driver::ProgramError> {

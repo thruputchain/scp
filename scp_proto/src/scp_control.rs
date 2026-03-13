@@ -1,7 +1,7 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: 2696fbbb9386179cc9913c691fce5654f491da71
+// Generated from xdrc commit: 7c72a5c64359279353bd0bdc336ae3445bb71e5e
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -30,22 +30,22 @@ use ::serde_arrays;
 #[allow(non_camel_case_types)]
 #[async_trait::async_trait]
 pub trait SCP_Control_SCP_Control1: Send + Sync {    
-    async fn scp_control_null(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>) -> Result<(), ::rpc_driver::ProgramError>;
+    async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError>;
         // arguments: slot index, value to nominate, previous value
 
-    async fn scp_control_nominate(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPSlotIndex, arg1 : SCPValue, arg2 : SCPValue) -> Result<bool, ::rpc_driver::ProgramError>;
+    async fn scp_control_nominate(&self, arg0 : SCPSlotIndex, arg1 : SCPValue, arg2 : SCPValue) -> Result<bool, ::rpc_driver::ProgramError>;
     
-    async fn scp_control_stop_nomination(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPSlotIndex) -> Result<(), ::rpc_driver::ProgramError>;
+    async fn scp_control_stop_nomination(&self, arg0 : SCPSlotIndex) -> Result<(), ::rpc_driver::ProgramError>;
     
-    async fn scp_control_update_local_quorum_set(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPQuorumSet) -> Result<(), ::rpc_driver::ProgramError>;
+    async fn scp_control_update_local_quorum_set(&self, arg0 : SCPQuorumSet) -> Result<(), ::rpc_driver::ProgramError>;
     
-    async fn scp_control_received_envelope(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPEnvelope) -> Result<(), ::rpc_driver::ProgramError>;
+    async fn scp_control_received_envelope(&self, arg0 : SCPEnvelope) -> Result<(), ::rpc_driver::ProgramError>;
     
-    async fn scp_control_set_qset(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPQuorumSet) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
+    async fn scp_control_set_qset(&self, arg0 : SCPQuorumSet) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
     
-    async fn scp_control_get_qset(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
+    async fn scp_control_get_qset(&self, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
     
-    async fn scp_control_remove_qset(&self, client: &::std::sync::Arc<::rpc_driver::ClientHandle>, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
+    async fn scp_control_remove_qset(&self, arg0 : SCPHash) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError>;
 }
 
 
@@ -61,66 +61,66 @@ impl SCP_Control_SCP_Control1_Dispatcher {
 }
 
 #[async_trait::async_trait]
-impl ::rpc_driver::ServerDispatch for SCP_Control_SCP_Control1_Dispatcher {
+impl ::rpc_driver::handler::RpcHandler for SCP_Control_SCP_Control1_Dispatcher {
     fn prog_vers(&self) -> ::rpc_driver::ProgVers {
         ::rpc_driver::ProgVers::new(0x9aa93003, 1)
     }
-    async fn dispatch(&self, proc: u32, data: &[u8], client: &::std::sync::Arc<::rpc_driver::ClientHandle>) -> Result<Vec<u8>, ::rpc_driver::RpcError> {
+    async fn dispatch(&self, proc: u32, data: &[u8]) -> Result<Vec<u8>, ::rpc_driver::RpcError> {
         match proc {
             // scp_control_null
             0 => {
                 let args: () =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_null(client).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_null().await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_nominate
             10 => {
                 let args: (SCPSlotIndex, SCPValue, SCPValue, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_nominate(client, args.0, args.1, args.2).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_nominate(args.0, args.1, args.2).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_stop_nomination
             20 => {
                 let args: (SCPSlotIndex, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_stop_nomination(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_stop_nomination(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_update_local_quorum_set
             100 => {
                 let args: (SCPQuorumSet, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_update_local_quorum_set(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_update_local_quorum_set(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_received_envelope
             200 => {
                 let args: (SCPEnvelope, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_received_envelope(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_received_envelope(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_set_qset
             300 => {
                 let args: (SCPQuorumSet, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_set_qset(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_set_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_get_qset
             301 => {
                 let args: (SCPHash, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_get_qset(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_get_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             // scp_control_remove_qset
             302 => {
                 let args: (SCPHash, ) =
                     xdrs::txs::decode(data).map_err(|_| ::rpc_driver::RpcError::GarbageArguments)?;
-                let res = self.inner.scp_control_remove_qset(client, args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
+                let res = self.inner.scp_control_remove_qset(args.0).await.map_err(|_| ::rpc_driver::RpcError::SystemError)?;
                 xdrs::txs::encode(&res).map_err(|_| ::rpc_driver::RpcError::SystemError)
             }
             _ => Err(::rpc_driver::RpcError::InvalidProcedure),
@@ -128,13 +128,13 @@ impl ::rpc_driver::ServerDispatch for SCP_Control_SCP_Control1_Dispatcher {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SCP_Control_SCP_Control1_Client {
-    handle: ::std::sync::Arc<::rpc_driver::ClientHandle>,
+    handle: ::std::sync::Arc<dyn ::rpc_driver::RpcSender>,
 }
 
 impl SCP_Control_SCP_Control1_Client {
-    pub fn new(handle: ::std::sync::Arc<::rpc_driver::ClientHandle>) -> Self {
+    pub fn new(handle: ::std::sync::Arc<dyn ::rpc_driver::RpcSender>) -> Self {
         Self { handle }
     }
 

@@ -584,7 +584,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1336,11 +1336,12 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "rpc_driver"
-version = "0.4.0"
+version = "0.5.0"
 source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
-checksum = "40af664113a1ca60b86d0f6d89c26726b0e349c95a2daff7ae9d98ae7eddf498"
+checksum = "94772b51829586b55f8a995f94525a3c721dc31f398b901e489c6437a1921630"
 dependencies = [
  "async-trait",
+ "libc",
  "thiserror",
  "tokio",
  "xdrs",
@@ -1393,7 +1394,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scp_kernel"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "rand",
@@ -1412,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "scp_proto"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "groundhog-serde_arrays",
@@ -1425,7 +1426,7 @@ dependencies = [
 
 [[package]]
 name = "scp_server"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "clap",
@@ -1446,7 +1447,7 @@ dependencies = [
 
 [[package]]
 name = "scp_util"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1571,7 +1572,7 @@ dependencies = [
 
 [[package]]
 name = "shfix"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "prettyplease",
  "proc-macro2",

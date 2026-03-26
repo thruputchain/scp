@@ -6342,4 +6342,148 @@ mod stellar_tests {
             test(&net_cfg);
         }
     }
+
+    // Regression test for a crash triggered by replaying envelopes on a
+    // freshly-restarted node (i.e. one whose SCP kernel state was wiped).
+    //
+    // ## Background
+    //
+    // In production the downstream crate persists SCP envelopes in a replay
+    // queue. When a node is wiped and reloaded it feeds those saved envelopes
+    // back into the SCP kernel via `received_envelope`.  Among the replayed
+    // messages are the node's *own* old envelopes from before the wipe.
+    //
+    // ## The bug
+    //
+    // Because the kernel was freshly created, `ballot_state.current` is `None`
+    // — the node has not started balloting for any slot.  However,
+    // `received_envelope` always passes `ours = false`, so the node's old
+    // PREPARE envelope (with ballot counter > 0) is recorded in
+    // `latest_envelopes` just like any peer message.
+    //
+    // When enough messages accumulate for a quorum (the node's own old PREPARE
+    // + a peer's PREPARE for the same ballot), `attempt_accept_prepared`
+    // succeeds via `federated_accept` and calls `set_accept_prepared`, which
+    // sets `ballot_state.prepared` and then calls `emit_current_state_statement`.
+    //
+    // `emit_current_state_statement` builds a self-PREPARE from current state.
+    // With `current = None` the ballot field defaults to `{ counter: 0,
+    // value: empty }`.  It then self-validates this envelope by calling
+    // `process_envelope(&self_env, true)`.  Inside `check_valid`,
+    // `is_newer_node_statement` compares the new counter-0 statement against
+    // the already-recorded counter-1 statement for the same node — it is
+    // stale, so `check_valid` returns `Invalid`.  The function treats an
+    // invalid self-generated envelope as a logic error and panics:
+    //
+    //     panic!("moved to a bad state (ballot protocol)")
+    //
+    // ## Why the fix is safe
+    //
+    // The fix is to return early from `emit_current_state_statement` when
+    // `current` is `None`.  This is safe because:
+    //
+    // 1. The statement can never be emitted to peers anyway — the existing
+    //    `can_emit` guard (`current.is_some()`) already prevents that.
+    //
+    // 2. A PREPARE with `ballot = { counter: 0, value: empty }` carries no
+    //    useful information for the network; the only non-trivial field would
+    //    be `prepared`, which is an internal bookkeeping update.
+    //
+    // 3. The internal state changes from `set_prepared` are preserved and will
+    //    be reflected in the next real statement once the node bumps its own
+    //    ballot (e.g. via `attempt_bump` or a nomination callback).
+    //
+    // 4. `check_invariants` imposes no constraints on the Prepare phase when
+    //    `current` is `None`, so no invariants are violated by skipping the
+    //    emit.
+    #[test]
+    fn test_replay_own_prepare_on_restart() {
+        let values = TestValues::default();
+        let nodes = TestNode::new_batch(3);
+
+        // 3-node quorum set with threshold 2.
+        // Any 2 nodes form a quorum; v-blocking also requires 2 nodes.
+        let mut q_set = SCPQuorumSet {
+            threshold: 2,
+            validators: VecM(vec![
+                nodes[0].node_id(),
+                nodes[1].node_id(),
+                nodes[2].node_id(),
+            ]),
+            inner_sets: VecM(vec![]),
+        };
+        normalize_qset(&mut q_set, None);
+        let qset_hash = scp_util::hash_xdr(&q_set).unwrap();
+
+        // Fresh kernel for node 0 — simulates a node that was wiped and
+        // restarted.  `current` is None; no slots have been touched.
+        let mut tk = TestKernel::new(nodes[0].node_id(), q_set.clone(), true);
+        tk.driver().store_quorum_set(&q_set);
+
+        let ballot = SCPBallot {
+            counter: 1,
+            value: values.x_value.clone(),
+        };
+
+        // --- Simulate replaying messages from the queue ---
+
+        // 1) A peer's PREPARE for ballot <1, x>.
+        //    By itself this does not form a quorum — nothing should happen.
+        let peer_prepare = make_prepare(
+            &nodes[1].secret_key,
+            qset_hash.into_inner(),
+            0, // slot index
+            ballot.clone(),
+            None, // prepared
+            0,    // n_c
+            0,    // n_h
+            None, // prepared_prime
+        )
+        .unwrap();
+
+        tk.proto().received_envelope(&peer_prepare);
+        assert_eq!(tk.driver().envelopes.len(), 0, "no envelope emitted yet");
+
+        // 2) The node's own old PREPARE from before the wipe.
+        //    Together with the peer's PREPARE this forms a quorum (2 of 3,
+        //    threshold 2), which causes `attempt_accept_prepared` to succeed.
+        //
+        //    Before the fix this panicked inside `emit_current_state_statement`
+        //    because the self-generated PREPARE (counter=0, current is None)
+        //    was stale vs. the recorded counter=1 PREPARE for the same node.
+        let own_old_prepare = make_prepare(
+            &nodes[0].secret_key,
+            qset_hash.into_inner(),
+            0,
+            ballot.clone(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .unwrap();
+
+        tk.proto().received_envelope(&own_old_prepare);
+
+        // After the fix the node must not have emitted anything — it has no
+        // current ballot so it cannot produce a valid outgoing statement.
+        assert_eq!(
+            tk.driver().envelopes.len(),
+            0,
+            "no envelope emitted — node has no current ballot"
+        );
+
+        // The node should still be able to make forward progress once it
+        // establishes its own ballot (e.g. after nomination completes).
+        assert!(
+            tk.bump_state(0, &values.x_value),
+            "bumping state must succeed"
+        );
+        // bump_state sets current and calls emit_current_state_statement,
+        // which should now succeed and emit a PREPARE.
+        assert!(
+            tk.driver().envelopes.len() >= 1,
+            "after bumping, the node emits its own PREPARE"
+        );
+    }
 }

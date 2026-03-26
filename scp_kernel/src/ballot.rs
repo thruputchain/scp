@@ -661,6 +661,28 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     #[instrument(skip_all)]
     fn emit_current_state_statement(&mut self) {
+        // During envelope replay on a freshly-restarted node, `current` may
+        // still be None while `prepared` has already been advanced by
+        // `set_accept_prepared`.  If the node's own old envelope (with a
+        // ballot counter > 0) was recorded via `received_envelope`, a PREPARE
+        // built from the current state would have ballot counter 0 — always
+        // stale compared to the recorded counter, causing the self-validation
+        // below to panic.
+        //
+        // This state (`current` is None yet the local node has a recorded
+        // envelope with counter > 0) can only arise from replay; in normal
+        // operation the node always goes through `bump_state` before reaching
+        // a non-zero counter.  Skip the emit in this case and let a
+        // subsequent `bump_state` produce the first valid statement.
+        if self.ballot_state().current.is_none() {
+            let local_node_id = self.slot_proto().local_proto().get_node_id().clone();
+            if let Some(env) = self.ballot_state().latest_envelopes.get(&local_node_id) {
+                if statement_ballot_counter(&env.statement) > 0 {
+                    return;
+                }
+            }
+        }
+
         let statement_type = match self.ballot_state().phase {
             Phase::Prepare => scp_proto::SCPStatementType::SCP_ST_PREPARE,
             Phase::Confirm => scp_proto::SCPStatementType::SCP_ST_CONFIRM,

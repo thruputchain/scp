@@ -93,5 +93,6 @@ pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
 pub fn to_str_key(pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
     match pk {
         SCPPublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+        _ => panic!("unreachable"),
     }
 }

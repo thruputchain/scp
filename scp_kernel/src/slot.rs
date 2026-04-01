@@ -115,6 +115,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 nominate.quorum_set_hash
             }
+            _ => panic!("unreachable"),
         }
     }
 
@@ -151,6 +152,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 self.driver().get_qset(&nominate.quorum_set_hash)
             }
+            _ => panic!("unreachable"),
         }
     }
 

@@ -1,7 +1,7 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: 7c72a5c64359279353bd0bdc336ae3445bb71e5e
+// Generated from xdrc commit: 3f7aa40465e2d2834a4cf154e51fc9d19cc97d83
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -29,24 +29,40 @@ use ::serde_arrays;
 // clang-format on
 
 #[derive(Serialize, Deserialize)]
+#[serde(transparent)]
 #[derive(ReadXDR, WriteXDR)]
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
-#[repr(i32)]
-pub enum SCPValidationLevel {
-    SCP_INVALID = 0 as i32,
-    SCP_MAYBE_VALID = 1 as i32,
-    SCP_FULLY_VALID = 2 as i32,
+#[repr(transparent)]
+pub struct SCPValidationLevel(pub i32);
+
+impl SCPValidationLevel {
+    pub const SCP_INVALID: Self = Self(0);
+    pub const SCP_MAYBE_VALID: Self = Self(1);
+    pub const SCP_FULLY_VALID: Self = Self(2);
 }
-impl TryFrom<i32> for SCPValidationLevel {
-    type Error = ();
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::SCP_INVALID),
-            1 => Ok(Self::SCP_MAYBE_VALID),
-            2 => Ok(Self::SCP_FULLY_VALID),
-            _ => Err(()),
+impl From<i32> for SCPValidationLevel {
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
+}
+#[cfg(feature = "std")]
+impl core::fmt::Display for SCPValidationLevel {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.0 {
+            x if x == Self::SCP_INVALID.0 => {
+                write!(f, "SCPValidationLevel::SCP_INVALID")
+            },
+            x if x == Self::SCP_MAYBE_VALID.0 => {
+                write!(f, "SCPValidationLevel::SCP_MAYBE_VALID")
+            },
+            x if x == Self::SCP_FULLY_VALID.0 => {
+                write!(f, "SCPValidationLevel::SCP_FULLY_VALID")
+            },
+            _ => {
+                write!(f, "SCPValidationLevel({})", self.0)
+            }
         }
     }
 }

@@ -38,11 +38,13 @@ pub fn verify_bytes(
 ) -> Result<(), SignatureError> {
     let ed25519_key = match public_key {
         scp_proto::SCPPublicKey::Ed25519 { ed25519 } => Some(ed25519),
+        _ => panic!("Unsupported public key type"),
     }
     .unwrap();
 
     let ed25519_signature = match signature {
         scp_proto::SCPSignature::Ed25519 { ed25519 } => Some(ed25519),
+        _ => panic!("Unsupported signature type"),
     }
     .unwrap();
 
@@ -52,6 +54,7 @@ pub fn verify_bytes(
 pub fn sign_bytes(secret_key: &scp_proto::SCPSecretKey, msg: &[u8]) -> scp_proto::SCPSignature {
     let ed25519_key = match secret_key {
         scp_proto::SCPSecretKey::Ed25519 { ed25519 } => Some(ed25519),
+        _ => panic!("Unsupported secret key type"),
     }
     .unwrap();
 

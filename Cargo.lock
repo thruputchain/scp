@@ -584,7 +584,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1336,9 +1336,9 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "rpc_driver"
-version = "0.6.0"
+version = "0.7.2"
 source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
-checksum = "ad829359ed1153c378b1bc8b0444d05bc10074f1c3b7cee8b03435d60ab465db"
+checksum = "e432646b05757e9f4655bd53971c17374e77b61dfd11bd86f2b84e0bd214b64c"
 dependencies = [
  "async-trait",
  "libc",
@@ -2244,3 +2244,19 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[patch.unused]]
+name = "groundhog-xdr"
+version = "0.6.6"
+
+[[patch.unused]]
+name = "groundhog_coordinator"
+version = "0.6.6"
+
+[[patch.unused]]
+name = "groundhog_hogx"
+version = "0.6.6"
+
+[[patch.unused]]
+name = "groundhog_scp"
+version = "0.6.6"

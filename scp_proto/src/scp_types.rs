@@ -1,7 +1,7 @@
 // -*-Rust-*-
 // Generated Code: DO NOT CHECK IN
 
-// Generated from xdrc commit: 7c72a5c64359279353bd0bdc336ae3445bb71e5e
+// Generated from xdrc commit: 3f7aa40465e2d2834a4cf154e51fc9d19cc97d83
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -97,7 +97,6 @@ impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519Signature {
         unsafe { &*ptr }
     }
 }
-
 impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
   fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
       let arr: &[u8; 64] = xdrs::read_xdr(r)?;
@@ -158,7 +157,6 @@ impl<'a> From<&'a [u8; 32]> for &'a SCPEd25519PublicKey {
         unsafe { &*ptr }
     }
 }
-
 impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
   fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
       let arr: &[u8; 32] = xdrs::read_xdr(r)?;
@@ -218,7 +216,6 @@ impl<'a> From<&'a [u8; 64]> for &'a SCPEd25519SecretKey {
         unsafe { &*ptr }
     }
 }
-
 impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
   fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
       let arr: &[u8; 64] = xdrs::read_xdr(r)?;
@@ -230,20 +227,32 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519SecretKey {
 
 
 #[derive(Serialize, Deserialize)]
+#[serde(transparent)]
 #[derive(ReadXDR, WriteXDR)]
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Copy)]
-#[repr(i32)]
-pub enum SCPCryptographicScheme {
-    Ed25519 = 0 as i32,
+#[repr(transparent)]
+pub struct SCPCryptographicScheme(pub i32);
+
+impl SCPCryptographicScheme {
+    pub const Ed25519: Self = Self(0);
 }
-impl TryFrom<i32> for SCPCryptographicScheme {
-    type Error = ();
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Ed25519),
-            _ => Err(()),
+impl From<i32> for SCPCryptographicScheme {
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
+}
+#[cfg(feature = "std")]
+impl core::fmt::Display for SCPCryptographicScheme {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.0 {
+            x if x == Self::Ed25519.0 => {
+                write!(f, "SCPCryptographicScheme::Ed25519")
+            },
+            _ => {
+                write!(f, "SCPCryptographicScheme({})", self.0)
+            }
         }
     }
 }
@@ -254,10 +263,11 @@ impl TryFrom<i32> for SCPCryptographicScheme {
 #[derive(ReadXDR, WriteXDR)]
 
 #[repr(i32)]
+#[non_exhaustive]
 pub enum SCPSignature {
     // case Ed25519:
     //   SCPEd25519Signature ed25519;
-    Ed25519 { ed25519: SCPEd25519Signature } = SCPCryptographicScheme::Ed25519 as i32,
+    Ed25519 { ed25519: SCPEd25519Signature } = SCPCryptographicScheme::Ed25519.0 as i32,
     
 }
 
@@ -266,10 +276,11 @@ pub enum SCPSignature {
 #[derive(ReadXDR, WriteXDR)]
 
 #[repr(i32)]
+#[non_exhaustive]
 pub enum SCPPublicKey {
     // case Ed25519:
     //   SCPEd25519PublicKey ed25519;
-    Ed25519 { ed25519: SCPEd25519PublicKey } = SCPCryptographicScheme::Ed25519 as i32,
+    Ed25519 { ed25519: SCPEd25519PublicKey } = SCPCryptographicScheme::Ed25519.0 as i32,
     
 }
 
@@ -278,10 +289,11 @@ pub enum SCPPublicKey {
 #[derive(ReadXDR, WriteXDR)]
 
 #[repr(i32)]
+#[non_exhaustive]
 pub enum SCPSecretKey {
     // case Ed25519:
     //   SCPEd25519SecretKey ed25519;
-    Ed25519 { ed25519: SCPEd25519SecretKey } = SCPCryptographicScheme::Ed25519 as i32,
+    Ed25519 { ed25519: SCPEd25519SecretKey } = SCPCryptographicScheme::Ed25519.0 as i32,
     
 }
 
@@ -335,7 +347,6 @@ impl<'a> From<&'a [u8; 32]> for &'a SCPSHA256Hash {
         unsafe { &*ptr }
     }
 }
-
 impl<'r> ReadXDR<'r> for &'r SCPSHA256Hash {
   fn read_xdr<R: xdrs::Reader<'r>>(r: &mut R) -> xdrs::ReadResult<Self> {
       let arr: &[u8; 32] = xdrs::read_xdr(r)?;
@@ -352,28 +363,28 @@ impl<'r> ReadXDR<'r> for &'r SCPSHA256Hash {
 //
 
 impl SCPSignature {
-    pub fn scheme(&self) -> i32 {
+    pub fn scheme(&self) -> SCPCryptographicScheme {
         match self {
             
-            _ => unsafe { *(self as *const Self as *const i32) },
+            _ => (unsafe { *(self as *const Self as *const i32) }).into(),
         }
     }
 }
 
 impl SCPPublicKey {
-    pub fn scheme(&self) -> i32 {
+    pub fn scheme(&self) -> SCPCryptographicScheme {
         match self {
             
-            _ => unsafe { *(self as *const Self as *const i32) },
+            _ => (unsafe { *(self as *const Self as *const i32) }).into(),
         }
     }
 }
 
 impl SCPSecretKey {
-    pub fn scheme(&self) -> i32 {
+    pub fn scheme(&self) -> SCPCryptographicScheme {
         match self {
             
-            _ => unsafe { *(self as *const Self as *const i32) },
+            _ => (unsafe { *(self as *const Self as *const i32) }).into(),
         }
     }
 }

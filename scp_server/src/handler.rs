@@ -382,7 +382,7 @@ struct HandleKernelState {
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
     //
-    highest_externalized: Option<SlotIndex>,
+    lowest_non_externalized_slot: SlotIndex,
 }
 
 impl fmt::Debug for HandleKernelState {
@@ -437,7 +437,7 @@ impl HandleKernel {
             validated_values: HashMap::new(),
             known_qsets: HashMap::new(),
             tx_switch_timer,
-            highest_externalized: None,
+            lowest_non_externalized_slot: 0,
         })))
     }
 
@@ -496,20 +496,18 @@ impl HandleKernel {
     }
 
     pub fn is_above_highest_externalized(&self, slot_index: SlotIndex) -> bool {
-        if let Some(highest) = self.lock().highest_externalized {
-            slot_index > highest
-        } else {
-            true
-        }
+        slot_index >= self.lock().lowest_non_externalized_slot
     }
 
-    pub fn update_highest_externalized(&self, slot_index: SlotIndex) {
+    pub fn update_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
-        if let Some(old_highest) = lk.highest_externalized {
-            lk.highest_externalized = Some(std::cmp::max(slot_index, old_highest))
-        } else {
-            lk.highest_externalized = Some(slot_index)
-        }
+        lk.lowest_non_externalized_slot =
+            std::cmp::max(slot_index, lk.lowest_non_externalized_slot);
+    }
+
+    pub fn set_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
+        let mut lk = self.lock_mut();
+        lk.lowest_non_externalized_slot = slot_index;
     }
 }
 
@@ -583,7 +581,7 @@ impl ConsensusNotify for HandleKernel {
             .send(SwitchTimer::SlotExternalized(slot_index))
             .unwrap();
 
-        self.update_highest_externalized(slot_index);
+        self.update_lowest_non_externalized_slot(slot_index + 1);
         self.purge_cached_validations(slot_index);
 
         self.lock()
@@ -759,6 +757,7 @@ impl Driver for HandleKernel {
                     hex_abbrev(&ed25519.into_inner()[..])
                 }
             }
+            _ => panic!("unreachable"),
         }
     }
 
@@ -895,5 +894,6 @@ fn to_validation_level(x: scp_proto::SCPValidationLevel) -> ValidationLevel {
         SCPValidationLevel::SCP_INVALID => ValidationLevel::Invalid,
         SCPValidationLevel::SCP_MAYBE_VALID => ValidationLevel::MaybeValid,
         SCPValidationLevel::SCP_FULLY_VALID => ValidationLevel::FullyValid,
+        _ => panic!("unreachable"),
     }
 }

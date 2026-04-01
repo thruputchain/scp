@@ -87,6 +87,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
 
                 result.push('}');
             }
+            _ => panic!("unreachable"),
         }
 
         result.push_str(" }");

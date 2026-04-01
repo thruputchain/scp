@@ -106,9 +106,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     ) -> bool {
         if discriminant(&older.pledges) != discriminant(&newer.pledges) {
             older.pledges.stmt_type() < newer.pledges.stmt_type()
-        } else if newer.pledges.stmt_type()
-            == scp_proto::SCPStatementType::SCP_ST_EXTERNALIZE as i32
-        {
+        } else if newer.pledges.stmt_type() == scp_proto::SCPStatementType::SCP_ST_EXTERNALIZE {
             false
         } else {
             match (&older.pledges, &newer.pledges) {
@@ -364,6 +362,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: _ } => {
                 panic!("unreachable");
             }
+            _ => panic!("unreachable"),
         }
     }
 
@@ -630,6 +629,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             scp_proto::SCPStatementType::SCP_ST_NOMINATE => {
                 panic!("create_statement should not be called with SCP_ST_NOMINATE");
             }
+
+            _ => panic!("unreachable"),
         };
 
         scp_proto::SCPStatement {
@@ -749,6 +750,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                 panic!("getPrepareCandidates should not be called with SCP_ST_NOMINATE");
             }
+            _ => panic!("unreachable"),
         }
 
         let mut candidates = HashSet::new();
@@ -802,6 +804,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
                     scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                         panic!("bug");
                     }
+                    _ => panic!("unreachable"),
                 }
             }
         }
@@ -853,6 +856,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                 panic!("bug");
             }
+            _ => panic!("unreachable"),
         }
     }
 

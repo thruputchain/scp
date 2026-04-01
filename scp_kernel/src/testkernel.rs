@@ -214,6 +214,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
     fn to_str_key(&self, pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
         match pk {
             scp_proto::SCPPublicKey::Ed25519 { ed25519 } => hex_abbrev(&ed25519.into_inner()[..]),
+            _ => panic!("unreachable"),
         }
     }
 

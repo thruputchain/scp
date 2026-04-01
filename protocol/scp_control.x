@@ -21,6 +21,8 @@ program SCP_Control
     SCPOptQuorumSet scp_control_set_qset(SCPQuorumSet) = 300;
     SCPOptQuorumSet scp_control_get_qset(SCPHash) = 301;
     SCPOptQuorumSet scp_control_remove_qset(SCPHash) = 302;
+
+    void scp_control_set_lowest_non_externalized_slot(SCPSlotIndex) = 400;
   }
   = 1;
 }

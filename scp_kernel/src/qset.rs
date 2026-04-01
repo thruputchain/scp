@@ -153,6 +153,7 @@ pub fn compare_public_key(l: &scp_proto::SCPPublicKey, r: &scp_proto::SCPPublicK
             scp_proto::SCPPublicKey::Ed25519 { ed25519: l_key },
             scp_proto::SCPPublicKey::Ed25519 { ed25519: r_key },
         ) => l_key.as_ref().cmp(r_key.as_ref()),
+        _ => panic!("unreachable"),
     }
 }
 

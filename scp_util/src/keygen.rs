@@ -29,6 +29,7 @@ pub fn derive_public_key(secret_key: &scp_proto::SCPSecretKey) -> scp_proto::SCP
                 ed25519: scp_proto::SCPEd25519PublicKey::from(public_bytes),
             }
         }
+        _ => panic!("Unsupported secret key type"),
     }
 }
 

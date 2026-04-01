@@ -97,6 +97,7 @@ pub enum ControlRequest {
     SetKnownQSet(SCPQuorumSet),
     GetKnownQSet(SCPHash),
     RemoveKnownQSet(SCPHash),
+    SetLowestNonExternalizedSlot(SCPSlotIndex),
 }
 
 pub enum ControlReply {
@@ -107,6 +108,7 @@ pub enum ControlReply {
     SetKnownQSet(Option<SCPQuorumSet>),
     GetKnownQSet(Option<SCPQuorumSet>),
     RemoveKnownQSet(Option<SCPQuorumSet>),
+    SetLowestNonExternalizedSlot(),
 }
 
 #[async_trait]
@@ -197,6 +199,22 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .unwrap();
         if let ControlReply::RemoveKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
             Ok(optq)
+        } else {
+            panic!("bug")
+        }
+    }
+
+    async fn scp_control_set_lowest_non_externalized_slot(
+        &self,
+        slot_index: SCPSlotIndex,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::SetLowestNonExternalizedSlot(slot_index))
+            .await
+            .unwrap();
+        if let ControlReply::SetLowestNonExternalizedSlot() = x.rx_reply.recv().await.unwrap() {
+            Ok(())
         } else {
             panic!("bug")
         }
@@ -530,6 +548,12 @@ impl ControlKernel {
                 let optq = self.handler.remove_known_qset(&qhash);
                 self.tx_reply
                     .blocking_send(ControlReply::RemoveKnownQSet(optq))
+                    .unwrap()
+            }
+            ControlRequest::SetLowestNonExternalizedSlot(slot_index) => {
+                self.handler.set_lowest_non_externalized_slot(slot_index);
+                self.tx_reply
+                    .blocking_send(ControlReply::SetLowestNonExternalizedSlot())
                     .unwrap()
             }
         }

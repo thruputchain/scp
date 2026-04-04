@@ -20,7 +20,10 @@ pub async fn start_server(
     is_validator: bool,
 ) -> SocketAddr {
     let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
-        connect_client(&handler_sockaddr).await.unwrap(),
+        connect_client(&handler_sockaddr)
+            .await
+            .unwrap()
+            .into_handle(),
     );
     let control_service = start_service(handle_client, cfg, secret_key, is_validator).await;
     start_control_server(&bind_controller_sockaddr, control_service).await

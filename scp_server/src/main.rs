@@ -97,7 +97,10 @@ async fn main() {
 
     let handle_socket_addr: SocketAddr = args.handle_addr.parse().unwrap();
     let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
-        connect_client(&handle_socket_addr).await.unwrap(),
+        connect_client(&handle_socket_addr)
+            .await
+            .unwrap()
+            .into_handle(),
     );
 
     // create server

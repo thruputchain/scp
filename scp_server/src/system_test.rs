@@ -258,17 +258,26 @@ async fn five() {
 
     // let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
     let client0 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
-        connect_client(&handler0_sockaddr).await.unwrap(),
+        connect_client(&handler0_sockaddr)
+            .await
+            .unwrap()
+            .into_handle(),
     );
 
     // let handler1_sockaddr: SocketAddr = "localhost:7771".parse().unwrap();
     let client1 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
-        connect_client(&handler1_sockaddr).await.unwrap(),
+        connect_client(&handler1_sockaddr)
+            .await
+            .unwrap()
+            .into_handle(),
     );
 
     // let handler2_sockaddr: SocketAddr = "localhost:7772".parse().unwrap();
     let client2 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
-        connect_client(&handler2_sockaddr).await.unwrap(),
+        connect_client(&handler2_sockaddr)
+            .await
+            .unwrap()
+            .into_handle(),
     );
 
     // secret keys

@@ -64,7 +64,10 @@ struct Args {
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
+        .with_span_events(
+            tracing_subscriber::fmt::format::FmtSpan::NEW
+                | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+        )
         .event_format(tracing_subscriber::fmt::format())
         // .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
         .with_target(false)

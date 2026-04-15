@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
@@ -134,23 +133,6 @@ impl ValidateClient {
 
 // HandleClient
 
-static HANDLE_CLIENT_REQUEST_LOG_ID: AtomicU64 = AtomicU64::new(1);
-
-struct HandleClientRequestLogGuard {
-    request_id: u64,
-    request_kind: &'static str,
-}
-
-impl Drop for HandleClientRequestLogGuard {
-    fn drop(&mut self) {
-        info!(
-            request_id = self.request_id,
-            request_kind = self.request_kind,
-            "handle_client.handle_request.finish",
-        );
-    }
-}
-
 pub struct HandleClient {
     rx_request: Receiver<HandleRequest>,
     tx_reply: Sender<HandleReply>,
@@ -170,32 +152,12 @@ impl HandleClient {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(
+        name = "handle_client.handle_request",
+        skip(self, req),
+        fields(request_kind = %req.kind())
+    )]
     async fn handle_request(&self, req: HandleRequest) {
-        let request_id = HANDLE_CLIENT_REQUEST_LOG_ID.fetch_add(1, Ordering::Relaxed);
-        let request_kind = match &req {
-            HandleRequest::EmitEnvelope(..) => "EmitEnvelope",
-            HandleRequest::ExtractValidValue(..) => "ExtractValidValue",
-            HandleRequest::CombineCandidates(..) => "CombineCandidates",
-            HandleRequest::GetQuorumSet(..) => "GetQuorumSet",
-            HandleRequest::ValueExternalized(..) => "ValueExternalized",
-            HandleRequest::StartedBallotProto(..) => "StartedBallotProto",
-            HandleRequest::AcceptedBallotPrepared(..) => "AcceptedBallotPrepared",
-            HandleRequest::ConfirmedBallotPrepared(..) => "ConfirmedBallotPrepared",
-            HandleRequest::AcceptedCommit(..) => "AcceptedCommit",
-            HandleRequest::BallotDidHearFromQuorum(..) => "BallotDidHearFromQuorum",
-            HandleRequest::NominatingValue(..) => "NominatingValue",
-            HandleRequest::UpdatedCandidateValue(..) => "UpdatedCandidateValue",
-        };
-        info!(
-            request_id = request_id,
-            request_kind = request_kind,
-            "handle_client.handle_request.start",
-        );
-        let _request_log_guard = HandleClientRequestLogGuard {
-            request_id,
-            request_kind,
-        };
         match req {
             HandleRequest::EmitEnvelope(env) => {
                 self.scp_handle
@@ -381,6 +343,25 @@ pub enum HandleRequest {
     NominatingValue(SlotIndex, SCPValue),
     #[allow(dead_code)]
     UpdatedCandidateValue(SlotIndex, SCPValue),
+}
+
+impl HandleRequest {
+    fn kind(&self) -> &'static str {
+        match self {
+            HandleRequest::EmitEnvelope(..) => "EmitEnvelope",
+            HandleRequest::ExtractValidValue(..) => "ExtractValidValue",
+            HandleRequest::CombineCandidates(..) => "CombineCandidates",
+            HandleRequest::GetQuorumSet(..) => "GetQuorumSet",
+            HandleRequest::ValueExternalized(..) => "ValueExternalized",
+            HandleRequest::StartedBallotProto(..) => "StartedBallotProto",
+            HandleRequest::AcceptedBallotPrepared(..) => "AcceptedBallotPrepared",
+            HandleRequest::ConfirmedBallotPrepared(..) => "ConfirmedBallotPrepared",
+            HandleRequest::AcceptedCommit(..) => "AcceptedCommit",
+            HandleRequest::BallotDidHearFromQuorum(..) => "BallotDidHearFromQuorum",
+            HandleRequest::NominatingValue(..) => "NominatingValue",
+            HandleRequest::UpdatedCandidateValue(..) => "UpdatedCandidateValue",
+        }
+    }
 }
 
 pub enum HandleReply {

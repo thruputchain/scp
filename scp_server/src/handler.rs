@@ -863,6 +863,7 @@ impl Driver for HandleKernel {
         if let HandleReply::EmitEnvelope() =
             self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
         {
+            info!("emitted envelope {}", self.envelope_to_str(&env));
         } else {
             panic!("bug")
         }

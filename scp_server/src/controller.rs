@@ -158,6 +158,10 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         }
     }
 
+    #[tracing::instrument(
+        skip(self, env),
+        fields(slot_index = env.statement.slot_index)
+    )]
     async fn scp_control_received_envelope(
         &self,
         env: SCPEnvelope,

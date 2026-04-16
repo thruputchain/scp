@@ -153,7 +153,6 @@ impl HandleClient {
     }
 
     #[tracing::instrument(
-        name = "handle_client.handle_request",
         skip(self, req),
         fields(request_kind = %req.kind())
     )]
@@ -225,14 +224,26 @@ impl HandleClient {
                     .unwrap();
             }
             HandleRequest::ValueExternalized(slot_index, value) => {
+                info!(
+                    "calling scp_handle_value_externalized for slot {}",
+                    slot_index,
+                );
                 self.scp_handle
                     .scp_handle_value_externalized(&slot_index, &value)
                     .await
                     .unwrap();
+                info!(
+                    "called scp_handle_value_externalized for slot {}",
+                    slot_index,
+                );
                 self.tx_reply
                     .send(HandleReply::ValueExternalized())
                     .await
                     .unwrap();
+                info!(
+                    "acked scp_handle_value_externalized for slot {}",
+                    slot_index,
+                );
             }
             HandleRequest::StartedBallotProto(slot_index, ballot) => {
                 self.scp_handle

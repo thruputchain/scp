@@ -489,7 +489,10 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         updated
     }
 
-    #[instrument(fields(slot_index=self.slot_proto().index(), ballot_counter=ballot.counter))]
+    #[instrument(
+        skip(self),
+        fields(slot_index = self.slot_proto().index(), ballot_counter = ballot.counter)
+    )]
     fn bump_to_ballot(&mut self, ballot: scp_proto::SCPBallot, check: bool) {
         trace!(
             slot_index = self.slot_proto().index(),
@@ -860,7 +863,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument(skip(voted, accepted))]
+    #[instrument(skip(self, voted, accepted))]
     fn federated_accept<F1, F2>(&self, voted: &F1, accepted: &F2) -> bool
     where
         F1: Fn(&scp_proto::SCPStatement) -> bool,
@@ -958,7 +961,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         did_work
     }
 
-    #[instrument(skip(voted))]
+    #[instrument(skip(self, voted))]
     fn federated_ratify<F>(&self, voted: F) -> bool
     where
         F: Fn(&scp_proto::SCPStatement) -> bool,

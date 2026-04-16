@@ -221,7 +221,7 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     }
 
     /// Check if filtered envelopes form a v-blocking set
-    #[instrument(skip(qset, filter))]
+    #[instrument(skip(qset, envs, filter))]
     pub fn is_vblocking_envelopes<F>(
         qset: &scp_proto::SCPQuorumSet,
         envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,

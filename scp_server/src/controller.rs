@@ -323,6 +323,7 @@ impl ControlKernel {
         rx
     }
 
+    #[tracing::instrument(skip_all)]
     fn flush_timer_switches(&mut self) {
         loop {
             match self.rx_switch_timer.try_recv() {

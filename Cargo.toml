@@ -29,4 +29,5 @@ xdrs = { registry = "groundhog", version = "0.5.0", features = [
     "alloc",
 ] }
 xdr-common = { version = "0.5.0", registry = "groundhog", features = ["alloc"] }
-rpc_driver = { version = "0.8.0", registry = "groundhog" }
+# rpc_driver = { version = "0.8.0", registry = "groundhog" }
+rpc_driver = { git = "https://github.com/groundhogchain/xdr_rpc", branch = "petar/xxx", package = "rpc_driver" }

@@ -1337,8 +1337,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 [[package]]
 name = "rpc_driver"
 version = "0.8.0"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
-checksum = "94230b9c2a75c447cad1171efcfed9748e16e05820cefaea6b7a5283ce047fc6"
+source = "git+https://github.com/groundhogchain/xdr_rpc?branch=petar%2Fxxx#a1b262383037c33bd5aeafdad24cb714070cd098"
 dependencies = [
  "async-trait",
  "libc",

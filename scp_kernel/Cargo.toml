@@ -27,7 +27,7 @@ tokio-util = "0.7"
 tracing = "0.1"
 sha2 = "0.10"
 thiserror = "2.0"
-rand = "0.8"
+rand = "0.9.3"
 xdr-common = { workspace = true }
 
 [dev-dependencies]

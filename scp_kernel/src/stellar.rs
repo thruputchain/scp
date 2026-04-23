@@ -407,15 +407,6 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         }
     }
 
-    pub fn set_state_from_envelope(
-        &mut self,
-        slot_index: SlotIndex,
-        envelope: &scp_proto::SCPEnvelope,
-    ) {
-        let mut slot = self.slot_proto_or_create(slot_index);
-        slot.set_state_from_envelope(envelope);
-    }
-
     pub fn empty(&self) -> bool {
         self.state.known_slots.is_empty()
     }
@@ -563,5 +554,14 @@ impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
                 }
             }
         }
+    }
+
+    fn set_state_from_envelope(
+        &mut self,
+        slot_index: SlotIndex,
+        envelope: &scp_proto::SCPEnvelope,
+    ) {
+        let mut slot = self.slot_proto_or_create(slot_index);
+        slot.set_state_from_envelope(envelope);
     }
 }

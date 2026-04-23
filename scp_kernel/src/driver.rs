@@ -90,6 +90,7 @@ pub trait Driver: Clone + Debug {
 pub trait DriverCb {
     fn received_envelope(&mut self, env: &scp_proto::SCPEnvelope);
     fn driver_calling_back(&mut self, cb: DriverCallback);
+    fn set_state_from_envelope(&mut self, slot_index: SlotIndex, envelope: &scp_proto::SCPEnvelope);
 }
 
 // values used to switch hash function between priority and neighborhood checks

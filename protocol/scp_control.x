@@ -17,6 +17,7 @@ program SCP_Control
     void scp_control_update_local_quorum_set(SCPQuorumSet) = 100;
 
     void scp_control_received_envelope(SCPEnvelope) = 200;
+    void scp_control_set_state_from_envelope(SCPSlotIndex, SCPEnvelope) = 201;
 
     SCPOptQuorumSet scp_control_set_qset(SCPQuorumSet) = 300;
     SCPOptQuorumSet scp_control_get_qset(SCPHash) = 301;

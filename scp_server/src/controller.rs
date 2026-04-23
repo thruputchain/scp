@@ -86,6 +86,23 @@ impl ControlService {
             panic!("bug")
         }
     }
+
+    pub async fn set_state_from_envelope(
+        &self,
+        slot_index: SCPSlotIndex,
+        env: SCPEnvelope,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        let mut x = self.lock_mut().await;
+        x.tx_request
+            .send(ControlRequest::SetStateFromEnvelope(slot_index, env))
+            .await
+            .unwrap();
+        if let ControlReply::SetStateFromEnvelope() = x.rx_reply.recv().await.unwrap() {
+            Ok(())
+        } else {
+            panic!("bug")
+        }
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -94,6 +111,7 @@ pub enum ControlRequest {
     StopNomination(SCPSlotIndex),
     UpdateLocalQuorumSet(SCPQuorumSet),
     ReceivedEnvelope(SCPEnvelope),
+    SetStateFromEnvelope(SCPSlotIndex, SCPEnvelope),
     SetKnownQSet(SCPQuorumSet),
     GetKnownQSet(SCPHash),
     RemoveKnownQSet(SCPHash),
@@ -105,6 +123,7 @@ pub enum ControlReply {
     StopNomination(),
     UpdateLocalQuorumSet(),
     ReceivedEnvelope(),
+    SetStateFromEnvelope(),
     SetKnownQSet(Option<SCPQuorumSet>),
     GetKnownQSet(Option<SCPQuorumSet>),
     RemoveKnownQSet(Option<SCPQuorumSet>),
@@ -167,6 +186,14 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
         self.control_received_envelope(env).await
+    }
+
+    async fn scp_control_set_state_from_envelope(
+        &self,
+        slot_index: SCPSlotIndex,
+        env: SCPEnvelope,
+    ) -> Result<(), ::rpc_driver::ProgramError> {
+        self.set_state_from_envelope(slot_index, env).await
     }
 
     async fn scp_control_set_qset(
@@ -535,6 +562,18 @@ impl ControlKernel {
                 }
                 self.tx_reply
                     .blocking_send(ControlReply::ReceivedEnvelope())
+                    .unwrap()
+            }
+            ControlRequest::SetStateFromEnvelope(slot_index, env) => {
+                info!(
+                    "control kernel setting state from envelope {}",
+                    self.kernel.proto().envelope_to_str(&env, false)
+                );
+                self.kernel
+                    .proto()
+                    .set_state_from_envelope(slot_index, &env);
+                self.tx_reply
+                    .blocking_send(ControlReply::SetStateFromEnvelope())
                     .unwrap()
             }
             ControlRequest::SetKnownQSet(qset) => {

@@ -28,6 +28,7 @@ type SCP_Control1 interface {
 	Scp_control_stop_nomination(context.Context, SCPSlotIndex) error
 	Scp_control_update_local_quorum_set(context.Context, SCPQuorumSet) error
 	Scp_control_received_envelope(context.Context, SCPEnvelope) error
+	Scp_control_set_state_from_envelope(context.Context, SCPSlotIndex, SCPEnvelope) error
 	Scp_control_set_qset(context.Context, SCPQuorumSet) (SCPOptQuorumSet, error)
 	Scp_control_get_qset(context.Context, SCPHash) (SCPOptQuorumSet, error)
 	Scp_control_remove_qset(context.Context, SCPHash) (SCPOptQuorumSet, error)
@@ -495,6 +496,71 @@ func (p *xdrSrvProc_Scp_control_received_envelope) Do() {
 }
 var _ XdrSrvProc = &xdrSrvProc_Scp_control_received_envelope{} // XXX
 
+type xdrProcArg_Scp_control_set_state_from_envelope struct {
+	a1 *SCPSlotIndex
+	a2 *SCPEnvelope
+}
+func (v *xdrProcArg_Scp_control_set_state_from_envelope) XdrPointer() interface{} { return v }
+func (xdrProcArg_Scp_control_set_state_from_envelope) XdrTypeName() string { return "xdrProcArg_Scp_control_set_state_from_envelope" }
+func (v xdrProcArg_Scp_control_set_state_from_envelope) XdrValue() interface{} { return v }
+func (v *xdrProcArg_Scp_control_set_state_from_envelope) XdrMarshal(x XDR, name string) { x.Marshal(name, v) }
+func (v *xdrProcArg_Scp_control_set_state_from_envelope) XdrRecurse(x XDR, name string) {
+	if name != "" {
+		name = x.Sprintf("%s.", name)
+	}
+	if v.a1 == nil { v.a1 = new(SCPSlotIndex) }
+	XDR_SCPSlotIndex(v.a1).XdrMarshal(x, x.Sprintf("%sa1", name))
+	if v.a2 == nil { v.a2 = new(SCPEnvelope) }
+	XDR_SCPEnvelope(v.a2).XdrMarshal(x, x.Sprintf("%sa2", name))
+}
+func XDR_xdrProcArg_Scp_control_set_state_from_envelope(v *xdrProcArg_Scp_control_set_state_from_envelope) *xdrProcArg_Scp_control_set_state_from_envelope { return v }
+var _ XdrType = &xdrProcArg_Scp_control_set_state_from_envelope{} // XXX
+
+type xdrProc_Scp_control_set_state_from_envelope struct {
+	Arg *xdrProcArg_Scp_control_set_state_from_envelope
+	Res *XdrVoid
+}
+func (xdrProc_Scp_control_set_state_from_envelope) Prog() uint32 { return 2594779139 }
+func (xdrProc_Scp_control_set_state_from_envelope) Vers() uint32 { return 1 }
+func (xdrProc_Scp_control_set_state_from_envelope) Proc() uint32 { return 201 }
+func (xdrProc_Scp_control_set_state_from_envelope) ProgName() string { return "SCP_Control" }
+func (xdrProc_Scp_control_set_state_from_envelope) VersName() string { return "SCP_Control1" }
+func (xdrProc_Scp_control_set_state_from_envelope) ProcName() string { return "scp_control_set_state_from_envelope" }
+func (p *xdrProc_Scp_control_set_state_from_envelope) GetArg() XdrType {
+	if p.Arg == nil {
+		p.Arg = new(xdrProcArg_Scp_control_set_state_from_envelope)
+	}
+	return XDR_xdrProcArg_Scp_control_set_state_from_envelope(p.Arg)
+}
+func (p *xdrProc_Scp_control_set_state_from_envelope) GetRes() XdrType {
+	if p.Res == nil {
+		p.Res = new(XdrVoid)
+	}
+	return XDR_XdrVoid(p.Res)
+}
+var _ XdrProc = &xdrProc_Scp_control_set_state_from_envelope{} // XXX
+
+type xdrSrvProc_Scp_control_set_state_from_envelope struct {
+	xdrProc_Scp_control_set_state_from_envelope
+	Srv SCP_Control1
+	Ctx context.Context
+}
+func (p *xdrSrvProc_Scp_control_set_state_from_envelope) SetContext(ctx context.Context) {
+	if wc, ok := p.Srv.(interface {
+		WithContext(context.Context) SCP_Control1
+	}); ok {
+		p.Srv = wc.WithContext(ctx)
+	}
+	p.Ctx = ctx
+}
+func (p *xdrSrvProc_Scp_control_set_state_from_envelope) Do() {
+	err := p.Srv.Scp_control_set_state_from_envelope(p.Ctx, *p.Arg.a1, *p.Arg.a2)
+	if err != nil {
+		panic(err)
+	}
+}
+var _ XdrSrvProc = &xdrSrvProc_Scp_control_set_state_from_envelope{} // XXX
+
 type xdrProc_Scp_control_set_qset struct {
 	Arg *SCPQuorumSet
 	Res *SCPOptQuorumSet
@@ -694,6 +760,8 @@ func init() {
 			return &xdrProc_Scp_control_update_local_quorum_set{}
 		case 200:
 			return &xdrProc_Scp_control_received_envelope{}
+		case 201:
+			return &xdrProc_Scp_control_set_state_from_envelope{}
 		case 300:
 			return &xdrProc_Scp_control_set_qset{}
 		case 301:
@@ -726,6 +794,8 @@ func (s SCP_Control1_Server) GetProc(p uint32) XdrSrvProc {
 		return &xdrSrvProc_Scp_control_update_local_quorum_set{ Srv: s.Srv }
 	case 200:  // scp_control_received_envelope
 		return &xdrSrvProc_Scp_control_received_envelope{ Srv: s.Srv }
+	case 201:  // scp_control_set_state_from_envelope
+		return &xdrSrvProc_Scp_control_set_state_from_envelope{ Srv: s.Srv }
 	case 300:  // scp_control_set_qset
 		return &xdrSrvProc_Scp_control_set_qset{ Srv: s.Srv }
 	case 301:  // scp_control_get_qset
@@ -786,6 +856,16 @@ func (c SCP_Control1_Client) Scp_control_update_local_quorum_set(ctx context.Con
 func (c SCP_Control1_Client) Scp_control_received_envelope(ctx context.Context, a1 SCPEnvelope) error {
 	var proc xdrProc_Scp_control_received_envelope
 	proc.Arg = &a1
+	if err := c.Send.SendCall(ctx, &proc); err != nil {
+		return err
+	}
+	return nil
+}
+func (c SCP_Control1_Client) Scp_control_set_state_from_envelope(ctx context.Context, a1 SCPSlotIndex, a2 SCPEnvelope) error {
+	var proc xdrProc_Scp_control_set_state_from_envelope
+	proc.GetArg()
+	proc.Arg.a1 = &a1
+	proc.Arg.a2 = &a2
 	if err := c.Send.SendCall(ctx, &proc); err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 use clap::Parser;
 use core::net::SocketAddr;
 use futures::future;
-use rpc_driver::{RpcServer, ServiceMap, connect_client};
+use rpc_driver::{ConnectionConfig, RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
 use tokio::net::TcpListener;
 use tracing::info;
@@ -123,7 +123,10 @@ async fn main() {
         scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
     ));
 
-    let control_server = RpcServer::new(control_listener, control_service_map);
+    // Cap incoming control RPC messages at 10 MiB.
+    const CONTROL_MAX_MESSAGE_SIZE: u32 = 10 * 1024 * 1024;
+    let control_config = ConnectionConfig::new(Some(CONTROL_MAX_MESSAGE_SIZE), control_service_map);
+    let control_server = RpcServer::new_with_config(control_listener, control_config);
     control_server.start().await;
 
     future::pending::<()>().await;

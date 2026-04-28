@@ -100,3 +100,14 @@ where
     let x = txs::encode(v).map_err(VerifyingError::EncodingError)?;
     verify_bytes(public_key, x.as_slice(), signature).map_err(VerifyingError::VerifyingError)
 }
+
+/// Verifies that `envelope.signature` is a valid signature over the XDR
+/// encoding of `envelope.statement` produced by the secret key matching
+/// `envelope.statement.node_id`.
+pub fn verify_envelope(envelope: &scp_proto::SCPEnvelope) -> Result<(), VerifyingError> {
+    verify_xdr(
+        &envelope.statement.node_id,
+        &envelope.statement,
+        &envelope.signature,
+    )
+}

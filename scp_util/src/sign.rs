@@ -111,3 +111,109 @@ pub fn verify_envelope(envelope: &scp_proto::SCPEnvelope) -> Result<(), Verifyin
         &envelope.signature,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::keygen::{derive_node_id, derive_public_key, generate_secret_key};
+    use xdr_common::{BytesM, VecM};
+
+    fn make_statement(node_id: scp_proto::SCPNodeID) -> scp_proto::SCPStatement {
+        scp_proto::SCPStatement {
+            node_id,
+            slot_index: 42,
+            pledges: scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                nominate: scp_proto::SCPStatementNominate {
+                    quorum_set_hash: [7u8; 32],
+                    votes: VecM(vec![BytesM(b"vote-1".to_vec())]),
+                    accepted: VecM(vec![]),
+                },
+            },
+        }
+    }
+
+    #[test]
+    fn sign_bytes_verify_bytes_roundtrip() {
+        let sk = generate_secret_key(b"sign-roundtrip");
+        let pk = derive_public_key(&sk);
+        let msg = b"the quick brown fox jumps over the lazy dog";
+        let sig = sign_bytes(&sk, msg);
+        verify_bytes(&pk, msg, &sig).expect("signature should verify");
+    }
+
+    #[test]
+    fn sign_bytes_is_deterministic_for_ed25519() {
+        let sk = generate_secret_key(b"sign-deterministic");
+        let msg = b"some payload";
+        let sig1 = sign_bytes(&sk, msg);
+        let sig2 = sign_bytes(&sk, msg);
+        let bytes1 = match &sig1 {
+            scp_proto::SCPSignature::Ed25519 { ed25519 } => ed25519,
+            _ => panic!("unexpected signature variant"),
+        };
+        let bytes2 = match &sig2 {
+            scp_proto::SCPSignature::Ed25519 { ed25519 } => ed25519,
+            _ => panic!("unexpected signature variant"),
+        };
+        assert_eq!(&bytes1[..], &bytes2[..]);
+    }
+
+    #[test]
+    fn verify_bytes_rejects_modified_message() {
+        let sk = generate_secret_key(b"sign-tamper-msg");
+        let pk = derive_public_key(&sk);
+        let sig = sign_bytes(&sk, b"original message");
+        assert!(verify_bytes(&pk, b"tampered message", &sig).is_err());
+    }
+
+    #[test]
+    fn verify_bytes_rejects_wrong_public_key() {
+        let sk1 = generate_secret_key(b"sign-key-1");
+        let sk2 = generate_secret_key(b"sign-key-2");
+        let pk2 = derive_public_key(&sk2);
+        let msg = b"hello";
+        let sig = sign_bytes(&sk1, msg);
+        assert!(verify_bytes(&pk2, msg, &sig).is_err());
+    }
+
+    #[test]
+    fn verify_envelope_roundtrip() {
+        let sk = generate_secret_key(b"envelope-roundtrip");
+        let node_id = derive_node_id(&sk);
+        let statement = make_statement(node_id);
+        let signature = sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
+        let envelope = scp_proto::SCPEnvelope {
+            statement,
+            signature,
+        };
+        verify_envelope(&envelope).expect("envelope should verify");
+    }
+
+    #[test]
+    fn verify_envelope_rejects_wrong_signer() {
+        let signer_sk = generate_secret_key(b"envelope-signer");
+        let claimed_sk = generate_secret_key(b"envelope-claimed");
+        let claimed_node_id = derive_node_id(&claimed_sk);
+        let statement = make_statement(claimed_node_id);
+        let signature = sign_xdr(&signer_sk, &statement).expect("sign_xdr should succeed");
+        let envelope = scp_proto::SCPEnvelope {
+            statement,
+            signature,
+        };
+        assert!(verify_envelope(&envelope).is_err());
+    }
+
+    #[test]
+    fn verify_envelope_rejects_tampered_statement() {
+        let sk = generate_secret_key(b"envelope-tamper");
+        let node_id = derive_node_id(&sk);
+        let statement = make_statement(node_id);
+        let signature = sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
+        let mut envelope = scp_proto::SCPEnvelope {
+            statement,
+            signature,
+        };
+        envelope.statement.slot_index += 1;
+        assert!(verify_envelope(&envelope).is_err());
+    }
+}

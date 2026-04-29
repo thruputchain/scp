@@ -61,3 +61,71 @@ pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<scp_proto::SCPSe
         ed25519: scp_proto::SCPEd25519SecretKey::from(secret_key_bytes),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn secret_bytes(sk: &scp_proto::SCPSecretKey) -> &[u8; 64] {
+        match sk {
+            scp_proto::SCPSecretKey::Ed25519 { ed25519 } => ed25519,
+            _ => panic!("unexpected secret key variant"),
+        }
+    }
+
+    fn public_bytes(pk: &scp_proto::SCPPublicKey) -> &[u8; 32] {
+        match pk {
+            scp_proto::SCPPublicKey::Ed25519 { ed25519 } => ed25519,
+            _ => panic!("unexpected public key variant"),
+        }
+    }
+
+    #[test]
+    fn generate_secret_key_is_deterministic() {
+        let sk1 = generate_secret_key(b"seed-a");
+        let sk2 = generate_secret_key(b"seed-a");
+        assert_eq!(secret_bytes(&sk1), secret_bytes(&sk2));
+    }
+
+    #[test]
+    fn generate_secret_key_differs_for_different_seeds() {
+        let sk1 = generate_secret_key(b"seed-a");
+        let sk2 = generate_secret_key(b"seed-b");
+        assert_ne!(secret_bytes(&sk1), secret_bytes(&sk2));
+    }
+
+    #[test]
+    fn generate_secret_key_embeds_matching_public_key() {
+        let sk = generate_secret_key(b"seed-roundtrip");
+        let pk = derive_public_key(&sk);
+        let sk_bytes = secret_bytes(&sk);
+        let pk_bytes = public_bytes(&pk);
+        assert_eq!(&sk_bytes[32..], &pk_bytes[..]);
+    }
+
+    #[test]
+    fn derive_public_key_is_deterministic() {
+        let sk = generate_secret_key(b"seed-derive");
+        let pk1 = derive_public_key(&sk);
+        let pk2 = derive_public_key(&sk);
+        assert_eq!(public_bytes(&pk1), public_bytes(&pk2));
+    }
+
+    #[test]
+    fn derive_public_key_differs_for_different_secrets() {
+        let sk1 = generate_secret_key(b"seed-a");
+        let sk2 = generate_secret_key(b"seed-b");
+        assert_ne!(
+            public_bytes(&derive_public_key(&sk1)),
+            public_bytes(&derive_public_key(&sk2)),
+        );
+    }
+
+    #[test]
+    fn derive_node_id_matches_derive_public_key() {
+        let sk = generate_secret_key(b"seed-node-id");
+        let pk = derive_public_key(&sk);
+        let node_id = derive_node_id(&sk);
+        assert_eq!(public_bytes(&pk), public_bytes(&node_id));
+    }
+}

@@ -223,7 +223,7 @@ impl Driver for Rc<RefCell<TestDriver>> {
     } // XXX: get from KeyUtils.cpp
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        hex_abbrev(&value.0)
+        hah(&value.0)
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {

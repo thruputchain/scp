@@ -641,7 +641,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         debug!(
             "nomination nominate, round {}, value: {}",
             self.nomination().round_number,
-            hex_abbrev(value)
+            hah(value)
         );
 
         let mut updated = false;
@@ -686,7 +686,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         {
             debug!(
                 "nomination, local node is leader, no votes yet, adding vote for value {}",
-                hex_abbrev(value)
+                hah(value)
             );
             if self.nomination_mut().votes.insert(value.clone()) {
                 updated = true;

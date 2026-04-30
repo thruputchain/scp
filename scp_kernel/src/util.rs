@@ -1,8 +1,10 @@
 use scp_proto::*;
 use xdr_common::BytesM;
 
+/// Compute the sha256 hash of the given bytes and return the abbreviated hash as a hexadecimal string.
+/// Intended for displaying scp values.
 pub fn hah(bytes: &[u8]) -> String {
-    hex_abbrev(&scp_util::hash_bytes(bytes)[..])
+    format!("hov:{}", hex_abbrev(&scp_util::hash_bytes(bytes)[..]))
 }
 
 pub fn hex_abbrev(bytes: &[u8]) -> String {

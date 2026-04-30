@@ -74,7 +74,7 @@ impl ValidateClient {
                     );
                     info!(
                         "validated nomination value {} for slot {} as {:#?}",
-                        scp_kernel::hex_abbrev(&v),
+                        scp_kernel::hah(&v),
                         slot_index,
                         r.2
                     );
@@ -566,7 +566,7 @@ impl Consensus for HandleKernel {
 
     #[tracing::instrument(
         skip(self, value),
-        fields(slot_index = slot_index, value = %scp_kernel::hex_abbrev(value))
+        fields(slot_index = slot_index, value = %scp_kernel::hah(value))
     )]
     fn validate_nomination_value(
         &self,
@@ -620,7 +620,7 @@ impl ConsensusNotify for HandleKernel {
     fn value_externalized(&self, slot_index: SlotIndex, value: &scp_proto::SCPValue) {
         info!(
             "externalizing value {} for slot {}",
-            scp_kernel::hex_abbrev(value),
+            scp_kernel::hah(value),
             slot_index
         );
         // cancel timers not above slot_index
@@ -814,8 +814,7 @@ impl Driver for HandleKernel {
     }
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        let value_hash = hash_bytes(&value.0);
-        hex_abbrev(&value_hash)
+        hah(&value.0)
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {

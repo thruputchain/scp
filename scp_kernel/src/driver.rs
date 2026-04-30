@@ -35,8 +35,8 @@ impl std::fmt::Display for DriverCallback {
                     f,
                     "Nomination{{ i: {} | X: {} | X': {} }}",
                     slot_index,
-                    hex_abbrev(value),
-                    hex_abbrev(prev_value)
+                    hah(value),
+                    hah(prev_value)
                 )
             }
         }

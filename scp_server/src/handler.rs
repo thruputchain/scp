@@ -814,7 +814,8 @@ impl Driver for HandleKernel {
     }
 
     fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
-        hex_abbrev(&value.0).to_string()
+        let value_hash = hash_bytes(&value.0);
+        hex_abbrev(&value_hash)
     }
 
     fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {

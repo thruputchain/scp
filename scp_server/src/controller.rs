@@ -523,6 +523,8 @@ impl ControlKernel {
                     .is_above_highest_externalized(env.statement.slot_index)
                     && self.kernel.proto().should_process_envelope(&env)
                 {
+                    // XXX: if the envelope is coming from us, should we forward it to set_state_from_envelope?
+
                     let slot_index = env.statement.slot_index;
                     let (nom_values, ballot_values) =
                         StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
@@ -546,6 +548,8 @@ impl ControlKernel {
                                 .is_none()
                         })
                         .collect::<Vec<_>>();
+
+                    // XXX: if the envelope is coming from us, should we cache values as fully valid?
 
                     // skip validate_envelope if no values to validate
                     if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {

@@ -505,7 +505,14 @@ impl HandleKernel {
         slot_index: SlotIndex,
         v: &scp_proto::SCPValue,
     ) -> Option<ValidationLevel> {
-        if let Some(x) = self.lock().validated_values.get(&slot_index) {
+        let state = self.lock();
+        assert!(
+            slot_index >= state.lowest_non_externalized_slot,
+            "slot_index {} is below lowest_non_externalized_slot {}",
+            slot_index,
+            state.lowest_non_externalized_slot
+        );
+        if let Some(x) = state.validated_values.get(&slot_index) {
             x.get(v).cloned()
         } else {
             None

@@ -541,12 +541,14 @@ impl HandleKernel {
         slot_index >= self.lock().lowest_non_externalized_slot
     }
 
+    #[tracing::instrument(skip(self), fields(slot_index = slot_index))]
     pub fn update_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot =
             std::cmp::max(slot_index, lk.lowest_non_externalized_slot);
     }
 
+    #[tracing::instrument(skip(self), fields(slot_index = slot_index))]
     pub fn set_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot = slot_index;
@@ -562,6 +564,10 @@ impl Consensus for HandleKernel {
         self.get_cached_validation(slot_index, value).unwrap()
     }
 
+    #[tracing::instrument(
+        skip(self, value),
+        fields(slot_index = slot_index, value = %scp_kernel::hex_abbrev(value))
+    )]
     fn validate_nomination_value(
         &self,
         slot_index: SCPSlotIndex,

@@ -1,4 +1,6 @@
-use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{
+    Digest, Sha512, Signature, SignatureError, SigningKey, VerifyingKey,
+};
 use thiserror::Error;
 use xdrs::txs;
 use xdrs::write_xdr::WriteXDR;
@@ -19,7 +21,10 @@ fn sign_bytes_ed25519(
     secret_key: &scp_proto::SCPEd25519SecretKey,
     msg: &[u8],
 ) -> scp_proto::SCPEd25519Signature {
-    let signature = signing_key_from_secret_key(secret_key).sign(msg);
+    let prehash = Sha512::new_with_prefix(msg);
+    let signature = signing_key_from_secret_key(secret_key)
+        .sign_prehashed(prehash, None)
+        .expect("sign_prehashed should not fail");
     scp_proto::SCPEd25519Signature::from(signature.to_bytes())
 }
 
@@ -28,7 +33,12 @@ fn verify_bytes_ed25519(
     msg: &[u8],
     signature: &scp_proto::SCPEd25519Signature,
 ) -> Result<(), SignatureError> {
-    verifying_key_from_public_key(public_key).verify(msg, &Signature::from_bytes(signature))
+    let prehash = Sha512::new_with_prefix(msg);
+    verifying_key_from_public_key(public_key).verify_prehashed(
+        prehash,
+        None,
+        &Signature::from_bytes(signature),
+    )
 }
 
 pub fn verify_bytes(

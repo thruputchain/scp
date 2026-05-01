@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 scp_proto = { workspace = true }
-ed25519-dalek = "3.0.0-pre.0"
+ed25519-dalek = { version = "3.0.0-pre.0", features = ["digest"] }
 thiserror = "2.0"
 sha2 = "0.10"
 base64 = "0.22"

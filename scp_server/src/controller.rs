@@ -475,8 +475,10 @@ impl ControlKernel {
     fn handle_timer_expired(&mut self, x: TimerExpired) {
         info!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);
-        self.kernel.proto().driver_calling_back(x.cb.clone());
-        self.flush_timer_switches();
+        if self.handler.is_above_highest_externalized(x.slot_index) {
+            self.kernel.proto().driver_calling_back(x.cb.clone());
+            self.flush_timer_switches();
+        }
         info!("<--- timer expired, driver called back {}", x);
     }
 

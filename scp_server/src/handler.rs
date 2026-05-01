@@ -11,7 +11,7 @@ use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
-use tracing::info;
+use tracing::{debug, info};
 use xdr_common::*;
 
 // ValidateClient
@@ -561,6 +561,11 @@ impl Consensus for HandleKernel {
         slot_index: SCPSlotIndex,
         value: &scp_proto::SCPValue,
     ) -> ValidationLevel {
+        debug!(
+            "validate_ballot_value XXX: slot_index = {}, value = {}",
+            slot_index,
+            scp_kernel::hah(value)
+        );
         self.get_cached_validation(slot_index, value).unwrap()
     }
 
@@ -573,6 +578,11 @@ impl Consensus for HandleKernel {
         slot_index: SCPSlotIndex,
         value: &scp_proto::SCPValue,
     ) -> ValidationLevel {
+        debug!(
+            "validate_nomination_value XXX: slot_index = {}, value = {}",
+            slot_index,
+            scp_kernel::hah(value)
+        );
         self.get_cached_validation(slot_index, value).unwrap()
     }
 

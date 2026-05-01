@@ -1,6 +1,6 @@
 use crate::*;
 use std::collections::{HashMap, HashSet};
-use tracing::{Level, debug, enabled, instrument, trace};
+use tracing::{Level, debug, enabled, error, instrument, trace};
 use xdr_common::VecM;
 
 #[derive(Debug, Default)]
@@ -224,6 +224,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             // There is a bug in the application if it queued up
             // a statement for itself that it considers invalid
             {
+                error!(env = ?envelope, "nomination moved to a bad state, due to envelope: {}", 
+                    self.0.cd.envelope_to_str(&envelope, false));
                 panic!("moved to a bad state (nomination)")
             }
         }

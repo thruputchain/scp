@@ -710,7 +710,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
             } else {
                 // there is a bug in the application if it queued up
                 // a statement for itself that it considers invalid
-                error!(env = ?envelope, "moved to a bad state, due to envelope: {}", 
+                error!(env = ?envelope, "ballot moved to a bad state, due to envelope: {}", 
                     self.0.cd.envelope_to_str(&envelope, false));
                 panic!("moved to a bad state (ballot protocol)");
             }

@@ -485,25 +485,33 @@ impl ControlKernel {
     fn handle_request(&mut self, req: ControlRequest) {
         match req {
             ControlRequest::Nominate(slot_index, value, prev_value) => {
-                // pre-register our nominations as fully valid;
-                // necessary because `nominate` calls `process_envelope` on its own envelopes internally
-                self.handler.set_cached_validation(
-                    slot_index,
-                    value.clone(),
-                    ValidationLevel::FullyValid,
-                );
-                let r = self
-                    .kernel
-                    .proto()
-                    .nominate(slot_index, &value, &prev_value);
-                self.flush_timer_switches();
-                self.tx_reply
-                    .blocking_send(ControlReply::Nominate(r))
-                    .unwrap()
+                if self.handler.is_above_highest_externalized(slot_index) {
+                    // pre-register our nominations as fully valid;
+                    // necessary because `nominate` calls `process_envelope` on its own envelopes internally
+                    self.handler.set_cached_validation(
+                        slot_index,
+                        value.clone(),
+                        ValidationLevel::FullyValid,
+                    );
+                    let r = self
+                        .kernel
+                        .proto()
+                        .nominate(slot_index, &value, &prev_value);
+                    self.flush_timer_switches();
+                    self.tx_reply
+                        .blocking_send(ControlReply::Nominate(r))
+                        .unwrap()
+                } else {
+                    self.tx_reply
+                        .blocking_send(ControlReply::Nominate(false))
+                        .unwrap()
+                }
             }
             ControlRequest::StopNomination(slot_index) => {
-                self.kernel.proto().stop_nomination(slot_index);
-                self.flush_timer_switches();
+                if self.handler.is_above_highest_externalized(slot_index) {
+                    self.kernel.proto().stop_nomination(slot_index);
+                    self.flush_timer_switches();
+                }
                 self.tx_reply
                     .blocking_send(ControlReply::StopNomination())
                     .unwrap()
@@ -575,9 +583,11 @@ impl ControlKernel {
                     "control kernel setting state from envelope {}",
                     self.kernel.proto().envelope_to_str(&env, false)
                 );
-                self.kernel
-                    .proto()
-                    .set_state_from_envelope(slot_index, &env);
+                if self.handler.is_above_highest_externalized(slot_index) {
+                    self.kernel
+                        .proto()
+                        .set_state_from_envelope(slot_index, &env);
+                }
                 self.tx_reply
                     .blocking_send(ControlReply::SetStateFromEnvelope())
                     .unwrap()

@@ -583,7 +583,33 @@ impl ControlKernel {
                     "control kernel setting state from envelope {}",
                     self.kernel.proto().envelope_to_str(&env, false)
                 );
+                let local_node_id = self.kernel.proto().get_local_node_id();
+                assert_eq!(
+                    env.statement.node_id, local_node_id,
+                    "set_state_from_envelope requires a local envelope"
+                );
                 if self.handler.is_above_highest_externalized(slot_index) {
+                    // mark all values from our envelopes as fully valid
+                    let (nom_values, ballot_values) =
+                        StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
+                            &env.statement,
+                        );
+
+                    for value in nom_values {
+                        self.handler.set_cached_validation(
+                            slot_index,
+                            value,
+                            ValidationLevel::FullyValid,
+                        );
+                    }
+                    for value in ballot_values {
+                        self.handler.set_cached_validation(
+                            slot_index,
+                            value,
+                            ValidationLevel::FullyValid,
+                        );
+                    }
+
                     self.kernel
                         .proto()
                         .set_state_from_envelope(slot_index, &env);

@@ -1,6 +1,4 @@
-use ed25519_dalek::{
-    Digest, Sha512, Signature, SignatureError, SigningKey, VerifyingKey,
-};
+use ed25519_dalek::{Digest, Sha512, Signature, SignatureError, SigningKey, VerifyingKey};
 use thiserror::Error;
 use xdrs::txs;
 use xdrs::write_xdr::WriteXDR;

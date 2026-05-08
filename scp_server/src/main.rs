@@ -3,7 +3,7 @@ use core::net::SocketAddr;
 use futures::future;
 use rpc_driver::{ConnectionConfig, RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpSocket};
 use tracing::info;
 use xdr_common::*;
 
@@ -36,6 +36,14 @@ struct Args {
         help = "Connect address for the SCP handler API"
     )]
     handle_addr: String,
+
+    #[arg(
+        long,
+        default_value_t = true,
+        action = clap::ArgAction::Set,
+        help = "Enable SO_REUSEADDR and SO_REUSEPORT when binding the SCP control API"
+    )]
+    reuse: bool,
 
     #[arg(
         long,
@@ -80,8 +88,8 @@ async fn main() {
     let args = Args::parse();
 
     info!(
-        "control_addr={} handle_addr={}",
-        args.control_addr, args.handle_addr
+        "control_addr={} handle_addr={} reuse={}",
+        args.control_addr, args.handle_addr, args.reuse
     );
 
     // TODO: remove the shim when XDR-JSON is available
@@ -116,7 +124,10 @@ async fn main() {
 
     // control server
 
-    let control_listener = TcpListener::bind(args.control_addr).await.unwrap();
+    let control_socket_addr: SocketAddr = args.control_addr.parse().unwrap();
+    let control_listener = bind_control_listener(control_socket_addr, args.reuse)
+        .await
+        .unwrap();
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
@@ -130,6 +141,23 @@ async fn main() {
     control_server.start().await;
 
     future::pending::<()>().await;
+}
+
+async fn bind_control_listener(addr: SocketAddr, reuse: bool) -> std::io::Result<TcpListener> {
+    if !reuse {
+        return TcpListener::bind(addr).await;
+    }
+
+    let socket = match addr {
+        SocketAddr::V4(_) => TcpSocket::new_v4()?,
+        SocketAddr::V6(_) => TcpSocket::new_v6()?,
+    };
+
+    socket.set_reuseaddr(true)?;
+    #[cfg(unix)]
+    socket.set_reuseport(true)?;
+    socket.bind(addr)?;
+    socket.listen(1024)
 }
 
 #[cfg(test)]

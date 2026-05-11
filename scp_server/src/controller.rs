@@ -447,10 +447,15 @@ impl ControlKernel {
     }
 
     fn handle_envelope_validated(&mut self, x: EnvelopeValidated) {
-        for (slot_index, value, level) in x.validated_values.into_iter() {
-            self.handler.set_cached_validation(slot_index, value, level);
+        if self
+            .handler
+            .is_above_highest_externalized(x.env.statement.slot_index)
+        {
+            for (slot_index, value, level) in x.validated_values.into_iter() {
+                self.handler.set_cached_validation(slot_index, value, level);
+            }
+            self.call_received_envelope(&x.env);
         }
-        self.call_received_envelope(&x.env);
     }
 
     fn call_received_envelope(&mut self, env: &scp_proto::SCPEnvelope) {

@@ -148,6 +148,7 @@ pub struct TestDriver {
     // Test-specific fields
     pub expected_candidates: HashSet<scp_proto::SCPValue>,
     pub composite_value: Option<scp_proto::SCPValue>,
+    pub secret_key: Option<scp_proto::SCPSecretKey>,
 }
 
 impl TestDriver {
@@ -174,7 +175,12 @@ impl TestDriver {
             current_timer_offset: Duration::from_millis(0),
             expected_candidates: HashSet::new(),
             composite_value: None,
+            secret_key: None,
         }
+    }
+
+    pub fn set_secret_key(&mut self, secret_key: scp_proto::SCPSecretKey) {
+        self.secret_key = Some(secret_key);
     }
 
     pub fn store_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
@@ -286,7 +292,12 @@ impl Driver for Rc<RefCell<TestDriver>> {
         (self.borrow().hash_value_calculator)(value)
     }
 
-    fn sign_envelope(&self, _: &mut scp_proto::SCPEnvelope) {}
+    fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope) {
+        if let Some(secret_key) = &self.borrow().secret_key {
+            env.signature =
+                scp_util::sign_xdr(secret_key, &env.statement).unwrap();
+        }
+    }
 
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
         self.borrow_mut().envelopes.push(env);

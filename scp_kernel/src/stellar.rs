@@ -566,6 +566,20 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         }
     }
 
+    /// Builds a proof snapshot for `slot_index` after it externalizes.
+    ///
+    /// Returns `Ok(None)` only when the slot is unknown or has no externalizing
+    /// state yet.
+    pub fn get_externalized_slot_proof(
+        &mut self,
+        slot_index: SlotIndex,
+    ) -> Result<Option<ExternalizedSlotProof>, ExternalizedSlotProofError> {
+        match self.slot_proto(slot_index) {
+            Some(mut slot) => slot.get_externalized_slot_proof(),
+            None => Ok(None),
+        }
+    }
+
     pub fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
         self.cd.driver.get_value_string(value)
     }

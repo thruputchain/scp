@@ -17,6 +17,45 @@ pub const MAX_COMPANION_QSET_BYTES: usize = 64 * 1024;
 /// Maximum aggregate companion quorum set XDR bytes accepted in one proof.
 pub const MAX_TOTAL_COMPANION_QSET_BYTES: usize = 4 * 1024 * 1024;
 
+/// Signer-keyed externalized-slot witness plus every companion quorum set
+/// referenced by those envelopes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExternalizedSlotProof {
+    /// Latest proof envelope by signer node id.
+    envelopes_by_node: HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
+    /// XDR-encoded companion quorum sets keyed by SCP hash.
+    companion_qsets: HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
+}
+
+impl ExternalizedSlotProof {
+    pub(crate) fn new(
+        envelopes_by_node: HashMap<
+            scp_proto::SCPNodeID,
+            scp_proto::SCPEnvelope,
+        >,
+        companion_qsets: HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
+    ) -> Self {
+        Self {
+            envelopes_by_node,
+            companion_qsets,
+        }
+    }
+
+    /// Latest proof envelope by signer node id.
+    pub fn envelopes_by_node(
+        &self,
+    ) -> &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope> {
+        &self.envelopes_by_node
+    }
+
+    /// XDR-encoded companion quorum sets keyed by SCP hash.
+    pub fn companion_qsets(
+        &self,
+    ) -> &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes> {
+        &self.companion_qsets
+    }
+}
+
 /// Specific reason an SCP proof envelope is malformed for externalization
 /// verification.
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
@@ -45,6 +84,28 @@ impl From<federated::CompanionQuorumSetHashError> for MalformedEnvelopeReason {
             }
         }
     }
+}
+
+/// Error returned while building an externalized-slot proof snapshot.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ExternalizedSlotProofError {
+    #[error("duplicate statement from node {node_id:?}")]
+    DuplicateNodeStatement { node_id: scp_proto::SCPNodeID },
+    #[error("missing companion quorum set {hash:?}")]
+    MissingCompanionQuorumSet { hash: scp_proto::SCPHash },
+    #[error(
+        "companion quorum set hash mismatch: claimed {claimed:?}, actual {actual:?}"
+    )]
+    CompanionQuorumSetHashMismatch {
+        claimed: scp_proto::SCPHash,
+        actual: scp_proto::SCPHash,
+    },
+    #[error("failed to hash companion quorum set {hash:?}")]
+    CompanionQuorumSetHashFailed { hash: scp_proto::SCPHash },
+    #[error("failed to encode companion quorum set {hash:?}")]
+    CompanionQuorumSetEncodingFailed { hash: scp_proto::SCPHash },
+    #[error("malformed proof envelope: {reason}")]
+    MalformedEnvelope { reason: MalformedEnvelopeReason },
 }
 
 /// Verification failure for an SCP externalization proof.
@@ -88,14 +149,30 @@ pub enum VerifyError {
     MalformedEnvelope { reason: MalformedEnvelopeReason },
 }
 
-/// Verifies that `envelopes` prove SCP externalization of `value` at
+/// Verifies that `proof` proves SCP externalization of `value` at
 /// `slot_index` under `trust_qset`.
 ///
-/// `peer_qsets` must contain the XDR-encoded companion quorum set bytes for
-/// every quorum-set hash referenced by the supplied envelopes. `envelopes`
-/// must contain at most one statement per signer node. The verifier rejects
-/// oversized proof material before allocating or decoding it.
-pub fn verify_externalized(
+/// The proof must contain at most one statement per signer node and the
+/// XDR-encoded companion quorum set bytes for every quorum-set hash referenced
+/// by those statements. The verifier rejects oversized proof material before
+/// allocating or decoding it.
+pub fn verify_externalized_proof(
+    trust_qset: &scp_proto::SCPQuorumSet,
+    slot_index: scp_proto::SCPSlotIndex,
+    value: &scp_proto::SCPValue,
+    proof: &ExternalizedSlotProof,
+) -> Result<(), VerifyError> {
+    let envelopes: Vec<_> = proof.envelopes_by_node.values().cloned().collect();
+    verify_externalized_envelopes(
+        trust_qset,
+        &proof.companion_qsets,
+        slot_index,
+        value,
+        &envelopes,
+    )
+}
+
+fn verify_externalized_envelopes(
     trust_qset: &scp_proto::SCPQuorumSet,
     peer_qsets: &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
     slot_index: scp_proto::SCPSlotIndex,
@@ -422,6 +499,8 @@ fn find_extended_interval<F>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::driver::DriverCb;
+    use crate::testkernel::TestKernel;
     use crate::testutil::*;
     use scp_proto::*;
     use xdr_common::VecM;
@@ -486,7 +565,7 @@ mod tests {
     }
 
     fn verify(fixture: &ProofFixture) -> Result<(), VerifyError> {
-        verify_externalized(
+        verify_externalized_envelopes(
             &fixture.trust_qset,
             &fixture.peer_qsets,
             7,
@@ -636,7 +715,7 @@ mod tests {
     #[test]
     fn rejects_slot_mismatch() {
         let fixture = fixture();
-        let err = verify_externalized(
+        let err = verify_externalized_envelopes(
             &fixture.trust_qset,
             &fixture.peer_qsets,
             8,
@@ -836,6 +915,37 @@ mod tests {
         fixture
     }
 
+    fn live_externalized_kernel() -> (TestKernel, SCPQuorumSet, SCPValue) {
+        let nodes = TestNode::new_batch(3);
+        let mut trust_qset = flat_qset(&nodes, 3);
+        crate::normalize_qset(&mut trust_qset, None);
+        let mut kernel =
+            TestKernel::new(nodes[0].node_id(), trust_qset.clone(), true);
+        kernel.driver().set_secret_key(nodes[0].secret_key.clone());
+        let qset_hash = *kernel.proto().local_proto().get_qset_hash();
+        let value = TestValues::default().x_value;
+        let ballot = SCPBallot {
+            counter: 1,
+            value: value.clone(),
+        };
+
+        assert!(kernel.bump_state(0, &value));
+        for node in nodes.iter().skip(1) {
+            let envelope = make_externalize(
+                &node.secret_key,
+                qset_hash,
+                0,
+                ballot.clone(),
+                1,
+            )
+            .unwrap();
+            kernel.proto().received_envelope(&envelope);
+        }
+
+        assert_eq!(kernel.driver().externalized_values.get(&0), Some(&value));
+        (kernel, trust_qset, value)
+    }
+
     #[test]
     fn rejects_confirm_with_zero_ballot_counter() {
         let fixture = malformed_confirm_fixture(0, 0, 0);
@@ -889,5 +999,76 @@ mod tests {
                 reason: MalformedEnvelopeReason::ExternalizeCommitAboveHigh
             })
         );
+    }
+
+    #[test]
+    fn replays_live_externalized_slot_snapshot() {
+        let (mut kernel, trust_qset, value) = live_externalized_kernel();
+        let proof = kernel
+            .proto()
+            .get_externalized_slot_proof(0)
+            .expect("snapshot error")
+            .expect("externalized slot proof");
+        assert_eq!(proof.envelopes_by_node().len(), 3);
+
+        for envelope in proof.envelopes_by_node().values() {
+            let qset_hash =
+                federated::get_companion_quorum_set_hash_from_statement(
+                    &envelope.statement,
+                );
+            let qset_bytes = proof
+                .companion_qsets()
+                .get(&qset_hash)
+                .expect("companion qset");
+            let qset: SCPQuorumSet =
+                scp_util::unmarshal_xdr(qset_bytes).unwrap();
+            assert_eq!(scp_util::hash_xdr_scp(&qset).unwrap(), qset_hash);
+        }
+
+        let envelopes: Vec<SCPEnvelope> =
+            proof.envelopes_by_node().values().cloned().collect();
+        assert_eq!(
+            verify_externalized_proof(&trust_qset, 0, &value, &proof),
+            Ok(())
+        );
+
+        let truncated = &envelopes[..envelopes.len() - 1];
+        assert_eq!(
+            verify_externalized_envelopes(
+                &trust_qset,
+                proof.companion_qsets(),
+                0,
+                &value,
+                truncated
+            ),
+            Err(VerifyError::SubQuorum)
+        );
+
+        let mut missing_qset = proof.companion_qsets().clone();
+        missing_qset.clear();
+        assert!(matches!(
+            verify_externalized_envelopes(
+                &trust_qset,
+                &missing_qset,
+                0,
+                &value,
+                &envelopes
+            ),
+            Err(VerifyError::UnknownQuorumSet { .. })
+        ));
+    }
+
+    #[test]
+    fn externalized_slot_proof_reports_missing_companion_qset() {
+        let (mut kernel, _, _) = live_externalized_kernel();
+        kernel.driver().quorum_sets.clear();
+
+        assert!(matches!(
+            kernel
+                .proto()
+                .get_externalized_slot_proof(0)
+                .expect_err("missing qset should be diagnostic"),
+            ExternalizedSlotProofError::MissingCompanionQuorumSet { .. }
+        ));
     }
 }

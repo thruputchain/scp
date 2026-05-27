@@ -600,6 +600,76 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.ballot_proto().get_externalizing_state()
     }
 
+    /// Builds a proof snapshot for this slot after it externalizes.
+    ///
+    /// Returns `Ok(None)` only when the slot has no externalizing state yet.
+    pub fn get_externalized_slot_proof(
+        &mut self,
+    ) -> Result<Option<ExternalizedSlotProof>, ExternalizedSlotProofError> {
+        let envelopes = self.get_externalizing_state();
+        if envelopes.is_empty() {
+            return Ok(None);
+        }
+
+        let mut envelopes_by_node = HashMap::with_capacity(envelopes.len());
+        let mut companion_qsets = HashMap::new();
+
+        for envelope in envelopes {
+            let node_id = envelope.statement.node_id.clone();
+            if envelopes_by_node.contains_key(&node_id) {
+                return Err(
+                    ExternalizedSlotProofError::DuplicateNodeStatement {
+                        node_id,
+                    },
+                );
+            }
+            envelopes_by_node.insert(node_id, envelope.clone());
+
+            let qset_hash =
+                federated::try_get_companion_quorum_set_hash_from_statement(
+                    &envelope.statement,
+                )
+                .map_err(|error| {
+                    ExternalizedSlotProofError::MalformedEnvelope {
+                        reason: error.into(),
+                    }
+                })?;
+            if companion_qsets.contains_key(&qset_hash) {
+                continue;
+            }
+
+            let qset = self.driver().get_qset(&qset_hash).ok_or(
+                ExternalizedSlotProofError::MissingCompanionQuorumSet {
+                    hash: qset_hash,
+                },
+            )?;
+            let actual_hash = scp_util::hash_xdr_scp(&qset).map_err(|_| {
+                ExternalizedSlotProofError::CompanionQuorumSetHashFailed {
+                    hash: qset_hash,
+                }
+            })?;
+            if actual_hash != qset_hash {
+                return Err(
+                    ExternalizedSlotProofError::CompanionQuorumSetHashMismatch {
+                        claimed: qset_hash,
+                        actual: actual_hash,
+                    },
+                );
+            }
+            let qset_bytes = scp_util::marshal_xdr(&qset).map_err(|_| {
+                ExternalizedSlotProofError::CompanionQuorumSetEncodingFailed {
+                    hash: qset_hash,
+                }
+            })?;
+            companion_qsets.insert(qset_hash, qset_bytes);
+        }
+
+        Ok(Some(ExternalizedSlotProof::new(
+            envelopes_by_node,
+            companion_qsets,
+        )))
+    }
+
     pub fn record_statement(&mut self, st: &scp_proto::SCPStatement) {
         let historical_statement = HistoricalStatement {
             when: std::time::SystemTime::now(), //XXX:diff

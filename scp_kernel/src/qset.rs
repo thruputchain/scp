@@ -19,7 +19,10 @@ struct QuorumSetSanityChecker {
 }
 
 impl QuorumSetSanityChecker {
-    fn new(qset: &scp_proto::SCPQuorumSet, extra_checks: bool) -> Result<Self, QSetError> {
+    fn new(
+        qset: &scp_proto::SCPQuorumSet,
+        extra_checks: bool,
+    ) -> Result<Self, QSetError> {
         let mut checker = QuorumSetSanityChecker {
             extra_checks,
             known_nodes: HashSet::new(),
@@ -31,7 +34,8 @@ impl QuorumSetSanityChecker {
 
         if checker.is_sane && (checker.count < 1 || checker.count > 1000) {
             return Err(QSetError::SanityError(
-                "total number of nodes in a quorum must be within 1 and 1000".to_string(),
+                "total number of nodes in a quorum must be within 1 and 1000"
+                    .to_string(),
             ));
         }
 
@@ -77,7 +81,8 @@ impl QuorumSetSanityChecker {
         // threshold is within the proper range
         if self.extra_checks && (qset.threshold as usize) < v_blocking_size {
             return Err(QSetError::SanityError(
-                "threshold is lower than the v-blocking size (< 51%)".to_string(),
+                "threshold is lower than the v-blocking size (< 51%)"
+                    .to_string(),
             ));
         }
 
@@ -97,7 +102,10 @@ impl QuorumSetSanityChecker {
     }
 }
 
-pub fn is_qset_sane(qset: &scp_proto::SCPQuorumSet, extra_checks: bool) -> Result<(), QSetError> {
+pub fn is_qset_sane(
+    qset: &scp_proto::SCPQuorumSet,
+    extra_checks: bool,
+) -> Result<(), QSetError> {
     let checker = QuorumSetSanityChecker::new(qset, extra_checks)?;
     if checker.is_sane() {
         Ok(())
@@ -141,13 +149,19 @@ fn normalize_qset_simplify(
 
     // simplify quorum set if needed
     // (threshold=1, no validators, 1 inner set)
-    if qset.threshold == 1 && qset.validators.is_empty() && qset.inner_sets.len() == 1 {
+    if qset.threshold == 1
+        && qset.validators.is_empty()
+        && qset.inner_sets.len() == 1
+    {
         let inner_set = qset.inner_sets.0.pop().unwrap().clone();
         *qset = inner_set;
     }
 }
 
-pub fn compare_public_key(l: &scp_proto::SCPPublicKey, r: &scp_proto::SCPPublicKey) -> Ordering {
+pub fn compare_public_key(
+    l: &scp_proto::SCPPublicKey,
+    r: &scp_proto::SCPPublicKey,
+) -> Ordering {
     match (l, r) {
         (
             scp_proto::SCPPublicKey::Ed25519 { ed25519: l_key },
@@ -157,9 +171,14 @@ pub fn compare_public_key(l: &scp_proto::SCPPublicKey, r: &scp_proto::SCPPublicK
     }
 }
 
-fn qset_compare(l: &scp_proto::SCPQuorumSet, r: &scp_proto::SCPQuorumSet) -> Ordering {
+fn qset_compare(
+    l: &scp_proto::SCPQuorumSet,
+    r: &scp_proto::SCPQuorumSet,
+) -> Ordering {
     // Compare by validators first - lexicographically (element by element)
-    for (l_validator, r_validator) in l.validators.0.iter().zip(r.validators.0.iter()) {
+    for (l_validator, r_validator) in
+        l.validators.0.iter().zip(r.validators.0.iter())
+    {
         let validator_cmp = compare_public_key(l_validator, r_validator);
         if validator_cmp != Ordering::Equal {
             return validator_cmp;

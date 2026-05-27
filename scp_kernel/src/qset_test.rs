@@ -192,36 +192,37 @@ fn test_nested_quorum_sets() {
     let keys = create_sorted_keys(10);
 
     // Test deep nesting
-    let test_nesting_level = |keys: &[SCPPublicKey],
-                              nesting_level: usize,
-                              expected_sanity: bool,
-                              expected_normalized_sanity: bool| {
-        let mut qsets = Vec::new();
-        for i in 0..=nesting_level {
-            qsets.push(make_singleton(keys[i].clone()));
-        }
+    let test_nesting_level =
+        |keys: &[SCPPublicKey],
+         nesting_level: usize,
+         expected_sanity: bool,
+         expected_normalized_sanity: bool| {
+            let mut qsets = Vec::new();
+            for i in 0..=nesting_level {
+                qsets.push(make_singleton(keys[i].clone()));
+            }
 
-        for i in (0..nesting_level).rev() {
-            qsets[i].inner_sets = vecm(vec![qsets[i + 1].clone()]);
-        }
+            for i in (0..nesting_level).rev() {
+                qsets[i].inner_sets = vecm(vec![qsets[i + 1].clone()]);
+            }
 
-        // Create expected normalized version
-        let mut expected_normalized = scp_proto::SCPQuorumSet {
-            threshold: 1,
-            validators: VecM(vec![]),
-            inner_sets: VecM(vec![]),
+            // Create expected normalized version
+            let mut expected_normalized = scp_proto::SCPQuorumSet {
+                threshold: 1,
+                validators: VecM(vec![]),
+                inner_sets: VecM(vec![]),
+            };
+            for i in 0..=nesting_level {
+                expected_normalized.validators.0.push(keys[i].clone());
+            }
+
+            check_qset(
+                &qsets[0],
+                expected_sanity,
+                &expected_normalized,
+                expected_normalized_sanity,
+            );
         };
-        for i in 0..=nesting_level {
-            expected_normalized.validators.0.push(keys[i].clone());
-        }
-
-        check_qset(
-            &qsets[0],
-            expected_sanity,
-            &expected_normalized,
-            expected_normalized_sanity,
-        );
-    };
 
     // Test maximum nesting level exceeded
     // Test: { t: 1, v0, { t: 1, v1, { .. t: 1, v_{MAXIMUM_QUORUM_NESTING_LEVEL + 1} }..} -> too deep"
@@ -234,7 +235,12 @@ fn test_nested_quorum_sets() {
 
     // Test maximum nesting level allowed
     // Test: { t: 1, v0, { t: 1, v1, { .. t: 1, v_MAXIMUM_QUORUM_NESTING_LEVEL }..} "
-    test_nesting_level(&keys, MAXIMUM_QUORUM_NESTING_LEVEL as usize, true, true);
+    test_nesting_level(
+        &keys,
+        MAXIMUM_QUORUM_NESTING_LEVEL as usize,
+        true,
+        true,
+    );
 }
 
 #[test]

@@ -28,7 +28,8 @@ impl SCPConfigShim {
             initial_ballot_timeout_ms: self.initial_ballot_timeout_ms,
             increment_ballot_timeout_ms: self.increment_ballot_timeout_ms,
             initial_nomination_timeout_ms: self.initial_nomination_timeout_ms,
-            increment_nomination_timeout_ms: self.increment_nomination_timeout_ms,
+            increment_nomination_timeout_ms: self
+                .increment_nomination_timeout_ms,
             quorum_set: self.quorum_set.into_scp_quorum_set(),
         }
     }

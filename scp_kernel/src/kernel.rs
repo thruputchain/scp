@@ -22,9 +22,12 @@ impl<C: Consensus, D: Driver> StellarKernel<C, D> {
         let driver_clone = driver.clone();
         StellarKernel {
             cd: ConsensusDriver { consensus, driver },
-            state: StellarState::new(node_id, is_validator, qset, |opaque: &[u8]| {
-                driver_clone.get_hash_of(opaque)
-            }),
+            state: StellarState::new(
+                node_id,
+                is_validator,
+                qset,
+                |opaque: &[u8]| driver_clone.get_hash_of(opaque),
+            ),
         }
     }
 

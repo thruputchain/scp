@@ -57,7 +57,9 @@ impl LocalState {
         }
     }
 
-    fn build_singleton_qset(node_id: &scp_proto::SCPNodeID) -> scp_proto::SCPQuorumSet {
+    fn build_singleton_qset(
+        node_id: &scp_proto::SCPNodeID,
+    ) -> scp_proto::SCPQuorumSet {
         scp_proto::SCPQuorumSet {
             threshold: 1,
             validators: VecM(vec![node_id.clone()]),
@@ -111,7 +113,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         &self.local.qset_hash
     }
 
-    pub fn get_singleton_qset(&self, node_id: &scp_proto::SCPNodeID) -> scp_proto::SCPQuorumSet {
+    pub fn get_singleton_qset(
+        &self,
+        node_id: &scp_proto::SCPNodeID,
+    ) -> scp_proto::SCPQuorumSet {
         LocalState::build_singleton_qset(node_id)
     }
 
@@ -123,7 +128,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         self.local.is_validator
     }
 
-    pub fn for_all_nodes<F>(qset: &scp_proto::SCPQuorumSet, proc: &mut F) -> bool
+    pub fn for_all_nodes<F>(
+        qset: &scp_proto::SCPQuorumSet,
+        proc: &mut F,
+    ) -> bool
     where
         F: FnMut(&scp_proto::SCPNodeID) -> bool,
     {
@@ -254,7 +262,8 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         filter: &FilterStmts,
     ) -> bool
     where
-        GetStmtQSet: Fn(&scp_proto::SCPStatement) -> Option<scp_proto::SCPQuorumSet>,
+        GetStmtQSet:
+            Fn(&scp_proto::SCPStatement) -> Option<scp_proto::SCPQuorumSet>,
         FilterStmts: Fn(&scp_proto::SCPStatement) -> bool,
     {
         // Start with nodes that pass the filter
@@ -311,7 +320,8 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
     ) -> Vec<scp_proto::SCPNodeID> {
         // Calculate nodes needed to block: total_entries - threshold + 1
         let total_entries = qset.validators.len() + qset.inner_sets.len();
-        let mut left_till_block = (total_entries + 1).saturating_sub(qset.threshold as usize);
+        let mut left_till_block =
+            (total_entries + 1).saturating_sub(qset.threshold as usize);
 
         let mut res = Vec::new();
 
@@ -340,7 +350,9 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         let mut res_internals: Vec<Vec<scp_proto::SCPNodeID>> = Vec::new();
 
         for inner_qset in qset.inner_sets.iter() {
-            let inner_result = Self::find_closest_v_blocking_nodes(inner_qset, nodes, excluded);
+            let inner_result = Self::find_closest_v_blocking_nodes(
+                inner_qset, nodes, excluded,
+            );
             if inner_result.is_empty() {
                 // This inner set is already blocked
                 left_till_block = left_till_block.saturating_sub(1);
@@ -399,7 +411,11 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
         Self::find_closest_v_blocking_nodes(qset, &nodes, excluded)
     }
 
-    pub fn to_json(&self, qset: &scp_proto::SCPQuorumSet, full_keys: bool) -> serde_json::Value {
+    pub fn to_json(
+        &self,
+        qset: &scp_proto::SCPQuorumSet,
+        full_keys: bool,
+    ) -> serde_json::Value {
         Self::to_json_with_formatter(qset, &|node_id| {
             self.cd.driver.to_str_key(node_id, full_keys)
         })
@@ -425,7 +441,10 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
             let str_key = formatter(validator);
             if str_key.is_empty() {
                 // In Rust we'll use a default representation instead of throwing
-                entries.push(serde_json::Value::String(format!("{:?}", validator)));
+                entries.push(serde_json::Value::String(format!(
+                    "{:?}",
+                    validator
+                )));
             } else {
                 entries.push(serde_json::Value::String(str_key));
             }
@@ -473,13 +492,22 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                     );
                 }
             },
-            _ => return Err("JSON field 't' must exist and be an unsigned integer".to_string()),
+            _ => {
+                return Err(
+                    "JSON field 't' must exist and be an unsigned integer"
+                        .to_string(),
+                );
+            }
         };
 
         // Check for required validators array field
         let entries = match obj.get("v") {
             Some(v) if v.is_array() => v.as_array().unwrap(),
-            _ => return Err("JSON field 'v' must exist and be an array".to_string()),
+            _ => {
+                return Err(
+                    "JSON field 'v' must exist and be an array".to_string()
+                );
+            }
         };
 
         let mut validators = Vec::new();
@@ -491,7 +519,12 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 let key_str = entry.as_str().unwrap();
                 match from_str_key(key_str) {
                     Ok(node_id) => validators.push(node_id),
-                    Err(e) => return Err(format!("Invalid validator key in 'v' array: {}", e)),
+                    Err(e) => {
+                        return Err(format!(
+                            "Invalid validator key in 'v' array: {}",
+                            e
+                        ));
+                    }
                 }
             } else if entry.is_object() {
                 // Recursively parse inner quorum set

@@ -1,17 +1,23 @@
-use ed25519_dalek::{Digest, Sha512, Signature, SignatureError, SigningKey, VerifyingKey};
+use ed25519_dalek::{
+    Digest, Sha512, Signature, SignatureError, SigningKey, VerifyingKey,
+};
 use thiserror::Error;
 use xdrs::txs;
 use xdrs::write_xdr::WriteXDR;
 
 /// Creates an ed25519_dalek::SigningKey from a scp_proto::SCPEd25519SecretKey
-fn signing_key_from_secret_key(secret_key: &scp_proto::SCPEd25519SecretKey) -> SigningKey {
+fn signing_key_from_secret_key(
+    secret_key: &scp_proto::SCPEd25519SecretKey,
+) -> SigningKey {
     // Ed25519SecretKey contains 64 bytes, but SigningKey expects 32 bytes
     // The first 32 bytes are the secret key, the last 32 bytes are typically the public key
     let secret_bytes: &[u8; 32] = &secret_key[..32].try_into().unwrap();
     SigningKey::from_bytes(secret_bytes)
 }
 
-fn verifying_key_from_public_key(public_key: &scp_proto::SCPEd25519PublicKey) -> VerifyingKey {
+fn verifying_key_from_public_key(
+    public_key: &scp_proto::SCPEd25519PublicKey,
+) -> VerifyingKey {
     VerifyingKey::from_bytes(public_key[..].try_into().unwrap()).unwrap()
 }
 
@@ -59,7 +65,10 @@ pub fn verify_bytes(
     verify_bytes_ed25519(ed25519_key, msg, ed25519_signature)
 }
 
-pub fn sign_bytes(secret_key: &scp_proto::SCPSecretKey, msg: &[u8]) -> scp_proto::SCPSignature {
+pub fn sign_bytes(
+    secret_key: &scp_proto::SCPSecretKey,
+    msg: &[u8],
+) -> scp_proto::SCPSignature {
     let ed25519_key = match secret_key {
         scp_proto::SCPSecretKey::Ed25519 { ed25519 } => Some(ed25519),
         _ => panic!("Unsupported secret key type"),
@@ -106,13 +115,16 @@ where
     T: WriteXDR + ?Sized,
 {
     let x = txs::encode(v).map_err(VerifyingError::EncodingError)?;
-    verify_bytes(public_key, x.as_slice(), signature).map_err(VerifyingError::VerifyingError)
+    verify_bytes(public_key, x.as_slice(), signature)
+        .map_err(VerifyingError::VerifyingError)
 }
 
 /// Verifies that `envelope.signature` is a valid signature over the XDR
 /// encoding of `envelope.statement` produced by the secret key matching
 /// `envelope.statement.node_id`.
-pub fn verify_envelope(envelope: &scp_proto::SCPEnvelope) -> Result<(), VerifyingError> {
+pub fn verify_envelope(
+    envelope: &scp_proto::SCPEnvelope,
+) -> Result<(), VerifyingError> {
     verify_xdr(
         &envelope.statement.node_id,
         &envelope.statement,
@@ -123,10 +135,14 @@ pub fn verify_envelope(envelope: &scp_proto::SCPEnvelope) -> Result<(), Verifyin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keygen::{derive_node_id, derive_public_key, generate_secret_key};
+    use crate::keygen::{
+        derive_node_id, derive_public_key, generate_secret_key,
+    };
     use xdr_common::{BytesM, VecM};
 
-    fn make_statement(node_id: scp_proto::SCPNodeID) -> scp_proto::SCPStatement {
+    fn make_statement(
+        node_id: scp_proto::SCPNodeID,
+    ) -> scp_proto::SCPStatement {
         scp_proto::SCPStatement {
             node_id,
             slot_index: 42,
@@ -189,7 +205,8 @@ mod tests {
         let sk = generate_secret_key(b"envelope-roundtrip");
         let node_id = derive_node_id(&sk);
         let statement = make_statement(node_id);
-        let signature = sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
+        let signature =
+            sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
         let envelope = scp_proto::SCPEnvelope {
             statement,
             signature,
@@ -203,7 +220,8 @@ mod tests {
         let claimed_sk = generate_secret_key(b"envelope-claimed");
         let claimed_node_id = derive_node_id(&claimed_sk);
         let statement = make_statement(claimed_node_id);
-        let signature = sign_xdr(&signer_sk, &statement).expect("sign_xdr should succeed");
+        let signature =
+            sign_xdr(&signer_sk, &statement).expect("sign_xdr should succeed");
         let envelope = scp_proto::SCPEnvelope {
             statement,
             signature,
@@ -216,7 +234,8 @@ mod tests {
         let sk = generate_secret_key(b"envelope-tamper");
         let node_id = derive_node_id(&sk);
         let statement = make_statement(node_id);
-        let signature = sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
+        let signature =
+            sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
         let mut envelope = scp_proto::SCPEnvelope {
             statement,
             signature,

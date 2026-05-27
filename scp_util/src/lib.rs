@@ -22,7 +22,8 @@ mod tests {
             lowbits: 2,
         };
         let bytes = txs::encode(&v).expect("encode failed");
-        let w: scp_proto::SCP_uint128_xdr = txs::decode(&bytes).expect("decode failed");
+        let w: scp_proto::SCP_uint128_xdr =
+            txs::decode(&bytes).expect("decode failed");
         assert!(v == w, "unequal");
     }
 
@@ -31,7 +32,10 @@ mod tests {
     fn as_maybe_uninit(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
         // SAFETY: MaybeUninit<u8> has the same layout as u8
         unsafe {
-            std::slice::from_raw_parts_mut(slice.as_mut_ptr() as *mut MaybeUninit<u8>, slice.len())
+            std::slice::from_raw_parts_mut(
+                slice.as_mut_ptr() as *mut MaybeUninit<u8>,
+                slice.len(),
+            )
         }
     }
 
@@ -42,7 +46,8 @@ mod tests {
             lowbits: 2,
         };
         let mut buf = BytesM::<100>(vec![0; 20]);
-        let n = txs::encode_into(&v, as_maybe_uninit(buf.0.as_mut_slice())).expect("encode failed");
+        let n = txs::encode_into(&v, as_maybe_uninit(buf.0.as_mut_slice()))
+            .expect("encode failed");
         assert!(n == 16, "size");
         let w: scp_proto::SCP_uint128_xdr =
             txs::decode(&buf.as_slice()[..16]).expect("decode failed");

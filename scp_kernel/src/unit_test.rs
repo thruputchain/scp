@@ -28,35 +28,42 @@ mod unit_tests {
         };
         normalize_qset(&mut q_set, None);
 
-        let mut uk = UnitTestKernel::new(nodes[0].node_id().clone(), q_set.clone(), true);
+        let mut uk = UnitTestKernel::new(
+            nodes[0].node_id().clone(),
+            q_set.clone(),
+            true,
+        );
 
-        let result = uk
-            .proto()
-            .cd
-            .driver
-            .get_node_weight(&nodes[2].node_id(), &q_set, false);
+        let result = uk.proto().cd.driver.get_node_weight(
+            &nodes[2].node_id(),
+            &q_set,
+            false,
+        );
         assert!(is_near(result, 0.75));
 
-        let result = uk
-            .proto()
-            .cd
-            .driver
-            .get_node_weight(&nodes[4].node_id(), &q_set, false);
+        let result = uk.proto().cd.driver.get_node_weight(
+            &nodes[4].node_id(),
+            &q_set,
+            false,
+        );
         assert_eq!(result, 0);
 
         let inner_qset = SCPQuorumSet {
             threshold: 1,
-            validators: VecM(vec![nodes[4].node_id().clone(), nodes[5].node_id().clone()]),
+            validators: VecM(vec![
+                nodes[4].node_id().clone(),
+                nodes[5].node_id().clone(),
+            ]),
             inner_sets: VecM(vec![]),
         };
         q_set.inner_sets.0.push(inner_qset);
         normalize_qset(&mut q_set, None);
 
-        let result = uk
-            .proto()
-            .cd
-            .driver
-            .get_node_weight(&nodes[4].node_id(), &q_set, false);
+        let result = uk.proto().cd.driver.get_node_weight(
+            &nodes[4].node_id(),
+            &q_set,
+            false,
+        );
         assert!(is_near(result, 0.6 * 0.5));
     }
 
@@ -83,7 +90,8 @@ mod unit_tests {
     fn nomination_weight_stats() {
         let nodes = TestNode::new_batch(7);
 
-        let node_ids: Vec<scp_proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
+        let node_ids: Vec<scp_proto::SCPNodeID> =
+            nodes.iter().map(|n| n.node_id()).collect();
 
         let total_slots = 1000;
         let max_round_per_slot = 5; // 5 -> 15 seconds
@@ -125,9 +133,14 @@ mod unit_tests {
                 let wins = run_tests(&qset);
 
                 for (node_id, win_count) in &wins {
-                    let stats = (*win_count as f64 * 100.0) / total_rounds as f64;
+                    let stats =
+                        (*win_count as f64 * 100.0) / total_rounds as f64;
                     let is_local = node_id == &node_ids[0];
-                    println!("got {:.2}{}", stats, if is_local { " LOCAL" } else { "" });
+                    println!(
+                        "got {:.2}{}",
+                        stats,
+                        if is_local { " LOCAL" } else { "" }
+                    );
                 }
             };
 
@@ -171,7 +184,8 @@ mod unit_tests {
     fn nomination_two_nodes_win() {
         let nb_rounds_for_stats = 9;
         let nodes = TestNode::new_batch(7);
-        let node_ids: Vec<scp_proto::SCPNodeID> = nodes.iter().map(|n| n.node_id()).collect();
+        let node_ids: Vec<scp_proto::SCPNodeID> =
+            nodes.iter().map(|n| n.node_id()).collect();
 
         let total_iter = 10000;
 
@@ -182,8 +196,16 @@ mod unit_tests {
                                   qset_node0: &scp_proto::SCPQuorumSet,
                                   qset_node1: &scp_proto::SCPQuorumSet|
          -> i32 {
-            let mut uk0 = UnitTestKernel::new(node_ids[0].clone(), qset_node0.clone(), true);
-            let mut uk1 = UnitTestKernel::new(node_ids[1].clone(), qset_node1.clone(), true);
+            let mut uk0 = UnitTestKernel::new(
+                node_ids[0].clone(),
+                qset_node0.clone(),
+                true,
+            );
+            let mut uk1 = UnitTestKernel::new(
+                node_ids[1].clone(),
+                qset_node1.clone(),
+                true,
+            );
 
             let mut tot = 0;
             for g in 0..total_iter {
@@ -218,22 +240,24 @@ mod unit_tests {
                     let l1 = nom_proto1.dbg_get_round_leaders();
                     assert!(!l1.is_empty());
 
-                    let update_voted = |node_id: &scp_proto::SCPNodeID,
-                                        leaders: &HashSet<scp_proto::SCPNodeID>,
-                                        voted: &mut bool| {
-                        if !*voted {
-                            *voted = leaders.contains(node_id);
-                        }
-                    };
+                    let update_voted =
+                        |node_id: &scp_proto::SCPNodeID,
+                         leaders: &HashSet<scp_proto::SCPNodeID>,
+                         voted: &mut bool| {
+                            if !*voted {
+                                *voted = leaders.contains(node_id);
+                            }
+                        };
 
                     // checks if id voted (any past round, including this one)
                     // AND id is a leader this round
-                    let find_node = |node_id: &scp_proto::SCPNodeID,
-                                     id_voted: bool,
-                                     other_leaders: &HashSet<scp_proto::SCPNodeID>|
-                     -> bool {
-                        id_voted && other_leaders.contains(node_id)
-                    };
+                    let find_node =
+                        |node_id: &scp_proto::SCPNodeID,
+                         id_voted: bool,
+                         other_leaders: &HashSet<scp_proto::SCPNodeID>|
+                         -> bool {
+                            id_voted && other_leaders.contains(node_id)
+                        };
 
                     update_voted(&node_ids[0], &l0, &mut v0_voted);
                     update_voted(&node_ids[1], &l1, &mut v1_voted);

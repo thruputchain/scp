@@ -107,11 +107,15 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         statement: &scp_proto::SCPStatement,
     ) -> scp_proto::SCPHash {
         match &statement.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => prepare.quorum_set_hash,
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => confirm.quorum_set_hash,
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
-                externalize.commit_quorum_set_hash
+            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+                prepare.quorum_set_hash
             }
+            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+                confirm.quorum_set_hash
+            }
+            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+                externalize,
+            } => externalize.commit_quorum_set_hash,
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 nominate.quorum_set_hash
             }
@@ -161,7 +165,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         node: &scp_proto::SCPNodeID,
         self_already_moved_on: bool,
     ) -> QuorumInfoNodeState {
-        let ballot_state = self.ballot_proto().get_state(node, self_already_moved_on);
+        let ballot_state =
+            self.ballot_proto().get_state(node, self_already_moved_on);
         if ballot_state != QuorumInfoNodeState::NoInfo {
             return ballot_state;
         }
@@ -169,7 +174,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             .get_state(node, self_already_moved_on)
     }
 
-    pub fn should_process_envelope(&mut self, env: &scp_proto::SCPEnvelope, ours: bool) -> bool {
+    pub fn should_process_envelope(
+        &mut self,
+        env: &scp_proto::SCPEnvelope,
+        ours: bool,
+    ) -> bool {
         assert_eq!(env.statement.slot_index, self.index());
         match &env.statement.pledges {
             scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
@@ -195,14 +204,15 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             self.cd.envelope_to_str(envelope, false),
         );
 
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            match &envelope.statement.pledges {
-                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
-                    self.nomination_proto().process_envelope(envelope)
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                match &envelope.statement.pledges {
+                    scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                        ..
+                    } => self.nomination_proto().process_envelope(envelope),
+                    _ => self.ballot_proto().process_envelope(envelope, ours),
                 }
-                _ => self.ballot_proto().process_envelope(envelope, ours),
-            }
-        }));
+            }));
 
         let result = match result {
             Ok(envelope_state) => envelope_state,
@@ -247,7 +257,11 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.ballot_proto().abandon_ballot(0)
     }
 
-    pub fn bump_state(&mut self, value: &scp_proto::SCPValue, force: bool) -> bool {
+    pub fn bump_state(
+        &mut self,
+        value: &scp_proto::SCPValue,
+        force: bool,
+    ) -> bool {
         self.ballot_proto().bump_state(value.clone(), force)
     }
 
@@ -273,7 +287,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         self.slot_state.fully_validated = validated;
     }
 
-    pub fn get_latest_composite_candidate(&mut self) -> Option<scp_proto::SCPValue> {
+    pub fn get_latest_composite_candidate(
+        &mut self,
+    ) -> Option<scp_proto::SCPValue> {
         self.nomination_proto().get_latest_composite_candidate()
     }
 
@@ -306,15 +322,23 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         use serde_json::{Value, json};
 
         let mut statements = Vec::new();
-        let mut qsets_used: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet> = HashMap::new();
+        let mut qsets_used: HashMap<
+            scp_proto::SCPHash,
+            scp_proto::SCPQuorumSet,
+        > = HashMap::new();
 
         for item in self.slot_state.statements_history.iter() {
             let mut statement_array = Vec::new();
 
-            if let Ok(duration) = item.when.duration_since(std::time::UNIX_EPOCH) {
-                statement_array.push(Value::Number(serde_json::Number::from(duration.as_secs())));
+            if let Ok(duration) =
+                item.when.duration_since(std::time::UNIX_EPOCH)
+            {
+                statement_array.push(Value::Number(serde_json::Number::from(
+                    duration.as_secs(),
+                )));
             } else {
-                statement_array.push(Value::Number(serde_json::Number::from(0u64)));
+                statement_array
+                    .push(Value::Number(serde_json::Number::from(0u64)));
             }
 
             statement_array.push(Value::String(
@@ -322,7 +346,9 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             ));
             statement_array.push(Value::Bool(item.validated));
 
-            let qset_hash = Self::get_companion_quorum_set_hash_from_statement(&item.statement);
+            let qset_hash = Self::get_companion_quorum_set_hash_from_statement(
+                &item.statement,
+            );
             if let Some(qset) = self.driver().get_qset(&qset_hash) {
                 qsets_used.insert(qset_hash, qset.clone());
             }
@@ -333,7 +359,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         let mut quorum_sets_obj = serde_json::Map::new();
         for (hash, qset) in qsets_used {
             let hash_abbrev = hex_abbrev(&hash);
-            quorum_sets_obj.insert(hash_abbrev, self.local_proto().to_json(&qset, full_keys));
+            quorum_sets_obj.insert(
+                hash_abbrev,
+                self.local_proto().to_json(&qset, full_keys),
+            );
         }
 
         json!({
@@ -356,7 +385,8 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             .get_json_quorum_info(id, summary, full_keys);
 
         if self.local_proto().is_validator() {
-            ret["validated"] = serde_json::Value::Bool(self.is_fully_validated());
+            ret["validated"] =
+                serde_json::Value::Bool(self.is_fully_validated());
         }
 
         ret
@@ -382,11 +412,14 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
 
         // Checks if the set of nodes that accepted or voted for it form a quorum
-        let ratify_filter = |st: &scp_proto::SCPStatement| -> bool { accepted(st) || voted(st) };
-
-        let qset_getter = |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
-            self.get_quorum_set_from_statement(st)
+        let ratify_filter = |st: &scp_proto::SCPStatement| -> bool {
+            accepted(st) || voted(st)
         };
+
+        let qset_getter =
+            |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
+                self.get_quorum_set_from_statement(st)
+            };
 
         LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, &ratify_filter)
     }
@@ -403,9 +436,10 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         let local_proto = self.local_proto();
         let qset = local_proto.get_qset();
 
-        let qset_getter = |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
-            self.get_quorum_set_from_statement(st)
-        };
+        let qset_getter =
+            |st: &scp_proto::SCPStatement| -> Option<scp_proto::SCPQuorumSet> {
+                self.get_quorum_set_from_statement(st)
+            };
 
         LocalProto::<C, D>::is_quorum(qset, envs, &qset_getter, voted)
     }
@@ -435,12 +469,16 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
 
         if self.slot_state.fully_validated {
             // Get nomination protocol's last message
-            if let Some(nomination_envelope) = self.nomination_proto().get_last_message_send() {
+            if let Some(nomination_envelope) =
+                self.nomination_proto().get_last_message_send()
+            {
                 res.push(nomination_envelope);
             }
 
             // Get ballot protocol's last message
-            if let Some(ballot_envelope) = self.ballot_proto().get_last_message_send() {
+            if let Some(ballot_envelope) =
+                self.ballot_proto().get_last_message_send()
+            {
                 res.push(ballot_envelope);
             }
         }
@@ -453,11 +491,14 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         node_id: &scp_proto::SCPNodeID,
     ) -> Option<scp_proto::SCPEnvelope> {
         // Check ballot protocol first
-        if let Some(envelope) = self.ballot_proto().get_latest_message(node_id) {
+        if let Some(envelope) = self.ballot_proto().get_latest_message(node_id)
+        {
             return Some(envelope);
         }
         // Fall back to nomination protocol
-        if let Some(envelope) = self.nomination_proto().get_latest_message(node_id) {
+        if let Some(envelope) =
+            self.nomination_proto().get_latest_message(node_id)
+        {
             return Some(envelope);
         }
         None
@@ -479,19 +520,26 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
             true
         });
 
-        self.slot_state.got_vblocking = LocalProto::<C, D>::is_vblocking_nodes(&qset, &nodes);
+        self.slot_state.got_vblocking =
+            LocalProto::<C, D>::is_vblocking_nodes(&qset, &nodes);
 
         if self.slot_state.got_vblocking {
             tracing::trace!("got v-blocking for slot {}", self.index());
         }
     }
 
-    pub fn set_state_from_envelope(&mut self, envelope: &scp_proto::SCPEnvelope) {
+    pub fn set_state_from_envelope(
+        &mut self,
+        envelope: &scp_proto::SCPEnvelope,
+    ) {
         let statement = &envelope.statement;
         let local_node_id = self.local_proto().get_node_id().clone();
 
-        if statement.node_id == local_node_id && statement.slot_index == self.index() {
-            let had_previous_message = self.get_latest_message(&statement.node_id).is_some();
+        if statement.node_id == local_node_id
+            && statement.slot_index == self.index()
+        {
+            let had_previous_message =
+                self.get_latest_message(&statement.node_id).is_some();
 
             match &statement.pledges {
                 scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
@@ -545,8 +593,12 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         // Handle each type appropriately
         if old_nomination {
             if let (
-                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_nom },
-                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: new_nom },
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                    nominate: old_nom,
+                },
+                scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                    nominate: new_nom,
+                },
             ) = (&old_st.pledges, &new_st.pledges)
             {
                 NominationProto::<C, D>::is_newer_statement(old_nom, new_nom)

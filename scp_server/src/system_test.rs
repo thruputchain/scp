@@ -15,7 +15,9 @@ fn instrument_test() {
         // .with_max_level(tracing::metadata::LevelFilter::DEBUG)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug")),
+                .unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("debug")
+                }),
         )
         .event_format(tracing_subscriber::fmt::format())
         .with_level(true)
@@ -250,9 +252,12 @@ async fn five() {
     let h1 = TestHandler::new();
     let h2 = TestHandler::new();
 
-    let handler0_sockaddr = start_handle_server("0.0.0.0:7770", h0.clone()).await;
-    let handler1_sockaddr = start_handle_server("0.0.0.0:7771", h1.clone()).await;
-    let handler2_sockaddr = start_handle_server("0.0.0.0:7772", h2.clone()).await;
+    let handler0_sockaddr =
+        start_handle_server("0.0.0.0:7770", h0.clone()).await;
+    let handler1_sockaddr =
+        start_handle_server("0.0.0.0:7771", h1.clone()).await;
+    let handler2_sockaddr =
+        start_handle_server("0.0.0.0:7772", h2.clone()).await;
 
     // clients
 
@@ -345,8 +350,10 @@ async fn five() {
     // future::pending::<()>().await;
 }
 
-async fn flush_emits<F, Fut>(nodes: &Vec<(ControlService, TestHandler)>, exit: F)
-where
+async fn flush_emits<F, Fut>(
+    nodes: &Vec<(ControlService, TestHandler)>,
+    exit: F,
+) where
     F: Fn() -> Fut,
     Fut: Future<Output = bool>,
 {

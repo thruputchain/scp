@@ -8,7 +8,9 @@ use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, error::TryRecvError};
+use tokio::sync::mpsc::{
+    Receiver, Sender, UnboundedReceiver, error::TryRecvError,
+};
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::info;
@@ -46,7 +48,9 @@ impl ControlService {
             .send(ControlRequest::SetKnownQSet(qset))
             .await
             .unwrap();
-        if let ControlReply::SetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::SetKnownQSet(optq) =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(optq)
         } else {
             panic!("bug")
@@ -80,7 +84,9 @@ impl ControlService {
             .send(ControlRequest::ReceivedEnvelope(env))
             .await
             .unwrap();
-        if let ControlReply::ReceivedEnvelope() = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::ReceivedEnvelope() =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(())
         } else {
             panic!("bug")
@@ -97,7 +103,9 @@ impl ControlService {
             .send(ControlRequest::SetStateFromEnvelope(slot_index, env))
             .await
             .unwrap();
-        if let ControlReply::SetStateFromEnvelope() = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::SetStateFromEnvelope() =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(())
         } else {
             panic!("bug")
@@ -154,7 +162,8 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .send(ControlRequest::StopNomination(slot_index))
             .await
             .unwrap();
-        if let ControlReply::StopNomination() = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::StopNomination() = x.rx_reply.recv().await.unwrap()
+        {
             Ok(())
         } else {
             panic!("bug")
@@ -170,7 +179,9 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .send(ControlRequest::UpdateLocalQuorumSet(qset))
             .await
             .unwrap();
-        if let ControlReply::UpdateLocalQuorumSet() = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::UpdateLocalQuorumSet() =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(())
         } else {
             panic!("bug")
@@ -212,7 +223,9 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .send(ControlRequest::GetKnownQSet(qhash))
             .await
             .unwrap();
-        if let ControlReply::GetKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::GetKnownQSet(optq) =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(optq)
         } else {
             panic!("bug")
@@ -228,7 +241,9 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .send(ControlRequest::RemoveKnownQSet(qhash))
             .await
             .unwrap();
-        if let ControlReply::RemoveKnownQSet(optq) = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::RemoveKnownQSet(optq) =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(optq)
         } else {
             panic!("bug")
@@ -244,7 +259,9 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
             .send(ControlRequest::SetLowestNonExternalizedSlot(slot_index))
             .await
             .unwrap();
-        if let ControlReply::SetLowestNonExternalizedSlot() = x.rx_reply.recv().await.unwrap() {
+        if let ControlReply::SetLowestNonExternalizedSlot() =
+            x.rx_reply.recv().await.unwrap()
+        {
             Ok(())
         } else {
             panic!("bug")
@@ -254,7 +271,8 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
 use crate::handler::*;
 
-pub type ValidatedValues = HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>;
+pub type ValidatedValues =
+    HashMap<SlotIndex, HashMap<SCPValue, ValidationLevel>>;
 
 pub struct ValidateEnvelope {
     pub env: SCPEnvelope,
@@ -310,9 +328,11 @@ impl ControlKernel {
         kernel: StellarKernel<HandleKernel, HandleKernel>,
         handler: HandleKernel,
     ) -> ControlKernel {
-        let (tx_timer_expired, rx_timer_expired) = mpsc::channel::<TimerExpired>(1);
+        let (tx_timer_expired, rx_timer_expired) =
+            mpsc::channel::<TimerExpired>(1);
         let rx_request_or_validated =
-            Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired).await;
+            Self::merge_rx(rx_request, rx_envelope_validated, rx_timer_expired)
+                .await;
         ControlKernel {
             tokio_handle,
             rx_signal: rx_request_or_validated,
@@ -498,10 +518,11 @@ impl ControlKernel {
                         value.clone(),
                         ValidationLevel::FullyValid,
                     );
-                    let r = self
-                        .kernel
-                        .proto()
-                        .nominate(slot_index, &value, &prev_value);
+                    let r = self.kernel.proto().nominate(
+                        slot_index,
+                        &value,
+                        &prev_value,
+                    );
                     self.flush_timer_switches();
                     self.tx_reply
                         .blocking_send(ControlReply::Nominate(r))
@@ -541,10 +562,13 @@ impl ControlKernel {
                     // XXX: if the envelope is coming from us, should we forward it to set_state_from_envelope?
 
                     let slot_index = env.statement.slot_index;
-                    let (nom_values, ballot_values) =
-                        StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
-                            &env.statement,
-                        );
+                    let (nom_values, ballot_values) = StellarProto::<
+                        '_,
+                        HandleKernel,
+                        HandleKernel,
+                    >::get_statement_values(
+                        &env.statement
+                    );
 
                     // filter non-cached values
                     let validate_nomination_values = nom_values
@@ -567,7 +591,9 @@ impl ControlKernel {
                     // XXX: if the envelope is coming from us, should we cache values as fully valid?
 
                     // skip validate_envelope if no values to validate
-                    if validate_nomination_values.is_empty() && validate_ballot_values.is_empty() {
+                    if validate_nomination_values.is_empty()
+                        && validate_ballot_values.is_empty()
+                    {
                         self.call_received_envelope(&env);
                     } else {
                         self.tx_validate_envelope
@@ -595,10 +621,13 @@ impl ControlKernel {
                 );
                 if self.handler.is_above_highest_externalized(slot_index) {
                     // mark all values from our envelopes as fully valid
-                    let (nom_values, ballot_values) =
-                        StellarProto::<'_, HandleKernel, HandleKernel>::get_statement_values(
-                            &env.statement,
-                        );
+                    let (nom_values, ballot_values) = StellarProto::<
+                        '_,
+                        HandleKernel,
+                        HandleKernel,
+                    >::get_statement_values(
+                        &env.statement
+                    );
 
                     for value in nom_values {
                         self.handler.set_cached_validation(

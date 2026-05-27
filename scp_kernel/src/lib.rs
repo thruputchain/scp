@@ -18,6 +18,9 @@ pub use info::*;
 pub mod local;
 pub use local::*;
 
+pub mod federated;
+pub use federated::*;
+
 pub mod slot;
 pub use slot::*;
 

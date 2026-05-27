@@ -106,21 +106,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
     pub fn get_companion_quorum_set_hash_from_statement(
         statement: &scp_proto::SCPStatement,
     ) -> scp_proto::SCPHash {
-        match &statement.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                prepare.quorum_set_hash
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                confirm.quorum_set_hash
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
-                externalize,
-            } => externalize.commit_quorum_set_hash,
-            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
-                nominate.quorum_set_hash
-            }
-            _ => panic!("unreachable"),
-        }
+        federated::get_companion_quorum_set_hash_from_statement(statement)
     }
 
     /// returns (nom values, ballot values)

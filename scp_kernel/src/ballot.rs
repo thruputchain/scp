@@ -1883,27 +1883,6 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         true
     }
 
-    // returns the hash of the QuorumSet that should be downloaded
-    // with the statement.
-    // note: the companion hash for an EXTERNALIZE statement does
-    // not match the hash of the QSet, but the hash of commitQuorumSetHash
-    fn get_companion_quorum_set_hash_from_statement(
-        st: &scp_proto::SCPStatement,
-    ) -> scp_proto::SCPHash {
-        match &st.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
-                prepare.quorum_set_hash
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
-                confirm.quorum_set_hash
-            }
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
-                externalize,
-            } => externalize.commit_quorum_set_hash,
-            _ => panic!("bug"),
-        }
-    }
-
     // helper function to retrieve b for PREPARE, P for CONFIRM or
     // c for EXTERNALIZE messages
     fn get_working_ballot(
@@ -2208,7 +2187,8 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
             // use the companion set here even for externalize to capture
             // the view of the quorum set during consensus
-            q_set_hash = Self::get_companion_quorum_set_hash_from_statement(st);
+            q_set_hash =
+                federated::get_companion_quorum_set_hash_from_statement(st);
         } else {
             ret["phase"] = serde_json::Value::String("unknown".to_string());
             if id == self.slot_proto().local_proto().get_node_id() {

@@ -21,6 +21,9 @@ pub use local::*;
 pub mod federated;
 pub use federated::*;
 
+pub mod verifier;
+pub use verifier::*;
+
 pub mod slot;
 pub use slot::*;
 

@@ -97,7 +97,9 @@ async fn main() {
     // convert that value into SCPConfig and assign it to a variable called cfg.
     let config_json = tokio::fs::read_to_string(&args.config_path)
         .await
-        .unwrap_or_else(|e| panic!("Failed to read config file '{}': {}", args.config_path, e));
+        .unwrap_or_else(|e| {
+            panic!("Failed to read config file '{}': {}", args.config_path, e)
+        });
 
     let config_shim: SCPConfigShim = serde_json::from_str(&config_json)
         .unwrap_or_else(|e| panic!("Failed to parse config JSON: {}", e));
@@ -120,14 +122,21 @@ async fn main() {
     let secret_key = scp_util::parse_secret_key_from_base64(&args.secret_key)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
-    let service = start_service(handle_client, cfg, &secret_key, args.is_validator.unwrap()).await;
+    let service = start_service(
+        handle_client,
+        cfg,
+        &secret_key,
+        args.is_validator.unwrap(),
+    )
+    .await;
 
     // control server
 
     let control_socket_addr: SocketAddr = args.control_addr.parse().unwrap();
-    let control_listener = bind_control_listener(control_socket_addr, args.reuse)
-        .await
-        .unwrap();
+    let control_listener =
+        bind_control_listener(control_socket_addr, args.reuse)
+            .await
+            .unwrap();
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
@@ -136,14 +145,21 @@ async fn main() {
 
     // Cap incoming control RPC messages at 10 MiB.
     const CONTROL_MAX_MESSAGE_SIZE: u32 = 10 * 1024 * 1024;
-    let control_config = ConnectionConfig::new(Some(CONTROL_MAX_MESSAGE_SIZE), control_service_map);
-    let control_server = RpcServer::new_with_config(control_listener, control_config);
+    let control_config = ConnectionConfig::new(
+        Some(CONTROL_MAX_MESSAGE_SIZE),
+        control_service_map,
+    );
+    let control_server =
+        RpcServer::new_with_config(control_listener, control_config);
     control_server.start().await;
 
     future::pending::<()>().await;
 }
 
-async fn bind_control_listener(addr: SocketAddr, reuse: bool) -> std::io::Result<TcpListener> {
+async fn bind_control_listener(
+    addr: SocketAddr,
+    reuse: bool,
+) -> std::io::Result<TcpListener> {
     if !reuse {
         return TcpListener::bind(addr).await;
     }

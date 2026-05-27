@@ -6,15 +6,15 @@ use xdr_common::VecM;
 #[derive(Debug, Default)]
 pub struct NominationState {
     round_number: scp_proto::SCPCount,
-    votes: HashSet<scp_proto::SCPValue>,      // X
-    accepted: HashSet<scp_proto::SCPValue>,   // Y
+    votes: HashSet<scp_proto::SCPValue>, // X
+    accepted: HashSet<scp_proto::SCPValue>, // Y
     candidates: HashSet<scp_proto::SCPValue>, // Z
     latest_nominations: HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>, // N
     last_envelope: Option<scp_proto::SCPEnvelope>, // last envelope emitted by this node
     round_leaders: HashSet<scp_proto::SCPNodeID>, // nodes from quorum set that have the highest priority this round
-    nomination_started: bool,                     // true if 'nominate' was called
+    nomination_started: bool, // true if 'nominate' was called
     latest_composite_candidate: Option<scp_proto::SCPValue>, // the latest (if any) candidate value
-    previous_value: Option<scp_proto::SCPValue>,  // the value from the previous slot
+    previous_value: Option<scp_proto::SCPValue>, // the value from the previous slot
     timer_exp_count: i32, // the number of times the timer has expired; used for the quorum endpoint
 }
 
@@ -25,7 +25,9 @@ impl NominationState {
 }
 
 #[derive(Debug)]
-pub struct NominationProto<'a, 'b, C: Consensus, D: Driver>(pub &'a mut SlotProto<'b, C, D>);
+pub struct NominationProto<'a, 'b, C: Consensus, D: Driver>(
+    pub &'a mut SlotProto<'b, C, D>,
+);
 
 impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     fn slot_proto_mut(&mut self) -> &mut SlotProto<'b, C, D> {
@@ -60,8 +62,9 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         match self.nomination().latest_nominations.get(node_id) {
             None => true,
             Some(old_envelope) => {
-                if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: old_st } =
-                    &old_envelope.statement.pledges
+                if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                    nominate: old_st,
+                } = &old_envelope.statement.pledges
                 {
                     Self::is_newer_statement(old_st, st)
                 } else {
@@ -79,7 +82,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
         if Self::is_subset(&oldst.votes, &st.votes, &mut grows_votes) {
             let mut grows_accepted = false;
-            if Self::is_subset(&oldst.accepted, &st.accepted, &mut grows_accepted) {
+            if Self::is_subset(
+                &oldst.accepted,
+                &st.accepted,
+                &mut grows_accepted,
+            ) {
                 grows_votes || grows_accepted
             } else {
                 false
@@ -116,7 +123,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     pub fn is_sane(&self, st: &scp_proto::SCPStatement) -> bool {
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &st.pledges
+        {
             // Check that nomination has at least one vote or accepted value
             let has_content = !nom.votes.is_empty() || !nom.accepted.is_empty();
 
@@ -213,7 +223,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                 };
 
                 if should_update {
-                    self.nomination_mut().last_envelope = Some(envelope.clone());
+                    self.nomination_mut().last_envelope =
+                        Some(envelope.clone());
 
                     if self.slot_proto().is_fully_validated() {
                         self.driver().emit_envelope(envelope);
@@ -231,8 +242,14 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    pub fn accept_predicate(v: &scp_proto::SCPValue, st: &scp_proto::SCPStatement) -> bool {
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+    pub fn accept_predicate(
+        v: &scp_proto::SCPValue,
+        st: &scp_proto::SCPStatement,
+    ) -> bool {
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &st.pledges
+        {
             nom.accepted.iter().any(|accepted_val| accepted_val == v)
         } else {
             false
@@ -324,7 +341,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                         old_size, new_size
                     );
                     for rl in &self.nomination().round_leaders {
-                        debug!("  leader {}", self.driver().to_short_string(rl));
+                        debug!(
+                            "  leader {}",
+                            self.driver().to_short_string(rl)
+                        );
                     }
                 }
                 return;
@@ -358,7 +378,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    fn hash_node(&self, is_priority: bool, node_id: &scp_proto::SCPNodeID) -> u64 {
+    fn hash_node(
+        &self,
+        is_priority: bool,
+        node_id: &scp_proto::SCPNodeID,
+    ) -> u64 {
         if let Some(ref previous_value) = self.nomination().previous_value {
             self.driver().compute_hash_node(
                 self.slot_proto().index(),
@@ -397,36 +421,47 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         let mut new_hash = 0u64;
         let mut found_valid_value = false;
 
-        let pick_value = |value: &scp_proto::SCPValue,
-                          new_vote: &mut Option<scp_proto::SCPValue>,
-                          new_hash: &mut u64,
-                          found_valid_value: &mut bool| {
-            let value_to_nominate = match self.validate_value(value) {
-                ValidationLevel::FullyValid => Some(value.clone()),
-                _ => self.extract_valid_value(value),
-            };
+        let pick_value =
+            |value: &scp_proto::SCPValue,
+             new_vote: &mut Option<scp_proto::SCPValue>,
+             new_hash: &mut u64,
+             found_valid_value: &mut bool| {
+                let value_to_nominate = match self.validate_value(value) {
+                    ValidationLevel::FullyValid => Some(value.clone()),
+                    _ => self.extract_valid_value(value),
+                };
 
-            if let Some(valid_val) = value_to_nominate {
-                *found_valid_value = true;
-                if !self.nomination().votes.contains(&valid_val) {
-                    let cur_hash = self.hash_value(&valid_val);
-                    if cur_hash >= *new_hash {
-                        *new_hash = cur_hash;
-                        *new_vote = Some(valid_val);
+                if let Some(valid_val) = value_to_nominate {
+                    *found_valid_value = true;
+                    if !self.nomination().votes.contains(&valid_val) {
+                        let cur_hash = self.hash_value(&valid_val);
+                        if cur_hash >= *new_hash {
+                            *new_hash = cur_hash;
+                            *new_vote = Some(valid_val);
+                        }
                     }
                 }
-            }
-        };
+            };
 
         // First look through accepted values
         for val in nom.accepted.iter() {
-            pick_value(val, &mut new_vote, &mut new_hash, &mut found_valid_value);
+            pick_value(
+                val,
+                &mut new_vote,
+                &mut new_hash,
+                &mut found_valid_value,
+            );
         }
 
         // Move on to votes if we have not found a valid accepted value
         if !found_valid_value {
             for val in nom.votes.iter() {
-                pick_value(val, &mut new_vote, &mut new_hash, &mut found_valid_value);
+                pick_value(
+                    val,
+                    &mut new_vote,
+                    &mut new_hash,
+                    &mut found_valid_value,
+                );
             }
         }
 
@@ -440,15 +475,24 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    fn extract_valid_value(&self, value: &scp_proto::SCPValue) -> Option<scp_proto::SCPValue> {
+    fn extract_valid_value(
+        &self,
+        value: &scp_proto::SCPValue,
+    ) -> Option<scp_proto::SCPValue> {
         self.consensus()
             .extract_valid_value(self.slot_proto().index(), value)
     }
 
-    pub fn should_process_envelope(&self, env: &scp_proto::SCPEnvelope) -> bool {
+    pub fn should_process_envelope(
+        &self,
+        env: &scp_proto::SCPEnvelope,
+    ) -> bool {
         let st = &env.statement;
 
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &st.pledges
+        {
             if !self.is_newer_node_statement(&st.node_id, nom) {
                 return false;
             }
@@ -479,10 +523,16 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     }
 
     #[instrument(skip_all)]
-    pub fn process_envelope(&mut self, envelope: &scp_proto::SCPEnvelope) -> EnvelopeState {
+    pub fn process_envelope(
+        &mut self,
+        envelope: &scp_proto::SCPEnvelope,
+    ) -> EnvelopeState {
         let st = &envelope.statement;
 
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &st.pledges
+        {
             if !self.is_newer_node_statement(&st.node_id, nom) {
                 return EnvelopeState::Invalid;
             }
@@ -514,18 +564,21 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                     }
 
                     // Check if this value can be accepted via federated accept
-                    let votes_predicate = |st: &scp_proto::SCPStatement| -> bool {
-                        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
+                    let votes_predicate =
+                        |st: &scp_proto::SCPStatement| -> bool {
+                            if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
                             &st.pledges
                         {
                             nom.votes.iter().any(|vote| vote == v)
                         } else {
                             false
                         }
-                    };
+                        };
 
                     let accept_predicate =
-                        |st: &scp_proto::SCPStatement| -> bool { Self::accept_predicate(v, st) };
+                        |st: &scp_proto::SCPStatement| -> bool {
+                            Self::accept_predicate(v, st)
+                        };
 
                     if self.slot_proto().federated_accept(
                         &votes_predicate,
@@ -537,7 +590,9 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                             self.nomination_mut().accepted.insert(v.clone());
                             self.nomination_mut().votes.insert(v.clone());
                             modified = true;
-                        } else if let Some(valid_value) = self.extract_valid_value(v) {
+                        } else if let Some(valid_value) =
+                            self.extract_valid_value(v)
+                        {
                             // The value made it pretty far: see if we can vote for a variation
                             // that we consider valid
                             if self.nomination_mut().votes.insert(valid_value) {
@@ -554,29 +609,36 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                     }
 
                     let accept_predicate =
-                        |st: &scp_proto::SCPStatement| -> bool { Self::accept_predicate(a, st) };
+                        |st: &scp_proto::SCPStatement| -> bool {
+                            Self::accept_predicate(a, st)
+                        };
 
-                    if self
-                        .slot_proto()
-                        .federated_ratify(&accept_predicate, &self.nomination().latest_nominations)
-                    {
+                    if self.slot_proto().federated_ratify(
+                        &accept_predicate,
+                        &self.nomination().latest_nominations,
+                    ) {
                         self.nomination_mut().candidates.insert(a.clone());
                         new_candidates = true;
                         // Stop the timer, as there's no need to continue nominating
-                        self.driver()
-                            .stop_timer(self.slot_proto().index(), Timer::Nomination);
+                        self.driver().stop_timer(
+                            self.slot_proto().index(),
+                            Timer::Nomination,
+                        );
                     }
                 }
 
                 // Only take round leader votes if we're still looking for candidates
                 if self.nomination().candidates.is_empty()
                     && self.nomination().round_leaders.contains(&st.node_id)
-                    && let Some(new_vote) = self.get_new_value_from_nomination(nom)
+                    && let Some(new_vote) =
+                        self.get_new_value_from_nomination(nom)
                 {
                     if self.nomination_mut().votes.insert(new_vote.clone()) {
                         modified = true;
-                        self.consensus()
-                            .nominating_value(self.slot_proto().index(), &new_vote);
+                        self.consensus().nominating_value(
+                            self.slot_proto().index(),
+                            &new_vote,
+                        );
                     } else {
                         panic!("bug")
                     }
@@ -588,13 +650,18 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
                 if new_candidates {
                     // Combine candidates and update state
-                    if let Some(composite) = self.consensus().combine_candidates(
-                        self.slot_proto().index(),
-                        &self.nomination().candidates,
-                    ) {
-                        self.nomination_mut().latest_composite_candidate = Some(composite.clone());
-                        self.consensus()
-                            .updated_candidate_value(self.slot_proto().index(), &composite);
+                    if let Some(composite) =
+                        self.consensus().combine_candidates(
+                            self.slot_proto().index(),
+                            &self.nomination().candidates,
+                        )
+                    {
+                        self.nomination_mut().latest_composite_candidate =
+                            Some(composite.clone());
+                        self.consensus().updated_candidate_value(
+                            self.slot_proto().index(),
+                            &composite,
+                        );
                         self.slot_proto_mut().bump_state(&composite, false);
                     }
                 }
@@ -607,9 +674,14 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    pub fn get_statement_values(st: &scp_proto::SCPStatement) -> Vec<scp_proto::SCPValue> {
+    pub fn get_statement_values(
+        st: &scp_proto::SCPStatement,
+    ) -> Vec<scp_proto::SCPValue> {
         let mut res = Vec::new();
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } = &st.pledges {
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &st.pledges
+        {
             Self::apply_all(nom, |v| {
                 res.push(v.clone());
             });
@@ -669,9 +741,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
 
         // Add a few more values from other leaders
         for leader in self.nomination().round_leaders.clone().iter() {
-            if let Some(latest_nomination) = self.nomination().latest_nominations.get(leader)
-                && let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
-                    &latest_nomination.statement.pledges
+            if let Some(latest_nomination) =
+                self.nomination().latest_nominations.get(leader)
+                && let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                    nominate: nom,
+                } = &latest_nomination.statement.pledges
                 && let Some(new_vote) = self.get_new_value_from_nomination(nom)
                 && self.nomination_mut().votes.insert(new_vote.clone())
             {
@@ -682,7 +756,8 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
 
         // If we're leader, add our value if we haven't added any votes yet
-        let local_node_id = self.slot_proto().local_proto().get_node_id().clone();
+        let local_node_id =
+            self.slot_proto().local_proto().get_node_id().clone();
         if self.nomination().round_leaders.contains(&local_node_id)
             && self.nomination().votes.is_empty()
         {
@@ -741,8 +816,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
     pub fn get_json_info(&self) -> serde_json::Value {
         let mut ret = serde_json::json!({});
 
-        ret["roundnumber"] = serde_json::Value::from(self.nomination().round_number);
-        ret["started"] = serde_json::Value::from(self.nomination().nomination_started);
+        ret["roundnumber"] =
+            serde_json::Value::from(self.nomination().round_number);
+        ret["started"] =
+            serde_json::Value::from(self.nomination().nomination_started);
 
         let mut votes_array = Vec::new();
         for vote in &self.nomination().votes {
@@ -783,9 +860,10 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             return state;
         }
 
-        let enough_time_has_passed = i64::from(self.nomination().timer_exp_count)
-            >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
-            || self_already_moved_on;
+        let enough_time_has_passed =
+            i64::from(self.nomination().timer_exp_count)
+                >= NUM_TIMEOUTS_THRESHOLD_FOR_REPORTING
+                || self_already_moved_on;
 
         match self.nomination().latest_nominations.get(node_id) {
             None => {
@@ -798,12 +876,15 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
             }
             Some(other_envelope) => {
                 if enough_time_has_passed
-                    && let Some(ref last_envelope) = self.nomination().last_envelope
+                    && let Some(ref last_envelope) =
+                        self.nomination().last_envelope
                     && let (
                         scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
                             nominate: other_nom,
                         },
-                        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: my_nom },
+                        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+                            nominate: my_nom,
+                        },
                     ) = (
                         &other_envelope.statement.pledges,
                         &last_envelope.statement.pledges,
@@ -812,8 +893,11 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
                     // Enough time has passed & we have some information on this node.
                     // We'll examine the information to determine the state of this node.
                     let mut not_equal = false;
-                    let is_subset =
-                        Self::is_subset(&other_nom.accepted, &my_nom.accepted, &mut not_equal);
+                    let is_subset = Self::is_subset(
+                        &other_nom.accepted,
+                        &my_nom.accepted,
+                        &mut not_equal,
+                    );
 
                     if is_subset {
                         if not_equal {
@@ -834,15 +918,19 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         state
     }
 
-    pub fn set_state_from_envelope(&mut self, envelope: &scp_proto::SCPEnvelope) {
+    pub fn set_state_from_envelope(
+        &mut self,
+        envelope: &scp_proto::SCPEnvelope,
+    ) {
         if self.nomination().nomination_started {
             panic!("cannot set state after nomination is started");
         }
 
         self.record_envelope(envelope);
 
-        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate: nom } =
-            &envelope.statement.pledges
+        if let scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
+            nominate: nom,
+        } = &envelope.statement.pledges
         {
             // Add all accepted values from the envelope
             for accepted_value in nom.accepted.iter() {
@@ -887,7 +975,9 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         self.nomination().latest_nominations.get(node_id).cloned()
     }
 
-    pub fn get_latest_composite_candidate(&self) -> Option<scp_proto::SCPValue> {
+    pub fn get_latest_composite_candidate(
+        &self,
+    ) -> Option<scp_proto::SCPValue> {
         self.nomination().latest_composite_candidate.clone()
     }
 

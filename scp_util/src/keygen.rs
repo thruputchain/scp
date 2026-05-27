@@ -11,14 +11,17 @@ pub fn generate_secret_key(seed: &[u8]) -> scp_proto::SCPSecretKey {
 
     let mut secret_key_bytes = [0u8; 64];
     secret_key_bytes[..32].copy_from_slice(&signing_key.to_bytes());
-    secret_key_bytes[32..].copy_from_slice(&signing_key.verifying_key().to_bytes());
+    secret_key_bytes[32..]
+        .copy_from_slice(&signing_key.verifying_key().to_bytes());
 
     scp_proto::SCPSecretKey::Ed25519 {
         ed25519: scp_proto::SCPEd25519SecretKey::from(secret_key_bytes),
     }
 }
 
-pub fn derive_public_key(secret_key: &scp_proto::SCPSecretKey) -> scp_proto::SCPPublicKey {
+pub fn derive_public_key(
+    secret_key: &scp_proto::SCPSecretKey,
+) -> scp_proto::SCPPublicKey {
     match secret_key {
         scp_proto::SCPSecretKey::Ed25519 { ed25519 } => {
             let secret_bytes: &[u8; 32] = &ed25519[..32].try_into().unwrap();
@@ -38,7 +41,9 @@ pub fn derive_node_id(sk: &scp_proto::SCPSecretKey) -> scp_proto::SCPNodeID {
 }
 
 /// Parse a SecretKey from a Base64 standard encoded string of the 64-byte secret key
-pub fn parse_secret_key_from_base64(base64_str: &str) -> Result<scp_proto::SCPSecretKey, String> {
+pub fn parse_secret_key_from_base64(
+    base64_str: &str,
+) -> Result<scp_proto::SCPSecretKey, String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     if base64_str.is_empty() {

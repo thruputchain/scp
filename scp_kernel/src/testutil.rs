@@ -180,8 +180,9 @@ pub fn verify_externalize(
     commit_ballot: scp_proto::SCPBallot,
     n_h: scp_proto::SCPCount,
 ) {
-    let expected = make_externalize(secret_key, qset_hash, slot_index, commit_ballot, n_h)
-        .expect("Failed to create expected envelope");
+    let expected =
+        make_externalize(secret_key, qset_hash, slot_index, commit_ballot, n_h)
+            .expect("Failed to create expected envelope");
 
     assert_eq!(expected.statement, actual.statement,);
 }
@@ -194,8 +195,9 @@ pub fn verify_nominate(
     votes: Vec<scp_proto::SCPValue>,
     accepted: Vec<scp_proto::SCPValue>,
 ) {
-    let expected = make_nominate(secret_key, qset_hash, slot_index, votes, accepted)
-        .expect("Failed to create expected envelope");
+    let expected =
+        make_nominate(secret_key, qset_hash, slot_index, votes, accepted)
+            .expect("Failed to create expected envelope");
 
     assert_eq!(expected.statement, actual.statement,);
 }

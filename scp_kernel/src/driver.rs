@@ -45,7 +45,10 @@ impl std::fmt::Display for DriverCallback {
 }
 #[allow(clippy::wrong_self_convention)]
 pub trait Driver: Clone + Debug {
-    fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet>;
+    fn get_qset(
+        &self,
+        h: &scp_proto::SCPHash,
+    ) -> Option<scp_proto::SCPQuorumSet>;
     fn to_short_string(&self, pk: &scp_proto::SCPNodeID) -> String;
     fn to_str_key(&self, pk: &scp_proto::SCPNodeID, full_key: bool) -> String;
     fn from_str_key(&self, s: &str) -> Result<scp_proto::SCPNodeID, String>; // XXX: get from KeyUtils.cpp
@@ -76,7 +79,11 @@ pub trait Driver: Clone + Debug {
     fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope);
 
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope);
-    fn compute_timeout(&self, round_number: scp_proto::SCPCount, is_nomination: bool) -> Duration;
+    fn compute_timeout(
+        &self,
+        round_number: scp_proto::SCPCount,
+        is_nomination: bool,
+    ) -> Duration;
     fn start_timer(
         &self,
         slot_index: SlotIndex,
@@ -90,7 +97,11 @@ pub trait Driver: Clone + Debug {
 pub trait DriverCb {
     fn received_envelope(&mut self, env: &scp_proto::SCPEnvelope);
     fn driver_calling_back(&mut self, cb: DriverCallback);
-    fn set_state_from_envelope(&mut self, slot_index: SlotIndex, envelope: &scp_proto::SCPEnvelope);
+    fn set_state_from_envelope(
+        &mut self,
+        slot_index: SlotIndex,
+        envelope: &scp_proto::SCPEnvelope,
+    );
 }
 
 // values used to switch hash function between priority and neighborhood checks

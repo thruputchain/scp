@@ -2,7 +2,9 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::Parse;
-use syn::{Block, Expr, ExprBlock, ItemFn, LitStr, Local, Stmt, StmtMacro, parse_quote};
+use syn::{
+    Block, Expr, ExprBlock, ItemFn, LitStr, Local, Stmt, StmtMacro, parse_quote,
+};
 
 #[proc_macro_attribute]
 pub fn shfix(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -20,7 +22,8 @@ fn shfix_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
         for (path, block) in rw_block.exclusive {
             let mut unfolded_fn = input_fn.clone();
             let name = format!("{}_{}", unfolded_fn.sig.ident, path.join("_"));
-            unfolded_fn.sig.ident = syn::Ident::new(&name, input_fn.sig.ident.span());
+            unfolded_fn.sig.ident =
+                syn::Ident::new(&name, input_fn.sig.ident.span());
             *unfolded_fn.block = block;
             output.extend(quote! { #unfolded_fn });
         }
@@ -59,13 +62,19 @@ fn rewrite_stmts(stmts: &[Stmt]) -> Vec<Rewritten<Stmt>> {
                 });
             }
             Stmt::Macro(stmt_macro) => {
-                if let Some((id, description, section_block)) = parse_section_macro(stmt_macro) {
-                    let rw_section_block = rewrite_block(Some(&description), &section_block);
+                if let Some((id, description, section_block)) =
+                    parse_section_macro(stmt_macro)
+                {
+                    let rw_section_block =
+                        rewrite_block(Some(&description), &section_block);
                     if rw_section_block.exclusive.is_empty() {
                         rewritten.push(Rewritten {
                             exclusive: vec![(
                                 vec![id.clone()],
-                                lift_block_to_stmt(stmt_macro, rw_section_block.fixed),
+                                lift_block_to_stmt(
+                                    stmt_macro,
+                                    rw_section_block.fixed,
+                                ),
                             )],
                             fixed: lift_block_to_stmt(
                                 stmt_macro,
@@ -78,7 +87,11 @@ fn rewrite_stmts(stmts: &[Stmt]) -> Vec<Rewritten<Stmt>> {
                         });
                     } else {
                         rewritten.push(Rewritten {
-                            exclusive: lift_blocks_to_stmts(&id, stmt_macro, rw_section_block),
+                            exclusive: lift_blocks_to_stmts(
+                                &id,
+                                stmt_macro,
+                                rw_section_block,
+                            ),
                             fixed: lift_block_to_stmt(
                                 stmt_macro,
                                 Block {
@@ -137,12 +150,13 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
             .into_iter()
             .map(|(p, b)| {
                 let mut new_local = local.clone();
-                let new_expr_closure =
-                    if let Expr::Closure(x) = &mut *new_local.init.as_mut().unwrap().expr {
-                        x
-                    } else {
-                        panic!("bug")
-                    };
+                let new_expr_closure = if let Expr::Closure(x) =
+                    &mut *new_local.init.as_mut().unwrap().expr
+                {
+                    x
+                } else {
+                    panic!("bug")
+                };
                 let expr_block = Expr::Block(ExprBlock {
                     attrs: expr_block.attrs.clone(),
                     label: expr_block.label.clone(),
@@ -155,7 +169,8 @@ fn rewrite_local(local: &Local) -> Rewritten<Local> {
 
         // fixed
         let mut new_fixed = local.clone();
-        let new_expr_closure = if let Expr::Closure(x) = &mut *new_fixed.init.as_mut().unwrap().expr
+        let new_expr_closure = if let Expr::Closure(x) =
+            &mut *new_fixed.init.as_mut().unwrap().expr
         {
             x
         } else {
@@ -240,7 +255,9 @@ fn rewrite_block(description: Option<&str>, block: &Block) -> Rewritten<Block> {
 }
 
 // unfoldings with one exclusive activation, unfolding with no exclusive activations
-fn unfold_stmts(stmts: &[Rewritten<Stmt>]) -> (Vec<(SectionPath, Vec<Stmt>)>, Vec<Stmt>) {
+fn unfold_stmts(
+    stmts: &[Rewritten<Stmt>],
+) -> (Vec<(SectionPath, Vec<Stmt>)>, Vec<Stmt>) {
     if stmts.is_empty() {
         (vec![], vec![])
     } else {
@@ -277,7 +294,9 @@ fn grab_fixed(stmts: &[Rewritten<Stmt>]) -> Vec<&Stmt> {
 
 /// parses macros of the form:
 ///     section!(identifier, "description", { ... });
-fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, Block)> {
+fn parse_section_macro(
+    stmt_macro: &syn::StmtMacro,
+) -> Option<(String, String, Block)> {
     if !stmt_macro.mac.path.is_ident("section") {
         return None;
     }
@@ -308,7 +327,9 @@ fn parse_section_macro(stmt_macro: &syn::StmtMacro) -> Option<(String, String, B
     }
 
     match syn::parse2::<SectionArgs>(tokens) {
-        Ok(args) => Some((args.ident.to_string(), args.description.value(), args.block)),
+        Ok(args) => {
+            Some((args.ident.to_string(), args.description.value(), args.block))
+        }
         Err(_) => None,
     }
 }
@@ -509,14 +530,18 @@ mod tests {
 
     #[test]
     fn test_impl() {
-        for (i, TestCase { input, expected }) in get_test_cases().iter().enumerate() {
+        for (i, TestCase { input, expected }) in
+            get_test_cases().iter().enumerate()
+        {
             let attr_args = TokenStream2::new();
             let result = shfix_impl(attr_args, quote! { #input });
 
             println!("test #{}", i);
 
-            let result_file: syn::File = syn::parse2(quote! { #result }).unwrap();
-            let expected_file: syn::File = syn::parse2(quote! { #expected }).unwrap();
+            let result_file: syn::File =
+                syn::parse2(quote! { #result }).unwrap();
+            let expected_file: syn::File =
+                syn::parse2(quote! { #expected }).unwrap();
 
             let result_pretty = prettyplease::unparse(&result_file);
             let expected_pretty = prettyplease::unparse(&expected_file);

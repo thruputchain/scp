@@ -20,7 +20,7 @@ mod handler;
 #[command(
     version,
     about = "SCP Server - Stellar Consensus Protocol stand-alone server",
-    long_about = "Use `RUST_LOG=warn|info|debug|trace` to set loggin level."
+    long_about = "Use `RUST_LOG=warn|info|debug|trace` to set logging level."
 )]
 struct Args {
     #[arg(

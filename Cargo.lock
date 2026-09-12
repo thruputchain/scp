@@ -718,7 +718,7 @@ dependencies = [
 [[package]]
 name = "groundhog-serde_arrays"
 version = "0.2.0"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "5f38492b48f71b7723c02af35531586816c22057e25c3acf173ef8a9b878ecbf"
 dependencies = [
  "serde",
@@ -1322,7 +1322,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 [[package]]
 name = "rpc_driver"
 version = "0.8.0"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "94230b9c2a75c447cad1171efcfed9748e16e05820cefaea6b7a5283ce047fc6"
 dependencies = [
  "async-trait",
@@ -2086,7 +2086,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 [[package]]
 name = "xdr-common"
 version = "0.5.6"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "b7ce1fcbae14263817d06f3dda88660cd2a928842a129dbdffe6e9e77e9ca8d3"
 dependencies = [
  "escape-bytes",
@@ -2098,7 +2098,7 @@ dependencies = [
 [[package]]
 name = "xdr-derive"
 version = "0.5.6"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "df90f8a4c5f1cfbad21b2d33cd38050714efa410e0b3f12043abdb0b7fe9c8d3"
 dependencies = [
  "darling 0.20.11",
@@ -2110,7 +2110,7 @@ dependencies = [
 [[package]]
 name = "xdr-repr"
 version = "0.5.6"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "5a7217bb1fb6b36311b32135d19fa1fefcbc72cb2e2fce6d42deff7277e5ed97"
 dependencies = [
  "xdr-common",
@@ -2119,7 +2119,7 @@ dependencies = [
 [[package]]
 name = "xdrs"
 version = "0.5.6"
-source = "sparse+https://groundhog.dev/crates/api/v1/crates/"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "68e94d5abd03594da02ad595a1be1e11ed3805d1d92bc702995b90658f21913f"
 dependencies = [
  "thiserror",

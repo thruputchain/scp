@@ -34,18 +34,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run hog schedule
+        # Interpolations expand into the script *before* the shell sees it, so a
+        # branch name carrying shell syntax would execute here. Pass via env.
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}  # PR branch, else pushed branch
+          REPO_NAME: ${{ github.event.repository.name }}
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          # For pull requests, use the PR branch name (github.head_ref)
-          # For push/workflow_dispatch, use the branch from github.ref_name
-          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
           echo "Branch name: $BRANCH_NAME"
           hog_sched \
-            --i="${{ github.event.repository.name }}-${{ github.run_id }}" \
-            --key=github_repo --value=${{ github.repository }} \
-            --key=git_commit --value=${{ github.sha }} \
-            --key=git_branch --value=$BRANCH_NAME \
-            --key=cargo_registry_global_credential_providers --value=${{ env.CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS }} \
-            --key=cargo_registry_token --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_TOKEN }} \
-            --key=cargo_registry_index --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_INDEX }} \
-            --key=cargo_registry_source --value=${{ env.CARGO_REGISTRIES_GROUNDHOG_SOURCE }} \
+            --i="${REPO_NAME}-${RUN_ID}" \
+            --key=github_repo --value="$REPOSITORY" \
+            --key=git_commit --value="$SHA" \
+            --key=git_branch --value="$BRANCH_NAME" \
+            --key=cargo_registry_global_credential_providers --value="$CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS" \
+            --key=cargo_registry_token --value="$CARGO_REGISTRIES_GROUNDHOG_TOKEN" \
+            --key=cargo_registry_index --value="$CARGO_REGISTRIES_GROUNDHOG_INDEX" \
+            --key=cargo_registry_source --value="$CARGO_REGISTRIES_GROUNDHOG_SOURCE" \
             ./scripts/schedules/ci.toml

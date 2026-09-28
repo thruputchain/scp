@@ -22,7 +22,6 @@ use xdrs::*;
 
 
 use ::serde::{{Serialize, Deserialize}};
-use ::serde_arrays;
 
 
 
@@ -57,7 +56,7 @@ pub struct SCP_int128_xdr {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct SCPEd25519Signature {
-    #[serde(with = "serde_arrays::hex")]
+    #[serde(with = "xdr_common::serde_hex")]
     inner: [u8; 64 as usize],
 }
 impl From<[u8; 64 as usize]> for SCPEd25519Signature {
@@ -117,7 +116,7 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519Signature {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct SCPEd25519PublicKey {
-    #[serde(with = "serde_arrays::hex")]
+    #[serde(with = "xdr_common::serde_hex")]
     inner: [u8; 32 as usize],
 }
 impl From<[u8; 32 as usize]> for SCPEd25519PublicKey {
@@ -176,7 +175,7 @@ impl<'r> ReadXDR<'r> for &'r SCPEd25519PublicKey {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct SCPEd25519SecretKey {
-    #[serde(with = "serde_arrays::hex")]
+    #[serde(with = "xdr_common::serde_hex")]
     inner: [u8; 64 as usize],
 }
 impl From<[u8; 64 as usize]> for SCPEd25519SecretKey {
@@ -307,7 +306,7 @@ pub enum SCPSecretKey {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct SCPSHA256Hash {
-    #[serde(with = "serde_arrays::hex")]
+    #[serde(with = "xdr_common::serde_hex")]
     inner: [u8; 32 as usize],
 }
 impl From<[u8; 32 as usize]> for SCPSHA256Hash {

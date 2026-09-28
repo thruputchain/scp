@@ -19,10 +19,14 @@ std = []
 
 [dependencies]
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }
-serde_arrays = { package = "groundhog-serde_arrays", version = "0.2.0", registry = "groundhog", default-features = false, features = ["alloc"] }
 serde_with = { version = "3.16.1", features = [] }
 async-trait = "0.1.89"
 
 xdrs = { workspace = true, features = ["serde"] }
-xdr-common = { workspace = true }
+# The Serde adapter operates on plain byte arrays, independently of the
+# older XDR/RPC types used by this workspace.
+xdr-common = { version = "0.10.2", registry = "groundhog", features = ["serde"] }
 rpc_driver = { workspace = true }
+
+[dev-dependencies.serde_json]
+version = "1.0"

@@ -11,6 +11,10 @@ all-features = true
 
 [advisories]
 ignore = []
+# Informational advisories (unsound, unmaintained) default to workspace-direct
+# dependencies only.
+unsound = "all"
+unmaintained = "all"
 
 [licenses]
 # Workspace crates carry no license field.

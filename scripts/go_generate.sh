@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 set -xeuo pipefail
 
-SCRIPT_DIR=$(dirname $(readlink -f "$0"))
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # generate pkg.go
 

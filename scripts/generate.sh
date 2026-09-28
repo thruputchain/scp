@@ -2,7 +2,7 @@
 
 set -xeuo pipefail
 
-SCRIPT_DIR=$(dirname $(readlink -f "$0"))
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # XDR files in protocol/ from which to generate rust
 protos=(
@@ -13,7 +13,7 @@ protos=(
   scp_types.x
 )
 
-[[ -z $XDRC ]] && XDRC="../../hogd/vscode/x23/x23c/x23c"
+XDRC="${XDRC:-../../hogd/vscode/x23/x23c/x23c}"
 
 echo "-- Using XDRC=${XDRC} --" >&2
 

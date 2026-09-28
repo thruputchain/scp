@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 
 
 source ./scripts/setup_cargo.sh

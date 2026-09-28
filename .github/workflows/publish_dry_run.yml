@@ -24,6 +24,13 @@ jobs:
         run: |
             echo "Cleaning up .gitconfig"
             rm -f /home/hogci/.gitconfig
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Loaded after the repo checkout, but before the actions checkout,
+      # which authenticates through the agent via the insteadOf rewrite below.
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
@@ -36,11 +43,6 @@ jobs:
             ${{ secrets.SCP_TO_XDRS_KEY }}
             ${{ secrets.SCP_TO_XDR_RPC_KEY }}
             ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
-
-      - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
 
       - name: Configure git to use SSH
         run: |

@@ -40,7 +40,14 @@ jobs:
         run: |
           echo "Cleaning up .gitconfig"
           rm -f /home/hogci/.gitconfig
-      - uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Loaded last: no earlier step needs the keys.
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
@@ -50,10 +57,6 @@ jobs:
             ${{ secrets.SCP_TO_XDRS_KEY }}
             ${{ secrets.SCP_TO_XDR_RPC_KEY }}
             ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
 
       - name: Run hog schedule
         # Interpolations expand into the script *before* the shell sees it, so a

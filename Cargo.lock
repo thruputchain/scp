@@ -705,15 +705,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "groundhog-serde_arrays"
-version = "0.2.0"
-source = "sparse+https://crates.thruput.network/api/v1/crates/"
-checksum = "5f38492b48f71b7723c02af35531586816c22057e25c3acf173ef8a9b878ecbf"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,7 +1360,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scp_kernel"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "async-trait",
  "rand",
@@ -1383,25 +1374,25 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
- "xdr-common",
+ "xdr-common 0.5.6",
 ]
 
 [[package]]
 name = "scp_proto"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "async-trait",
- "groundhog-serde_arrays",
  "rpc_driver",
  "serde",
+ "serde_json",
  "serde_with",
- "xdr-common",
+ "xdr-common 0.10.2",
  "xdrs",
 ]
 
 [[package]]
 name = "scp_server"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "async-trait",
  "clap",
@@ -1416,12 +1407,12 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "xdr-common",
+ "xdr-common 0.5.6",
 ]
 
 [[package]]
 name = "scp_util"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1429,7 +1420,7 @@ dependencies = [
  "serde",
  "sha2 0.10.9",
  "thiserror",
- "xdr-common",
+ "xdr-common 0.5.6",
  "xdrs",
 ]
 
@@ -1546,7 +1537,7 @@ dependencies = [
 
 [[package]]
 name = "shfix"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2073,6 +2064,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "xdr-common"
+version = "0.10.2"
+source = "sparse+https://crates.thruput.network/api/v1/crates/"
+checksum = "60b53dc86cc6d89204bed084f8207cc2e24bdc5db888a031e3d92a180990034e"
+dependencies = [
+ "escape-bytes",
+ "serde",
+]
+
+[[package]]
 name = "xdr-derive"
 version = "0.5.6"
 source = "sparse+https://crates.thruput.network/api/v1/crates/"
@@ -2090,7 +2091,7 @@ version = "0.5.6"
 source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "5a7217bb1fb6b36311b32135d19fa1fefcbc72cb2e2fce6d42deff7277e5ed97"
 dependencies = [
- "xdr-common",
+ "xdr-common 0.5.6",
 ]
 
 [[package]]
@@ -2100,7 +2101,7 @@ source = "sparse+https://crates.thruput.network/api/v1/crates/"
 checksum = "68e94d5abd03594da02ad595a1be1e11ed3805d1d92bc702995b90658f21913f"
 dependencies = [
  "thiserror",
- "xdr-common",
+ "xdr-common 0.5.6",
  "xdr-derive",
  "xdr-repr",
 ]

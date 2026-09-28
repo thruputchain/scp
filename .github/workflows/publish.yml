@@ -10,10 +10,13 @@ env:
   CARGO_REGISTRIES_GROUNDHOG_INDEX: sparse+https://crates.thruput.network/api/v1/crates/
   CARGO_REGISTRIES_GROUNDHOG_SOURCE: sparse+https://crates.thruput.network/api/v1/crates/
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     permissions:
-      contents: write
+      contents: write # pushes the version tag
     runs-on: hog1
 
     steps:
@@ -23,7 +26,7 @@ jobs:
             rm -f /home/hogci/.gitconfig
 
       - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
@@ -36,20 +39,21 @@ jobs:
             ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Configure git to use SSH
         run: |
           git config --global url."git@github.com:".insteadOf "https://github.com/"
 
       - name: Checkout actions repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: groundhogchain/actions
           path: actions
-          ref: main
+          ref: af074672d3a6f3ddedcacd758224ea5a5cf2a8f3 # v0
+          persist-credentials: false
 
       - name: dry run
         uses: ./actions/cargo-publish-dry-run
@@ -62,9 +66,13 @@ jobs:
         uses: ./actions/cargo-version-tag
 
       - name: push tag
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ steps.publish-tag.outputs.tag }}
         run: |
-          git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}.git
-          TAG="${{ steps.publish-tag.outputs.tag }}"
+          git remote set-url origin "https://$ACTOR:$TOKEN@github.com/$REPOSITORY.git"
           LOCAL_COMMIT=$(git rev-parse "$TAG")
           # Check if tag exists on remote and get its commit SHA
           REMOTE_TAG_REF=$(git ls-remote origin "refs/tags/$TAG" | cut -f1)
@@ -82,7 +90,7 @@ jobs:
             # Tag doesn't exist on remote, push it
             git push origin "$TAG"
           fi
-          git remote set-url origin git@github.com:${{ github.repository }}.git
+          git remote set-url origin "git@github.com:$REPOSITORY.git"
 
       - name: publish
         uses: ./actions/cargo-publish

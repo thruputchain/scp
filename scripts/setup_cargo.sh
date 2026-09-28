@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 set -x
 echo 'setting up cargo'
 rm -r .cargo/ # clear the .cargo directory, so that we can symlink into the actual .cargo install

@@ -1,0 +1,55 @@
+# cargo-deny configuration: advisory, license, source, and duplicate-version
+# policy. https://embarkstudios.github.io/cargo-deny/
+#
+# Advisories are checked per-PR (ci.yml) and daily (audit.yml). The daily run
+# is what catches an advisory filed against an already-frozen Cargo.lock.
+#
+# Every exception names the dependency that needs it.
+
+[graph]
+all-features = true
+
+[advisories]
+ignore = []
+
+[licenses]
+# Workspace crates carry no license field.
+private = { ignore = true }
+allow = [
+    "Apache-2.0",
+    "MIT",
+    # wasi, wasip2, wit-bindgen: not implied by the bare Apache-2.0 above.
+    "Apache-2.0 WITH LLVM-exception",
+    # fiat-crypto
+    "BSD-1-Clause",
+    # zerocopy
+    "BSD-2-Clause",
+    # curve25519-dalek, ed25519-dalek, matchit, subtle
+    "BSD-3-Clause",
+    # unicode-ident is (MIT OR Apache-2.0) AND Unicode-3.0
+    "Unicode-3.0",
+    # dual-licensed Unlicense OR MIT (byteorder, memchr)
+    "Unlicense",
+    # miniz_oxide
+    "Zlib",
+]
+# NOTE: r-efi is "MIT OR Apache-2.0 OR LGPL-2.1-or-later". The permissive OR is
+# satisfied by MIT above, so LGPL is deliberately NOT allowed and carries no
+# obligation. `cargo deny list` still prints r-efi under LGPL-2.1-or-later
+# because it enumerates every license in an expression; that is not evidence of
+# a copyleft dependency.
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Internal path dependencies carry no version requirement. Registry wildcards
+# stay denied.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+    "sparse+https://crates.thruput.network/api/v1/crates/",
+]

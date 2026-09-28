@@ -15,6 +15,9 @@ ignore = []
 # dependencies only.
 unsound = "all"
 unmaintained = "all"
+# Inert while we fetch every run; matters only if the DB is cached or
+# --offline is used. Default bound is 90 days; measured from the last fetch.
+maximum-db-staleness = "P7D"
 
 [licenses]
 # Workspace crates carry no license field.

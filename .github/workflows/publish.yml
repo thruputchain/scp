@@ -43,7 +43,6 @@ jobs:
             ${{ secrets.SCP_TO_XDR_COMMON_KEY }}
             ${{ secrets.SCP_TO_XDRS_KEY }}
             ${{ secrets.SCP_TO_XDR_RPC_KEY }}
-            ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
 
       - name: Configure git to use SSH
         run: |

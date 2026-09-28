@@ -22,7 +22,6 @@ use xdrs::*;
 
 
 use ::serde::{{Serialize, Deserialize}};
-use ::serde_arrays;
 
 
 

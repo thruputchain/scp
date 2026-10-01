@@ -2,6 +2,12 @@
 resolver = "3"
 members = ["shfix", "scp_proto", "scp_util", "scp_kernel", "scp_server"]
 
+# scpd previously shipped from the dev profile; keep overflow checks on so
+# moving to release does not silently drop overflow panics.
+[profile.release]
+debug = "line-tables-only"
+overflow-checks = true
+
 [workspace.package]
 version = "1.2.2"
 edition = "2024"

@@ -12,6 +12,12 @@ git remote add origin git@github.com:{{ .github_repo }}.git
 git fetch --depth 1 origin {{ .git_commit }} --no-progress --quiet
 git checkout -q {{ .git_commit }}
 
+# setup_cargo.sh replaces .cargo with the shared Cargo installation. Keep the
+# repository config outside that directory and explicitly load it for release
+# checks, without writing project flags into the shared installation's config.
+release_config="$PWD/ci-release-cargo-config.toml"
+cp .cargo/config.toml "$release_config"
+
 source ./scripts/prepare_env.sh > prepare_env.log 2>&1 || (cat prepare_env.log && exit 1)
 
 cargo fetch
@@ -24,6 +30,24 @@ cargo clippy --offline --locked -p scp_server --no-deps -- -D warnings
 cargo clippy --offline --locked -p scp_server --no-deps --features heap-profiling -- -D warnings
 cargo test --offline --locked -p scp_server --features heap-profiling
 cargo test --offline --locked -p scp_server --features heap-profiling --release
+
+# A fresh target directory guarantees verbose output includes the scpd rustc
+# invocation even when the shared installation has cached release artifacts.
+# No `|| exit 1` after the subshell: that would put it in a context where bash
+# ignores errexit, so a failed check inside would not stop the subshell. The
+# outer `set -e` fails the job when the subshell exits non-zero.
+(
+    set -euo pipefail
+    unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS
+    mkdir -p "$PWD/target"
+    CARGO_TARGET_DIR=$(mktemp -d "$PWD/target/ci-release.XXXXXX")
+    export CARGO_TARGET_DIR
+    cargo --config "$release_config" build --release --offline --locked -p scp_server --bin scpd -v 2>&1 | tee release-build.log
+    # Check flags on the binary's actual compiler invocation, not a dependency.
+    grep -E '^ *Running `.*--crate-name scpd ' release-build.log | grep -F -- '-C force-frame-pointers=yes'
+    readelf -n "$CARGO_TARGET_DIR/release/scpd" > release-notes.log
+    grep -Eq 'Build ID: [[:xdigit:]]+' release-notes.log
+)
 
 """
 

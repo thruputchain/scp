@@ -174,7 +174,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip_all, name = "slot.process_envelope", fields(slot_index = envelope.statement.slot_index))]
     pub fn process_envelope(
         &mut self,
         envelope: &scp_proto::SCPEnvelope,

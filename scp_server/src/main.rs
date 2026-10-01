@@ -1,6 +1,5 @@
 use clap::Parser;
 use core::net::SocketAddr;
-use futures::future;
 use rpc_driver::{ConnectionConfig, RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
 use tokio::net::{TcpListener, TcpSocket};
@@ -21,6 +20,7 @@ mod handler;
 )]
 mod heap_profile;
 mod heap_profiling;
+mod telemetry;
 
 #[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 #[global_allocator]
@@ -86,8 +86,14 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+    use opentelemetry::trace::TracerProvider;
+    use tracing_subscriber::prelude::*;
+
+    let (provider, telemetry_error) = telemetry::provider();
+    let otel_layer = provider.as_ref().map(|provider| {
+        tracing_opentelemetry::layer().with_tracer(provider.tracer("scpd"))
+    });
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(
             tracing_subscriber::fmt::format::FmtSpan::NEW
                 | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
@@ -98,9 +104,17 @@ async fn main() {
         .with_file(true)
         .with_line_number(true)
         .with_level(true)
-        .with_ansi(false)
-        // .compact()
+        .with_ansi(false);
+    tracing_subscriber::registry()
+        .with(
+            fmt_layer
+                .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
+        )
+        .with(otel_layer)
         .init();
+    if let Some(error) = telemetry_error {
+        tracing::warn!(%error, "OpenTelemetry tracing configuration warning");
+    }
     let args = Args::parse();
 
     if let Err(err) = heap_profiling::start_from_env().await {
@@ -174,7 +188,11 @@ async fn main() {
         RpcServer::new_with_config(control_listener, control_config);
     control_server.start().await;
 
-    future::pending::<()>().await;
+    telemetry::termination_signal().await;
+    if let Some(provider) = provider {
+        // Shutdown drains the batch processor; keep its blocking wait off Tokio.
+        let _ = tokio::task::spawn_blocking(move || provider.shutdown()).await;
+    }
 }
 
 async fn bind_control_listener(

@@ -251,7 +251,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         )
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip_all, name = "ballot.process_envelope", fields(slot_index = env.statement.slot_index))]
     pub fn process_envelope(
         &mut self,
         env: &scp_proto::SCPEnvelope,
@@ -407,7 +407,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), ballot_counter = n))]
     pub fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
@@ -488,7 +488,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), ballot_counter = new_ballot.counter))]
     fn update_current_value(
         &mut self,
         new_ballot: scp_proto::SCPBallot,
@@ -2233,7 +2233,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(slot_index = hint.slot_index))]
     fn advance_slot(&mut self, hint: &scp_proto::SCPStatement) {
         const MAX_ADVANCE_SLOT_RECURSION: i64 = 100;
 

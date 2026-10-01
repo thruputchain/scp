@@ -668,7 +668,7 @@ impl Consensus for HandleKernel {
 }
 
 impl ConsensusNotify for HandleKernel {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(slot_index = slot_index))]
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
@@ -1024,7 +1024,7 @@ impl Driver for HandleKernel {
         Duration::from_millis(timeout_ms)
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(slot_index = env.statement.slot_index))]
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
         info!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()

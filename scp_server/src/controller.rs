@@ -496,7 +496,7 @@ impl ControlKernel {
         );
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(slot_index = x.slot_index))]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
         info!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);

@@ -14,6 +14,13 @@ fn enabled(endpoint: Option<&OsStr>, disabled: Option<&OsStr>) -> bool {
         && endpoint.is_some_and(|value| !value.is_empty())
 }
 
+fn unsupported_endpoint(endpoint: Option<&OsStr>) -> Option<String> {
+    let endpoint = endpoint.and_then(OsStr::to_str)?;
+    endpoint.to_ascii_lowercase().starts_with("https://").then(|| {
+        format!("OTEL_EXPORTER_OTLP_ENDPOINT {endpoint:?} uses https, which this build does not support; tracing is disabled")
+    })
+}
+
 fn sampler_override(
     value: Option<&OsStr>,
 ) -> (Option<Sampler>, Option<String>) {
@@ -36,6 +43,13 @@ pub fn provider() -> (Option<SdkTracerProvider>, Option<String>) {
         std::env::var_os("OTEL_SDK_DISABLED").as_deref(),
     ) {
         return (None, None);
+    }
+    // The exporter is built without TLS (devnet sends to the host Alloy over
+    // loopback), so an https endpoint would fail silently; say so instead.
+    if let Some(warning) = unsupported_endpoint(
+        std::env::var_os("OTEL_EXPORTER_OTLP_ENDPOINT").as_deref(),
+    ) {
+        return (None, Some(warning));
     }
     let (sampler, warning) =
         sampler_override(std::env::var_os("OTEL_TRACES_SAMPLER").as_deref());
@@ -66,10 +80,10 @@ pub fn provider() -> (Option<SdkTracerProvider>, Option<String>) {
     let mut resource = Resource::builder_empty()
         .with_service_name("scpd")
         .with_detector(Box::new(EnvResourceDetector::new()));
-    if let Ok(name) = std::env::var("OTEL_SERVICE_NAME") {
-        if !name.is_empty() {
-            resource = resource.with_service_name(name);
-        }
+    if let Ok(name) = std::env::var("OTEL_SERVICE_NAME")
+        && !name.is_empty()
+    {
+        resource = resource.with_service_name(name);
     }
     let resource = resource.build();
     let provider = builder
@@ -91,10 +105,10 @@ struct WarnOnceExporter {
 impl SpanExporter for WarnOnceExporter {
     async fn export(&self, batch: Vec<SpanData>) -> OTelSdkResult {
         let result = self.inner.export(batch).await;
-        if let Err(error) = &result {
-            if !self.warned.swap(true, Ordering::Relaxed) {
-                tracing::warn!(%error, "OpenTelemetry span export failed; collector may be unreachable");
-            }
+        if let Err(error) = &result
+            && !self.warned.swap(true, Ordering::Relaxed)
+        {
+            tracing::warn!(%error, "OpenTelemetry span export failed; collector may be unreachable");
         }
         result
     }
@@ -108,30 +122,202 @@ impl SpanExporter for WarnOnceExporter {
     }
 }
 
-pub async fn termination_signal() {
+pub fn span_filter() -> tracing_subscriber::EnvFilter {
+    tracing_subscriber::EnvFilter::from_default_env()
+}
+
+pub async fn run_until_termination(
+    startup: impl std::future::Future<Output = ()>,
+    termination: impl std::future::Future<Output = ()>,
+) {
+    tokio::pin!(termination);
+    tokio::select! {
+        _ = startup => termination.await,
+        _ = &mut termination => {},
+    }
+}
+
+pub fn termination_signal() -> impl std::future::Future<Output = ()> {
     #[cfg(unix)]
     {
         let mut terminate = tokio::signal::unix::signal(
             tokio::signal::unix::SignalKind::terminate(),
         )
         .expect("install SIGTERM handler");
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {},
-            _ = terminate.recv() => {},
+        let mut interrupt = tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::interrupt(),
+        )
+        .expect("install SIGINT handler");
+        async move {
+            tokio::select! {
+                _ = interrupt.recv() => {},
+                _ = terminate.recv() => {},
+            }
         }
     }
     #[cfg(not(unix))]
-    let _ = tokio::signal::ctrl_c().await;
+    async {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[derive(Debug, Clone)]
+    struct Exporter(std::sync::Arc<std::sync::Mutex<Vec<SpanData>>>);
+
+    impl SpanExporter for Exporter {
+        async fn export(&self, batch: Vec<SpanData>) -> OTelSdkResult {
+            self.0.lock().unwrap().extend(batch);
+            Ok(())
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sigterm_during_startup_reaches_shutdown() {
+        use opentelemetry::trace::TracerProvider;
+        use tracing_subscriber::prelude::*;
+
+        if std::env::var_os("SCP_SIGNAL_TEST").is_none() {
+            assert!(std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "telemetry::tests::sigterm_during_startup_reaches_shutdown"])
+                .env("SCP_SIGNAL_TEST", "1")
+                .status().unwrap().success());
+            return;
+        }
+        let termination = termination_signal();
+        let spans = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::AlwaysOn)
+            .with_batch_exporter(Exporter(spans.clone()))
+            .build();
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_opentelemetry::layer().with_tracer(provider.tracer("test")),
+        );
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info_span!("startup").in_scope(|| {});
+        });
+        let startup = async {
+            assert!(
+                std::process::Command::new("kill")
+                    .args(["-TERM", &std::process::id().to_string()])
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            std::future::pending::<()>().await;
+        };
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            run_until_termination(startup, termination),
+        )
+        .await
+        .unwrap();
+        tokio::task::spawn_blocking(move || provider.shutdown())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(spans.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn termination_cancels_pending_startup() {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(run_until_termination(
+            std::future::pending(),
+            async {
+                receive.await.unwrap();
+            },
+        ));
+        send.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn termination_waits_after_startup() {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(run_until_termination(async {}, async {
+            receive.await.unwrap();
+        }));
+        tokio::task::yield_now().await;
+        assert!(!task.is_finished());
+        send.send(()).unwrap();
+        task.await.unwrap();
+    }
+
+    #[test]
+    fn exported_spans_obey_log_filter() {
+        use opentelemetry::trace::TracerProvider;
+        use tracing_subscriber::prelude::*;
+
+        if std::env::var_os("SCP_FILTER_TEST").is_none() {
+            assert!(
+                std::process::Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "telemetry::tests::exported_spans_obey_log_filter"
+                    ])
+                    .env("SCP_FILTER_TEST", "1")
+                    .env("RUST_LOG", "warn,scp_kernel=info")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            return;
+        }
+        let spans = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::AlwaysOn)
+            .with_simple_exporter(Exporter(spans.clone()))
+            .build();
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_opentelemetry::layer()
+                .with_tracer(provider.tracer("test"))
+                .with_filter(span_filter()),
+        );
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info_span!(target: "unrelated", "excluded")
+                .in_scope(|| {});
+            tracing::debug_span!(target: "scp_kernel", "excluded_debug")
+                .in_scope(|| {});
+            tracing::info_span!(target: "scp_kernel", "consensus")
+                .in_scope(|| {});
+            tracing::warn_span!(target: "unrelated", "warning").in_scope(|| {});
+        });
+        provider.shutdown().unwrap();
+        let names: Vec<_> = spans
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|s| s.name.to_string())
+            .collect();
+        assert_eq!(names, ["consensus", "warning"]);
+    }
+
     #[test]
     fn tracing_disabled_without_endpoint() {
         assert!(!enabled(None, None));
         assert!(!enabled(Some(OsStr::new("")), None));
+    }
+
+    #[test]
+    fn https_endpoint_is_reported_not_silently_dropped() {
+        for endpoint in ["https://collector:4317", "HTTPS://collector:4317"] {
+            let warning = unsupported_endpoint(Some(OsStr::new(endpoint)))
+                .expect(endpoint);
+            assert!(warning.contains("https"), "{warning}");
+        }
+        assert_eq!(
+            unsupported_endpoint(Some(OsStr::new("http://127.0.0.1:4317"))),
+            None
+        );
+        assert_eq!(unsupported_endpoint(None), None);
     }
 
     #[test]

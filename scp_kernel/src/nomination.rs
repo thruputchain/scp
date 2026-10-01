@@ -689,7 +689,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         res
     }
 
-    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), round_number = self.nomination().round_number))]
+    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), entry_round_number = self.nomination().round_number))]
     pub fn nominate(
         &mut self,
         value: &scp_proto::SCPValue,

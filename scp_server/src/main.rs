@@ -91,7 +91,9 @@ async fn main() {
 
     let (provider, telemetry_error) = telemetry::provider();
     let otel_layer = provider.as_ref().map(|provider| {
-        tracing_opentelemetry::layer().with_tracer(provider.tracer("scpd"))
+        tracing_opentelemetry::layer()
+            .with_tracer(provider.tracer("scpd"))
+            .with_filter(telemetry::span_filter())
     });
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(
@@ -122,6 +124,15 @@ async fn main() {
         std::process::exit(1);
     }
 
+    let termination = telemetry::termination_signal();
+    telemetry::run_until_termination(run(args), termination).await;
+    if let Some(provider) = provider {
+        // Shutdown drains the batch processor; keep its blocking wait off Tokio.
+        let _ = tokio::task::spawn_blocking(move || provider.shutdown()).await;
+    }
+}
+
+async fn run(args: Args) {
     info!(
         "control_addr={} handle_addr={} reuse={}",
         args.control_addr, args.handle_addr, args.reuse
@@ -187,12 +198,6 @@ async fn main() {
     let control_server =
         RpcServer::new_with_config(control_listener, control_config);
     control_server.start().await;
-
-    telemetry::termination_signal().await;
-    if let Some(provider) = provider {
-        // Shutdown drains the batch processor; keep its blocking wait off Tokio.
-        let _ = tokio::task::spawn_blocking(move || provider.shutdown()).await;
-    }
 }
 
 async fn bind_control_listener(

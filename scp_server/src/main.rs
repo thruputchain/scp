@@ -15,6 +15,18 @@ use system::*;
 
 mod controller;
 mod handler;
+#[cfg(any(target_os = "linux", test))]
+mod heap_profiling;
+
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+// SAFETY: jemalloc reads this NUL-terminated configuration at initialization.
+#[cfg(target_os = "linux")]
+#[unsafe(export_name = "malloc_conf")]
+pub static MALLOC_CONF: &[u8] =
+    b"prof:true,prof_active:false,lg_prof_sample:19\0";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -86,6 +98,11 @@ async fn main() {
         // .compact()
         .init();
     let args = Args::parse();
+
+    #[cfg(target_os = "linux")]
+    heap_profiling::start_from_env()
+        .await
+        .expect("failed to initialize heap profiling");
 
     info!(
         "control_addr={} handle_addr={} reuse={}",

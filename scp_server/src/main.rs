@@ -15,6 +15,8 @@ use system::*;
 
 mod controller;
 mod handler;
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod heap_profile;
 #[cfg(any(target_os = "linux", test))]
 mod heap_profiling;
 

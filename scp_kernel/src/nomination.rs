@@ -274,7 +274,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), round_number = self.nomination().round_number))]
+    #[instrument(skip_all, fields(slot_index = i64::try_from(self.slot_proto().index()).unwrap_or(i64::MAX), round_number = i64::from(self.nomination().round_number)))]
     pub fn update_round_leaders(&mut self) {
         let mut my_qset = self.slot_proto().local_proto().get_qset().clone();
         let local_id = self.slot_proto().local_proto().get_node_id().clone();
@@ -522,7 +522,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         s
     }
 
-    #[instrument(skip_all, name = "nomination.process_envelope", fields(slot_index = envelope.statement.slot_index))]
+    #[instrument(skip_all, name = "nomination.process_envelope", fields(slot_index = i64::try_from(envelope.statement.slot_index).unwrap_or(i64::MAX)))]
     pub fn process_envelope(
         &mut self,
         envelope: &scp_proto::SCPEnvelope,
@@ -689,7 +689,7 @@ impl<'a, 'b, C: Consensus, D: Driver> NominationProto<'a, 'b, C, D> {
         res
     }
 
-    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), entry_round_number = self.nomination().round_number))]
+    #[instrument(skip_all, fields(slot_index = i64::try_from(self.slot_proto().index()).unwrap_or(i64::MAX), entry_round_number = i64::from(self.nomination().round_number)))]
     pub fn nominate(
         &mut self,
         value: &scp_proto::SCPValue,

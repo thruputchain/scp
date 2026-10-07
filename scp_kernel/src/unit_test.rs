@@ -27,7 +27,7 @@ mod unit_tests {
         }
 
         #[derive(Clone)]
-        struct Capture(std::sync::Arc<std::sync::Mutex<Vec<(String, u64)>>>);
+        struct Capture(std::sync::Arc<std::sync::Mutex<Vec<(String, i64)>>>);
         impl tracing::field::Visit for Capture {
             fn record_debug(
                 &mut self,
@@ -35,10 +35,10 @@ mod unit_tests {
                 _: &dyn std::fmt::Debug,
             ) {
             }
-            fn record_u64(
+            fn record_i64(
                 &mut self,
                 field: &tracing::field::Field,
-                value: u64,
+                value: i64,
             ) {
                 self.0
                     .lock()

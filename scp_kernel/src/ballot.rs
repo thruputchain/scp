@@ -251,7 +251,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         )
     }
 
-    #[instrument(skip_all, name = "ballot.process_envelope", fields(slot_index = env.statement.slot_index))]
+    #[instrument(skip_all, name = "ballot.process_envelope", fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
     pub fn process_envelope(
         &mut self,
         env: &scp_proto::SCPEnvelope,
@@ -407,7 +407,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
         }
     }
 
-    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), ballot_counter = n))]
+    #[instrument(skip_all, fields(slot_index = i64::try_from(self.slot_proto().index()).unwrap_or(i64::MAX), ballot_counter = i64::from(n)))]
     pub fn abandon_ballot(&mut self, n: u32) -> bool {
         trace!("abandoning ballot");
         let v = match self.slot_proto_mut().get_latest_composite_candidate() {
@@ -488,7 +488,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     /// updates the local state based to the specified ballot
     /// (that could be a prepared ballot) enforcing invariants
-    #[instrument(skip_all, fields(slot_index = self.slot_proto().index(), ballot_counter = new_ballot.counter))]
+    #[instrument(skip_all, fields(slot_index = i64::try_from(self.slot_proto().index()).unwrap_or(i64::MAX), ballot_counter = i64::from(new_ballot.counter)))]
     fn update_current_value(
         &mut self,
         new_ballot: scp_proto::SCPBallot,
@@ -541,7 +541,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
 
     #[instrument(
         skip(self),
-        fields(slot_index = self.slot_proto().index(), ballot_counter = ballot.counter)
+        fields(slot_index = i64::try_from(self.slot_proto().index()).unwrap_or(i64::MAX), ballot_counter = i64::from(ballot.counter))
     )]
     fn bump_to_ballot(&mut self, ballot: scp_proto::SCPBallot, check: bool) {
         trace!(
@@ -2233,7 +2233,7 @@ impl<'a, 'b, C: Consensus, D: Driver> BallotProto<'a, 'b, C, D> {
     // attempts to make progress using the latest statement as a hint
     // calls into the various attempt* methods, emits message
     // to make progress
-    #[instrument(skip_all, fields(slot_index = hint.slot_index))]
+    #[instrument(skip_all, fields(slot_index = i64::try_from(hint.slot_index).unwrap_or(i64::MAX)))]
     fn advance_slot(&mut self, hint: &scp_proto::SCPStatement) {
         const MAX_ADVANCE_SLOT_RECURSION: i64 = 100;
 

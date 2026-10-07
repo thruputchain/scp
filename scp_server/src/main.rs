@@ -15,17 +15,19 @@ use system::*;
 
 mod controller;
 mod handler;
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+#[cfg_attr(
+    not(all(target_os = "linux", feature = "heap-profiling")),
+    allow(dead_code)
+)]
 mod heap_profile;
-#[cfg(any(target_os = "linux", test))]
 mod heap_profiling;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 // SAFETY: jemalloc reads this NUL-terminated configuration at initialization.
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 #[unsafe(export_name = "malloc_conf")]
 pub static MALLOC_CONF: &[u8] =
     b"prof:true,prof_active:false,lg_prof_sample:19\0";
@@ -101,10 +103,10 @@ async fn main() {
         .init();
     let args = Args::parse();
 
-    #[cfg(target_os = "linux")]
-    heap_profiling::start_from_env()
-        .await
-        .expect("failed to initialize heap profiling");
+    if let Err(err) = heap_profiling::start_from_env().await {
+        eprintln!("scpd: failed to initialize heap profiling: {err}");
+        std::process::exit(1);
+    }
 
     info!(
         "control_addr={} handle_addr={} reuse={}",

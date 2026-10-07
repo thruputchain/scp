@@ -13,6 +13,14 @@ description = "SCP consensus server"
 
 [features]
 info_callbacks = []
+# Linux jemalloc allocator plus opt-in heap profiles. Off until load numbers
+# qualify it.
+heap-profiling = [
+    "dep:tikv-jemallocator",
+    "dep:tikv-jemalloc-sys",
+    "dep:backtrace",
+    "dep:object",
+]
 
 [[bin]]
 name = "scpd"
@@ -36,5 +44,7 @@ xdr-common = { workspace = true }
 rpc_driver = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
-tikv-jemalloc-sys = { version = "0.7", features = ["profiling"] }
+tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemalloc-sys = { version = "0.7", features = ["profiling"], optional = true }
+backtrace = { version = "0.3", optional = true }
+object = { version = "0.37", default-features = false, features = ["read_core", "elf", "std"], optional = true }

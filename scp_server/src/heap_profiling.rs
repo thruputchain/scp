@@ -11,12 +11,19 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-#[cfg(target_os = "linux")]
 pub async fn start_from_env() -> io::Result<()> {
     let addr = std::env::var_os("SCPD_PPROF_LISTEN");
     let enabled = std::env::var_os("GROUNDHOG_HEAP_PROFILING")
         .is_some_and(|value| value == "1");
+    #[cfg(not(all(target_os = "linux", feature = "heap-profiling")))]
+    if enabled {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "GROUNDHOG_HEAP_PROFILING=1 needs a Linux scpd built with the heap-profiling feature",
+        ));
+    }
     // Leave allocator profiling controls untouched when sampling is disabled.
+    #[cfg(all(target_os = "linux", feature = "heap-profiling"))]
     if enabled {
         if !read_bool(c"config.prof")? || !read_bool(c"opt.prof")? {
             return Err(io::Error::other(
@@ -58,7 +65,7 @@ pub async fn start_from_env() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 async fn dump_heap(
     permit: tokio::sync::OwnedSemaphorePermit,
 ) -> io::Result<Vec<u8>> {
@@ -104,16 +111,21 @@ async fn dump_heap(
         };
         ctl_result(result)?;
         drop(file);
-        crate::heap_profile::jemalloc_to_pprof(
+        let profile = crate::heap_profile::jemalloc_to_pprof(
             &std::fs::read_to_string(&cleanup.0)?,
             &std::fs::read_to_string("/proc/self/maps")?,
-        )
+            &mut LinuxSymbolizer::default(),
+        );
+        // Drop parsed debuginfo so it neither stays resident nor appears in
+        // later profiles.
+        backtrace::clear_symbol_cache();
+        profile
     })
     .await
     .map_err(io::Error::other)?
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 fn ctl_result(result: i32) -> io::Result<()> {
     if result == 0 {
         Ok(())
@@ -124,7 +136,7 @@ fn ctl_result(result: i32) -> io::Result<()> {
         )))
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 fn read_bool(name: &std::ffi::CStr) -> io::Result<bool> {
     let mut value = false;
     let mut len = std::mem::size_of_val(&value);
@@ -146,7 +158,7 @@ fn read_bool(name: &std::ffi::CStr) -> io::Result<bool> {
     })?;
     Ok(value)
 }
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 fn set_active(mut value: bool) -> io::Result<()> {
     // SAFETY: prof.active accepts a bool with this size.
     ctl_result(unsafe {
@@ -158,6 +170,70 @@ fn set_active(mut value: bool) -> io::Result<()> {
             std::mem::size_of_val(&value),
         )
     })
+}
+
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
+#[derive(Default)]
+struct LinuxSymbolizer {
+    build_ids: std::collections::BTreeMap<String, Option<String>>,
+}
+
+#[cfg(all(target_os = "linux", feature = "heap-profiling"))]
+impl crate::heap_profile::Symbolize for LinuxSymbolizer {
+    fn frames(&mut self, pc: u64) -> Vec<crate::heap_profile::Frame> {
+        let mut frames = Vec::new();
+        backtrace::resolve(pc as *mut std::ffi::c_void, |symbol| {
+            if let Some(name) = symbol.name() {
+                frames.push(crate::heap_profile::Frame {
+                    name: format!("{name:#}"),
+                    system_name: String::from_utf8_lossy(name.as_bytes())
+                        .into_owned(),
+                    file: symbol
+                        .filename()
+                        .map(|path| path.display().to_string()),
+                    line: symbol.lineno(),
+                });
+            }
+        });
+        frames
+    }
+
+    fn build_id(&mut self, path: &str) -> Option<String> {
+        self.build_ids
+            .entry(path.to_owned())
+            .or_insert_with(|| {
+                use object::Object;
+                use std::fmt::Write;
+                // Read only the headers and note, not the whole file.
+                let file = std::fs::File::open(path).ok()?;
+                if !file.metadata().ok()?.is_file() {
+                    return None;
+                }
+                let data = object::ReadCache::new(file);
+                let elf = object::read::elf::ElfFile64::<
+                    object::Endianness,
+                    _,
+                >::parse(&data)
+                .ok()?;
+                let bytes = elf.build_id().ok()??;
+                let mut id = String::new();
+                for byte in bytes {
+                    write!(&mut id, "{byte:02x}").ok()?;
+                }
+                Some(id)
+            })
+            .clone()
+    }
+}
+
+#[cfg(not(all(target_os = "linux", feature = "heap-profiling")))]
+async fn dump_heap(
+    _permit: tokio::sync::OwnedSemaphorePermit,
+) -> io::Result<Vec<u8>> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "heap profiling unavailable",
+    ))
 }
 
 async fn bind_listener(addr: Option<&str>) -> io::Result<Option<TcpListener>> {
@@ -369,19 +445,60 @@ mod tests {
         task.await.unwrap();
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(all(target_os = "linux", feature = "heap-profiling")))]
+    #[tokio::test]
+    async fn activation_requires_linux_feature_build() {
+        let _guard = TEST_LOCK.lock().await;
+        // SAFETY: TEST_LOCK serializes tests that access this variable.
+        unsafe { std::env::set_var("GROUNDHOG_HEAP_PROFILING", "1") };
+        let result = start_from_env().await;
+        // SAFETY: the test still owns TEST_LOCK.
+        unsafe { std::env::remove_var("GROUNDHOG_HEAP_PROFILING") };
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Unsupported);
+    }
+
+    #[cfg(all(target_os = "linux", feature = "heap-profiling"))]
+    #[inline(never)]
+    fn retain_heap_profile_marker() -> Box<[u8]> {
+        std::hint::black_box(vec![42; 8 * 1024 * 1024].into_boxed_slice())
+    }
+
+    #[cfg(all(target_os = "linux", feature = "heap-profiling"))]
     #[tokio::test]
     async fn jemalloc_starts_inactive_and_can_dump_pprof() {
         let _guard = TEST_LOCK.lock().await;
         assert!(!read_bool(c"prof.active").unwrap());
         set_active(true).unwrap();
-        let allocation = vec![42u8; 4 * 1024 * 1024];
+        let allocation = retain_heap_profile_marker();
         std::hint::black_box(&allocation);
         let profile =
             dump_heap(DUMP_SLOT.clone().acquire_owned().await.unwrap()).await;
         // Restore shared allocator state even if the conversion failed.
         set_active(false).unwrap();
         let profile = profile.unwrap();
-        assert!(!profile.is_empty());
+        std::hint::black_box(&allocation);
+        use crate::heap_profile::wire::decode;
+        let fields = decode(&profile);
+        let strings: Vec<_> =
+            fields.iter().filter(|f| f.0 == 6).map(|f| f.2).collect();
+        assert!(fields.iter().filter(|f| f.0 == 5).any(|f| {
+            decode(f.2).iter().any(|f| {
+                f.0 == 2
+                    && String::from_utf8_lossy(
+                        strings[usize::try_from(f.1).unwrap()],
+                    )
+                    .contains("retain_heap_profile_marker")
+            })
+        }));
+        let executable = std::env::current_exe().unwrap();
+        let path = executable.to_str().unwrap().as_bytes();
+        assert!(fields.iter().filter(|f| f.0 == 3).any(|f| {
+            let mapping = decode(f.2);
+            mapping.iter().any(|f| {
+                f.0 == 5 && strings[usize::try_from(f.1).unwrap()] == path
+            }) && mapping.iter().any(|f| {
+                f.0 == 6 && !strings[usize::try_from(f.1).unwrap()].is_empty()
+            })
+        }));
     }
 }

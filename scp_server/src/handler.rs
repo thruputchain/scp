@@ -1021,7 +1021,7 @@ impl Driver for HandleKernel {
             self.lock().max_timeout.as_millis() as u64,
         );
 
-        Duration::from_millis(timeout_ms as u64)
+        Duration::from_millis(timeout_ms)
     }
 
     #[tracing::instrument(skip_all)]

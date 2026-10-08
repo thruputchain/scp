@@ -13,7 +13,10 @@ Heap profiling is opt-in at build time and at run time:
   fails startup rather than ignoring it.
 - Set `SCPD_PPROF_LISTEN=127.0.0.1:9646` to open a separate HTTP listener.
   Without it no profiling socket or task exists. The listener has no
-  authentication; use a private address.
+  authentication and allows only loopback by default (`127.0.0.0/8`, `::1`,
+  `localhost`). Hostnames are resolved and every result must be loopback.
+  `SCPD_PPROF_ALLOW_REMOTE=1` permits other addresses (including `0.0.0.0`
+  inside a container whose published port is restricted) and logs a warning.
 - `GET /debug/pprof/heap` returns an uncompressed pprof protobuf converted from
   jemalloc `heap_v2`. Without activation, and for other paths and methods, the
   listener returns 404.

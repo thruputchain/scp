@@ -1,4 +1,5 @@
 //! Opt-in heap profiles. No socket or background task exists without a listen address.
+use std::net::SocketAddr;
 use std::time::Duration;
 use std::{future::Future, io};
 use tokio::time::timeout;
@@ -13,6 +14,8 @@ use tokio::{
 
 pub async fn start_from_env() -> io::Result<()> {
     let addr = std::env::var_os("SCPD_PPROF_LISTEN");
+    let allow_remote = std::env::var_os("SCPD_PPROF_ALLOW_REMOTE")
+        .is_some_and(|value| value == "1");
     let enabled = std::env::var_os("GROUNDHOG_HEAP_PROFILING")
         .is_some_and(|value| value == "1");
     #[cfg(not(all(target_os = "linux", feature = "heap-profiling")))]
@@ -42,7 +45,8 @@ pub async fn start_from_env() -> io::Result<()> {
             })
         })
         .transpose()?;
-    let Some(listener) = bind_listener(addr.as_deref()).await? else {
+    let Some(listener) = bind_listener(addr.as_deref(), allow_remote).await?
+    else {
         return Ok(());
     };
     tracing::info!(addr = %listener.local_addr()?, "heap profile listener enabled");
@@ -236,11 +240,48 @@ async fn dump_heap(
     ))
 }
 
-async fn bind_listener(addr: Option<&str>) -> io::Result<Option<TcpListener>> {
-    match addr {
-        Some(addr) => TcpListener::bind(addr).await.map(Some),
-        None => Ok(None),
+fn check_listen_addrs(
+    value: &str,
+    addrs: &[SocketAddr],
+    allow_remote: bool,
+) -> io::Result<bool> {
+    if addrs.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("SCPD_PPROF_LISTEN={value} resolves to no addresses"),
+        ));
     }
+    let remote = addrs
+        .iter()
+        .find(|addr| !addr.ip().to_canonical().is_loopback());
+    if let Some(addr) = remote
+        && !allow_remote
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!(
+                "SCPD_PPROF_LISTEN={value} resolves to non-loopback address {}; the heap profile listener is unauthenticated. Set SCPD_PPROF_ALLOW_REMOTE=1 to allow it.",
+                addr.ip()
+            ),
+        ));
+    }
+    Ok(remote.is_some())
+}
+
+async fn bind_listener(
+    addr: Option<&str>,
+    allow_remote: bool,
+) -> io::Result<Option<TcpListener>> {
+    let Some(addr) = addr else { return Ok(None) };
+    let addrs: Vec<_> = tokio::net::lookup_host(addr).await?.collect();
+    if check_listen_addrs(addr, &addrs, allow_remote)? {
+        for addr in &addrs {
+            if !addr.ip().to_canonical().is_loopback() {
+                tracing::warn!(%addr, "heap profile listener is unauthenticated and reachable remotely");
+            }
+        }
+    }
+    TcpListener::bind(addrs.as_slice()).await.map(Some)
 }
 
 async fn serve_connection<F, Fut>(
@@ -322,13 +363,78 @@ mod tests {
 
     #[tokio::test]
     async fn unset_listen_address_creates_no_listener() {
-        assert!(bind_listener(None).await.unwrap().is_none());
+        assert!(bind_listener(None, false).await.unwrap().is_none());
+    }
+
+    #[test]
+    fn listen_addresses_require_loopback_or_opt_in() {
+        for ip in ["127.0.0.1", "127.1.2.3", "::1", "::ffff:127.0.0.1"] {
+            let addr = SocketAddr::new(ip.parse().unwrap(), 0);
+            assert!(!check_listen_addrs(ip, &[addr], false).unwrap());
+        }
+        for ip in ["0.0.0.0", "::", "10.0.0.1", "192.168.1.1", "2001:db8::1"] {
+            let addr = SocketAddr::new(ip.parse().unwrap(), 0);
+            assert_eq!(
+                check_listen_addrs(ip, &[addr], false).unwrap_err().kind(),
+                io::ErrorKind::PermissionDenied
+            );
+            assert!(check_listen_addrs(ip, &[addr], true).unwrap());
+        }
+        let mixed = [
+            "127.0.0.1:0".parse().unwrap(),
+            "10.0.0.1:0".parse().unwrap(),
+        ];
+        assert_eq!(
+            check_listen_addrs("mixed", &mixed, false)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(check_listen_addrs("mixed", &mixed, true).unwrap());
+        assert!(check_listen_addrs("empty", &[], true).is_err());
+    }
+
+    #[tokio::test]
+    async fn listener_requires_remote_opt_in() {
+        assert!(bind_listener(Some("localhost:0"), false).await.is_ok());
+        let err = bind_listener(Some("0.0.0.0:0"), false).await.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert!(err.to_string().contains("SCPD_PPROF_ALLOW_REMOTE"));
+        assert!(bind_listener(Some("0.0.0.0:0"), true).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn startup_requires_remote_opt_in() {
+        let _guard = TEST_LOCK.lock().await;
+        // SAFETY: TEST_LOCK serializes tests that access these variables.
+        unsafe {
+            std::env::remove_var("GROUNDHOG_HEAP_PROFILING");
+            std::env::remove_var("SCPD_PPROF_ALLOW_REMOTE");
+            std::env::set_var("SCPD_PPROF_LISTEN", "0.0.0.0:0");
+        }
+        let refused = start_from_env().await;
+        // SAFETY: the test still owns TEST_LOCK.
+        unsafe { std::env::set_var("SCPD_PPROF_ALLOW_REMOTE", "1") };
+        let allowed = start_from_env().await;
+        // SAFETY: the test still owns TEST_LOCK. Clean up before assertions.
+        unsafe {
+            std::env::remove_var("SCPD_PPROF_LISTEN");
+            std::env::remove_var("SCPD_PPROF_ALLOW_REMOTE");
+            std::env::remove_var("GROUNDHOG_HEAP_PROFILING");
+        }
+        assert_eq!(
+            refused.unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        allowed.unwrap();
     }
 
     async fn request(enabled: bool, line: &str, fail: bool) -> Vec<u8> {
         let _guard = TEST_LOCK.lock().await;
-        let listener =
-            bind_listener(Some("127.0.0.1:0")).await.unwrap().unwrap();
+        let listener = bind_listener(Some("127.0.0.1:0"), false)
+            .await
+            .unwrap()
+            .unwrap();
         let addr = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
@@ -402,8 +508,10 @@ mod tests {
     #[tokio::test]
     async fn concurrent_request_is_429_and_long_dump_survives() {
         let _guard = TEST_LOCK.lock().await;
-        let listener =
-            bind_listener(Some("127.0.0.1:0")).await.unwrap().unwrap();
+        let listener = bind_listener(Some("127.0.0.1:0"), false)
+            .await
+            .unwrap()
+            .unwrap();
         let addr = listener.local_addr().unwrap();
         let (started, ready) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {

@@ -9,9 +9,10 @@ ln -s "$USER_HOME/.cache" "$HOME/.cache"
 echo 'cargo version check'
 cargo --version
 
-# The shared rustup install does not always carry it; ci.toml runs `cargo fmt`.
-echo 'rustfmt component'
-rustup component add rustfmt
+# The shared rustup install does not always carry them; ci.toml runs
+# `cargo fmt` and `cargo clippy`.
+echo 'rustfmt and clippy components'
+rustup component add rustfmt clippy
 
 echo 'cargo fetch'
 CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch

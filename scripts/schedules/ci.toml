@@ -4,7 +4,7 @@ name = "rs_build"
 name = "{{ .hog_schedule }}_{{ .hog_host }}"
 script = """
 
-set -x
+set -ex
 
 echo 'cloning repository'
 git init -q .
@@ -18,6 +18,12 @@ cargo fetch
 cargo fmt --check
 cargo build --offline --locked
 cargo test --offline --locked
+
+# heap-profiling is off by default; keep the gated Linux code compiled and tested.
+cargo clippy --offline --locked -p scp_server --no-deps -- -D warnings
+cargo clippy --offline --locked -p scp_server --no-deps --features heap-profiling -- -D warnings
+cargo test --offline --locked -p scp_server --features heap-profiling
+cargo test --offline --locked -p scp_server --features heap-profiling --release
 
 """
 

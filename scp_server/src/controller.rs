@@ -1,3 +1,4 @@
+use crate::telemetry::{link_slot, slot_span};
 use async_trait::async_trait;
 use scp_kernel::*;
 use scp_proto::*;
@@ -13,6 +14,7 @@ use tokio::sync::mpsc::{
 };
 use tokio::sync::oneshot;
 use tokio::time::sleep;
+use tracing::Instrument;
 use tracing::info;
 use xdr_common::*;
 
@@ -188,15 +190,19 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         }
     }
 
-    #[tracing::instrument(
-        skip(self, env),
-        fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX))
-    )]
     async fn scp_control_received_envelope(
         &self,
         env: SCPEnvelope,
     ) -> Result<(), ::rpc_driver::ProgramError> {
-        self.control_received_envelope(env).await
+        let height =
+            i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX);
+        let span = tracing::info_span!(
+            "scp_control_received_envelope",
+            slot_index = height,
+            "groundhog.block.height" = height
+        );
+        link_slot(&span, env.statement.slot_index);
+        self.control_received_envelope(env).instrument(span).await
     }
 
     async fn scp_control_set_state_from_envelope(
@@ -382,11 +388,21 @@ impl ControlKernel {
                         self.stop_timer(slot_index, timer);
                     }
                     SwitchTimer::SlotExternalized(slot_index) => {
-                        self.stop_timers_not_above(slot_index);
-                        // purge slots not above slot_index
-                        self.kernel
-                            .proto()
-                            .purge_slots(slot_index + 1, slot_index + 1);
+                        let height =
+                            i64::try_from(slot_index).unwrap_or(i64::MAX);
+                        let span = tracing::info_span!(
+                            "slot_externalized",
+                            slot_index = height,
+                            "groundhog.block.height" = height
+                        );
+                        link_slot(&span, slot_index);
+                        span.in_scope(|| {
+                            self.stop_timers_not_above(slot_index);
+                            // purge slots not above slot_index
+                            self.kernel
+                                .proto()
+                                .purge_slots(slot_index + 1, slot_index + 1);
+                        });
                     }
                 },
                 Err(TryRecvError::Empty) => break,
@@ -467,6 +483,11 @@ impl ControlKernel {
     }
 
     fn handle_envelope_validated(&mut self, x: EnvelopeValidated) {
+        slot_span(x.env.statement.slot_index)
+            .in_scope(|| self.handle_envelope_validated_in_slot(x));
+    }
+
+    fn handle_envelope_validated_in_slot(&mut self, x: EnvelopeValidated) {
         if self
             .handler
             .is_above_highest_externalized(x.env.statement.slot_index)
@@ -496,8 +517,18 @@ impl ControlKernel {
         );
     }
 
-    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(x.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(x.slot_index).unwrap_or(i64::MAX)))]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
+        let height = i64::try_from(x.slot_index).unwrap_or(i64::MAX);
+        let span = tracing::info_span!(
+            "handle_timer_expired",
+            slot_index = height,
+            "groundhog.block.height" = height
+        );
+        link_slot(&span, x.slot_index);
+        span.in_scope(|| self.handle_timer_expired_in_slot(x));
+    }
+
+    fn handle_timer_expired_in_slot(&mut self, x: TimerExpired) {
         info!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);
         if self.handler.is_above_highest_externalized(x.slot_index) {
@@ -508,6 +539,26 @@ impl ControlKernel {
     }
 
     fn handle_request(&mut self, req: ControlRequest) {
+        let index = match &req {
+            ControlRequest::Nominate(index, ..)
+            | ControlRequest::StopNomination(index)
+            | ControlRequest::SetStateFromEnvelope(index, ..)
+            | ControlRequest::SetLowestNonExternalizedSlot(index) => {
+                Some(*index)
+            }
+            ControlRequest::ReceivedEnvelope(env) => {
+                Some(env.statement.slot_index)
+            }
+            _ => None,
+        };
+        if let Some(index) = index {
+            slot_span(index).in_scope(|| self.handle_request_in_slot(req));
+        } else {
+            self.handle_request_in_slot(req);
+        }
+    }
+
+    fn handle_request_in_slot(&mut self, req: ControlRequest) {
         match req {
             ControlRequest::Nominate(slot_index, value, prev_value) => {
                 if self.handler.is_above_highest_externalized(slot_index) {

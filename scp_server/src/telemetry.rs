@@ -4,10 +4,22 @@
 //! default to parentbased_traceidratio 0.05. OTEL_SPAN_FILTER defaults to info,
 //! independently of RUST_LOG. OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES
 //! configure the service resource.
+//! GROUNDHOG_NETWORK_HASH (set by chuckd, 64 hex characters) correlates slot
+//! spans with block traces and samples their deterministic IDs at the configured
+//! ratio. Missing or invalid hashes log one error and leave independent traces.
 
+use opentelemetry::trace::{
+    SpanContext, SpanKind, TraceContextExt, TraceFlags, TraceId, TraceState,
+};
+use opentelemetry_sdk::trace::{
+    IdGenerator, RandomIdGenerator, SamplingDecision, ShouldSample,
+};
+use sha2::{Digest, Sha256};
 use std::ffi::OsStr;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::error::OTelSdkResult;
@@ -15,6 +27,119 @@ use opentelemetry_sdk::resource::EnvResourceDetector;
 use opentelemetry_sdk::trace::{
     Sampler, SdkTracerProvider, SpanData, SpanExporter,
 };
+
+struct SlotTraces {
+    network_hash: [u8; 32],
+    root_sampler: Box<dyn ShouldSample>,
+}
+
+static SLOT_TRACES: OnceLock<SlotTraces> = OnceLock::new();
+
+pub fn block_trace_id(network_hash: &[u8; 32], height: u64) -> TraceId {
+    let mut hash = Sha256::new();
+    hash.update(b"groundhog.block-trace.v1\0");
+    hash.update(network_hash);
+    hash.update(height.to_be_bytes());
+    trace_id_from_digest(hash.finalize().into())
+}
+
+fn trace_id_from_digest(digest: [u8; 32]) -> TraceId {
+    let mut bytes: [u8; 16] = digest[..16].try_into().unwrap();
+    if bytes == [0; 16] {
+        bytes[15] = 1;
+    }
+    TraceId::from_bytes(bytes)
+}
+
+fn parse_network_hash(value: Option<&OsStr>) -> Result<[u8; 32], String> {
+    let value = value.filter(|value| !value.is_empty()).ok_or_else(||
+        "GROUNDHOG_NETWORK_HASH is not set; slot spans are not correlated with chuckd block traces".to_owned())?;
+    let value = value
+        .to_str()
+        .filter(|value| value.len() == 64)
+        .ok_or_else(|| {
+            "GROUNDHOG_NETWORK_HASH must contain exactly 64 hex characters"
+                .to_owned()
+        })?;
+    let mut hash = [0; 32];
+    for (byte, pair) in hash.iter_mut().zip(value.as_bytes().chunks_exact(2)) {
+        let digit = |byte: u8| (byte as char).to_digit(16);
+        *byte = digit(pair[0])
+            .zip(digit(pair[1]))
+            .map(|(hi, lo)| ((hi << 4) | lo) as u8)
+            .ok_or_else(|| {
+                "GROUNDHOG_NETWORK_HASH contains non-hex characters".to_owned()
+            })?;
+    }
+    Ok(hash)
+}
+
+fn configure_slot_traces(sampler: &Sampler) -> Result<(), String> {
+    let network_hash = parse_network_hash(
+        std::env::var_os("GROUNDHOG_NETWORK_HASH").as_deref(),
+    )?;
+    let root_sampler = match sampler {
+        Sampler::ParentBased(root) => root.clone(),
+        sampler => Box::new(sampler.clone()),
+    };
+    // A process builds its tracing provider once; retain the first configuration.
+    let _ = SLOT_TRACES.set(SlotTraces {
+        network_hash,
+        root_sampler,
+    });
+    Ok(())
+}
+
+/// Link a freshly created span BEFORE its first enter consumes the OTel builder.
+pub fn link_slot(span: &tracing::Span, slot_index: u64) {
+    let Some(traces) = SLOT_TRACES.get().filter(|_| !span.is_disabled()) else {
+        return;
+    };
+    let trace_id = block_trace_id(&traces.network_hash, slot_index);
+    if tracing::Span::current()
+        .context()
+        .span()
+        .span_context()
+        .trace_id()
+        == trace_id
+    {
+        return;
+    }
+    let sampled = traces
+        .root_sampler
+        .should_sample(None, trace_id, "slot", &SpanKind::Internal, &[], &[])
+        .decision
+        == SamplingDecision::RecordAndSample;
+    let context = SpanContext::new(
+        trace_id,
+        RandomIdGenerator::default().new_span_id(),
+        if sampled {
+            TraceFlags::SAMPLED
+        } else {
+            TraceFlags::default()
+        },
+        true,
+        TraceState::default(),
+    );
+    // A log-only subscriber can enable the span without an OTel layer. Report
+    // failures at debug level; callers must still link before entering.
+    if let Err(error) = span.set_parent(
+        opentelemetry::Context::new().with_remote_span_context(context),
+    ) {
+        tracing::debug!(%error, "Could not link slot span to block trace");
+    }
+}
+
+pub fn slot_span(slot_index: u64) -> tracing::Span {
+    let height = i64::try_from(slot_index).unwrap_or(i64::MAX);
+    let span = tracing::info_span!(
+        "slot",
+        slot_index = height,
+        "groundhog.block.height" = height
+    );
+    link_slot(&span, slot_index);
+    span
+}
 
 fn enabled(endpoint: Option<&OsStr>, disabled: Option<&OsStr>) -> bool {
     !disabled.is_some_and(|value| value.eq_ignore_ascii_case("true"))
@@ -31,7 +156,7 @@ fn unsupported_endpoint(endpoint: Option<&OsStr>) -> Option<String> {
 fn sampler_override(
     value: Option<&OsStr>,
     arg: Option<&OsStr>,
-) -> (Option<Sampler>, Option<String>) {
+) -> (Sampler, Option<String>) {
     let value = value.filter(|value| !value.is_empty());
     match value.and_then(OsStr::to_str) {
         Some(name @ ("traceidratio" | "parentbased_traceidratio")) => {
@@ -40,17 +165,19 @@ fn sampler_override(
                 .filter(|ratio| ratio.is_finite() && (0.0..=1.0).contains(ratio))
             {
                 let sampler = Sampler::TraceIdRatioBased(ratio);
-                return (Some(if name == "traceidratio" { sampler } else {
+                return (if name == "traceidratio" { sampler } else {
                     Sampler::ParentBased(Box::new(sampler))
-                }), None);
+                }, None);
             }
-            (Some(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.05)))),
+            (Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.05))),
                 Some(format!("Invalid or missing OTEL_TRACES_SAMPLER_ARG {arg:?}; using parentbased_traceidratio with ratio 0.05")))
         }
-        Some("always_on" | "always_off"
-            | "parentbased_always_on" | "parentbased_always_off") => (None, None),
+        Some("always_on") => (Sampler::AlwaysOn, None),
+        Some("always_off") => (Sampler::AlwaysOff, None),
+        Some("parentbased_always_on") => (Sampler::ParentBased(Box::new(Sampler::AlwaysOn)), None),
+        Some("parentbased_always_off") => (Sampler::ParentBased(Box::new(Sampler::AlwaysOff)), None),
         _ => (
-            Some(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.05)))),
+            Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.05))),
             value.map(|value| format!(
                 "Invalid OTEL_TRACES_SAMPLER {value:?}; using parentbased_traceidratio with ratio 0.05"
             )),
@@ -86,16 +213,9 @@ pub fn provider(
         warnings
             .extend(protocol_warning(name, std::env::var_os(name).as_deref()));
     }
-    // The SDK reads sampler env vars in the builder's default config. Suppress
-    // its invalid-value warning: we report our different fallback after the
-    // application's logging subscriber has been installed.
-    let mut builder = tracing::subscriber::with_default(
-        tracing::subscriber::NoSubscriber::default(),
-        SdkTracerProvider::builder,
-    );
-    if let Some(sampler) = sampler {
-        builder = builder.with_sampler(sampler);
-    }
+    // The builder's default config also reads the sampler env vars; its
+    // warnings are compiled out with the SDK's internal-logs feature.
+    let builder = SdkTracerProvider::builder().with_sampler(sampler.clone());
     opentelemetry::global::set_text_map_propagator(
         opentelemetry_sdk::propagation::TraceContextPropagator::new(),
     );
@@ -116,6 +236,7 @@ pub fn provider(
             warned: AtomicBool::new(false),
         })
         .build();
+    warnings.extend(configure_slot_traces(&sampler).err());
     (Some(provider), warnings)
 }
 
@@ -142,14 +263,15 @@ fn resource(instance_id: Option<String>) -> Resource {
             instance_id,
         ));
     }
+    // Detected attributes override earlier ones; OTEL_SERVICE_NAME goes last
+    // because the OTel spec gives it precedence over OTEL_RESOURCE_ATTRIBUTES.
+    resource = resource.with_detector(Box::new(EnvResourceDetector::new()));
     if let Ok(name) = std::env::var("OTEL_SERVICE_NAME")
         && !name.is_empty()
     {
         resource = resource.with_service_name(name);
     }
-    resource
-        .with_detector(Box::new(EnvResourceDetector::new()))
-        .build()
+    resource.build()
 }
 
 #[derive(Debug)]
@@ -250,6 +372,210 @@ pub fn termination_signal() -> impl std::future::Future<Output = ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn block_trace_id_vector_and_zero_fixup() {
+        assert_eq!(
+            block_trace_id(&[0x11; 32], 42).to_string(),
+            "553a3192399806a83a6f64004c4cab48"
+        );
+        assert_eq!(trace_id_from_digest([0; 32]), TraceId::from(1));
+        let mut digest = [0; 32];
+        digest[31] = 7;
+        assert_eq!(trace_id_from_digest(digest), TraceId::from(1));
+        digest[0] = 2;
+        assert_eq!(trace_id_from_digest(digest).to_bytes()[0], 2);
+    }
+
+    #[test]
+    fn network_hash_parsing() {
+        for value in ["ab".repeat(32), "AB".repeat(32)] {
+            assert_eq!(
+                parse_network_hash(Some(OsStr::new(&value))).unwrap(),
+                [0xab; 32]
+            );
+        }
+        for value in [None, Some(OsStr::new(""))] {
+            assert_eq!(
+                parse_network_hash(value).unwrap_err(),
+                "GROUNDHOG_NETWORK_HASH is not set; slot spans are not correlated with chuckd block traces"
+            );
+        }
+        for value in ["a".repeat(63), "a".repeat(65), "a".repeat(100_000)] {
+            let error =
+                parse_network_hash(Some(OsStr::new(&value))).unwrap_err();
+            assert!(error.contains("64 hex") && error.len() < 200);
+        }
+        assert!(
+            parse_network_hash(Some(OsStr::new(&"zz".repeat(32))))
+                .unwrap_err()
+                .contains("non-hex")
+        );
+        assert!(parse_network_hash(Some(OsStr::new(&"é".repeat(32)))).is_err());
+    }
+
+    #[test]
+    fn explicit_root_samplers() {
+        for (name, sampled) in [
+            ("always_on", true),
+            ("always_off", false),
+            ("parentbased_always_on", true),
+            ("parentbased_always_off", false),
+        ] {
+            let (sampler, warning) =
+                sampler_override(Some(OsStr::new(name)), None);
+            assert!(warning.is_none());
+            let root: Box<dyn ShouldSample> = match sampler {
+                Sampler::ParentBased(root) => root,
+                sampler => Box::new(sampler),
+            };
+            assert_eq!(
+                root.should_sample(
+                    None,
+                    block_trace_id(&[0x11; 32], 42),
+                    "slot",
+                    &SpanKind::Internal,
+                    &[],
+                    &[]
+                )
+                .decision
+                    == SamplingDecision::RecordAndSample,
+                sampled
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correlated_slot_spans() {
+        use opentelemetry::trace::TracerProvider;
+        use tracing_subscriber::prelude::*;
+
+        let Ok(case) = std::env::var("SCP_SLOT_TRACE_TEST") else {
+            for case in ["on", "off", "missing", "invalid"] {
+                let mut command = std::process::Command::new(
+                    std::env::current_exe().unwrap(),
+                );
+                command
+                    .args([
+                        "--exact",
+                        "telemetry::tests::correlated_slot_spans",
+                    ])
+                    .env("SCP_SLOT_TRACE_TEST", case)
+                    .env("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")
+                    .env(
+                        "OTEL_TRACES_SAMPLER_ARG",
+                        if case == "off" { "0.0" } else { "1.0" },
+                    )
+                    .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
+                    .env_remove("OTEL_SDK_DISABLED")
+                    .env_remove("OTEL_EXPORTER_OTLP_PROTOCOL")
+                    .env_remove("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
+                    .env_remove("GROUNDHOG_NETWORK_HASH");
+                if case != "missing" {
+                    command.env(
+                        "GROUNDHOG_NETWORK_HASH",
+                        if case == "invalid" {
+                            "bad".to_owned()
+                        } else {
+                            "11".repeat(32)
+                        },
+                    );
+                }
+                assert!(command.status().unwrap().success(), "{case}");
+            }
+            return;
+        };
+        let (sampler, warning) = sampler_override(
+            std::env::var_os("OTEL_TRACES_SAMPLER").as_deref(),
+            std::env::var_os("OTEL_TRACES_SAMPLER_ARG").as_deref(),
+        );
+        assert!(warning.is_none());
+        // Exercise production setup without exporting any spans to the OTLP
+        // provider; use an in-memory exporter for all assertions below.
+        let (otel_provider, warnings) = provider(None);
+        assert!(otel_provider.is_some());
+        let correlated = case == "on" || case == "off";
+        assert_eq!(warnings.len(), usize::from(!correlated));
+        if !correlated {
+            assert!(warnings[0].contains("GROUNDHOG_NETWORK_HASH"));
+            assert!(SLOT_TRACES.get().is_none());
+        }
+        otel_provider.unwrap().shutdown().unwrap();
+        let spans = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(sampler)
+            .with_simple_exporter(Exporter(spans.clone()))
+            .build();
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_opentelemetry::layer().with_tracer(provider.tracer("test")),
+        );
+        tracing::subscriber::with_default(subscriber, || {
+            let disabled = tracing::Span::none();
+            link_slot(&disabled, 42);
+            slot_span(42).in_scope(|| {
+                tracing::info_span!("child").in_scope(|| {});
+                // Same block keeps its natural parent even when linked again.
+                slot_span(42).in_scope(|| {
+                    tracing::info_span!("grandchild").in_scope(|| {})
+                });
+                slot_span(43).in_scope(|| {});
+            });
+            tracing::info_span!("independent").in_scope(|| {});
+        });
+        provider.shutdown().unwrap();
+        let spans = spans.lock().unwrap();
+        if case == "off" {
+            assert!(spans.is_empty(), "{spans:?}");
+            return;
+        }
+        let child = spans.iter().find(|s| s.name == "child").unwrap();
+        let slot = spans
+            .iter()
+            .find(|s| {
+                s.name == "slot"
+                    && s.span_context.span_id() == child.parent_span_id
+                    && s.attributes.iter().any(|a| {
+                        a.key.as_str() == "groundhog.block.height"
+                            && a.value == opentelemetry::Value::I64(42)
+                    })
+            })
+            .unwrap();
+        assert_eq!(child.parent_span_id, slot.span_context.span_id());
+        assert_eq!(child.span_context.trace_id(), slot.span_context.trace_id());
+        let nested = spans.iter().find(|s| s.name == "grandchild").unwrap();
+        let nested_slot = spans
+            .iter()
+            .find(|s| s.span_context.span_id() == nested.parent_span_id)
+            .unwrap();
+        assert_eq!(nested_slot.parent_span_id, slot.span_context.span_id());
+        let independent =
+            spans.iter().find(|s| s.name == "independent").unwrap();
+        assert_ne!(
+            independent.span_context.trace_id(),
+            slot.span_context.trace_id()
+        );
+        let expected =
+            TraceId::from_hex("553a3192399806a83a6f64004c4cab48").unwrap();
+        if correlated {
+            assert_eq!(slot.span_context.trace_id(), expected);
+            let other = spans
+                .iter()
+                .find(|s| {
+                    s.name == "slot"
+                        && s.attributes.iter().any(|a| {
+                            a.key.as_str() == "groundhog.block.height"
+                                && a.value == opentelemetry::Value::I64(43)
+                        })
+                })
+                .unwrap();
+            assert_eq!(
+                other.span_context.trace_id(),
+                block_trace_id(&[0x11; 32], 43)
+            );
+        } else {
+            assert_ne!(slot.span_context.trace_id(), expected);
+        }
+    }
 
     #[derive(Debug, Clone)]
     struct Exporter(std::sync::Arc<std::sync::Mutex<Vec<SpanData>>>);
@@ -512,25 +838,46 @@ mod tests {
     #[test]
     fn service_resource_attributes() {
         if std::env::var_os("SCP_RESOURCE_TEST").is_none() {
-            assert!(
-                std::process::Command::new(std::env::current_exe().unwrap())
+            for (attributes, service_name) in [
+                (None, None),
+                (
+                    Some("service.name=from-attributes,service.version=9.9.9"),
+                    Some("from-env"),
+                ),
+            ] {
+                let mut command = std::process::Command::new(
+                    std::env::current_exe().unwrap(),
+                );
+                command
                     .args([
                         "--exact",
-                        "telemetry::tests::service_resource_attributes"
+                        "telemetry::tests::service_resource_attributes",
                     ])
                     .env("SCP_RESOURCE_TEST", "1")
                     .env_remove("OTEL_RESOURCE_ATTRIBUTES")
-                    .env_remove("OTEL_SERVICE_NAME")
-                    .status()
-                    .unwrap()
-                    .success()
-            );
+                    .env_remove("OTEL_SERVICE_NAME");
+                if let Some(attributes) = attributes {
+                    command.env("OTEL_RESOURCE_ATTRIBUTES", attributes);
+                }
+                if let Some(service_name) = service_name {
+                    command.env("OTEL_SERVICE_NAME", service_name);
+                }
+                assert!(command.status().unwrap().success());
+            }
             return;
         }
+        let overridden = std::env::var_os("OTEL_SERVICE_NAME").is_some();
         let resource = resource(Some("node-id".into()));
         for (key, value) in [
-            ("service.name", "scpd"),
-            ("service.version", env!("CARGO_PKG_VERSION")),
+            ("service.name", if overridden { "from-env" } else { "scpd" }),
+            (
+                "service.version",
+                if overridden {
+                    "9.9.9"
+                } else {
+                    env!("CARGO_PKG_VERSION")
+                },
+            ),
             ("service.instance.id", "node-id"),
         ] {
             assert_eq!(
@@ -659,9 +1006,14 @@ mod tests {
                     .env("OTEL_BSP_SCHEDULE_DELAY", "100")
                     .env("OTEL_EXPORTER_OTLP_TIMEOUT", "200")
                     .env("OTEL_TRACES_SAMPLER", "always_on")
+                    .env("GROUNDHOG_NETWORK_HASH", "11".repeat(32))
                     .env_remove("OTEL_SDK_DISABLED")
                     .env_remove("OTEL_EXPORTER_OTLP_PROTOCOL")
                     .env_remove("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
+                    .env_remove("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+                    .env_remove("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT")
+                    .env_remove("OTEL_EXPORTER_OTLP_HEADERS")
+                    .env_remove("OTEL_EXPORTER_OTLP_TRACES_HEADERS")
                     .status()
                     .unwrap()
                     .success()
@@ -839,6 +1191,7 @@ mod tests {
             command
                 .args(["--exact", "telemetry::tests::sampler_environment"])
                 .env("SCP_SAMPLER_TEST_CASE", expected)
+                .env("GROUNDHOG_NETWORK_HASH", "11".repeat(32))
                 .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
                 .env(
                     "OTEL_SDK_DISABLED",

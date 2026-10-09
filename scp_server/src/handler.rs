@@ -576,14 +576,14 @@ impl HandleKernel {
         slot_index >= self.lock().lowest_non_externalized_slot
     }
 
-    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
+    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     pub fn update_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot =
             std::cmp::max(slot_index, lk.lowest_non_externalized_slot);
     }
 
-    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
+    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     pub fn set_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot = slot_index;
@@ -606,7 +606,7 @@ impl Consensus for HandleKernel {
 
     #[tracing::instrument(
         skip(self, value),
-        fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), value = %scp_kernel::hah(value))
+        fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX), value = %scp_kernel::hah(value))
     )]
     fn validate_nomination_value(
         &self,
@@ -668,7 +668,7 @@ impl Consensus for HandleKernel {
 }
 
 impl ConsensusNotify for HandleKernel {
-    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
+    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
@@ -1024,7 +1024,7 @@ impl Driver for HandleKernel {
         Duration::from_millis(timeout_ms)
     }
 
-    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
+    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
         info!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()

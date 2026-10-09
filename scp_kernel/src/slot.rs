@@ -174,7 +174,7 @@ impl<'a, C: Consensus, D: Driver> SlotProto<'a, C, D> {
         }
     }
 
-    #[instrument(skip_all, name = "slot.process_envelope", fields(slot_index = i64::try_from(envelope.statement.slot_index).unwrap_or(i64::MAX)))]
+    #[instrument(skip_all, name = "slot.process_envelope", fields(slot_index = i64::try_from(envelope.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(envelope.statement.slot_index).unwrap_or(i64::MAX)))]
     pub fn process_envelope(
         &mut self,
         envelope: &scp_proto::SCPEnvelope,

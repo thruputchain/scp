@@ -190,7 +190,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
 
     #[tracing::instrument(
         skip(self, env),
-        fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX))
+        fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX))
     )]
     async fn scp_control_received_envelope(
         &self,
@@ -496,7 +496,7 @@ impl ControlKernel {
         );
     }
 
-    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(x.slot_index).unwrap_or(i64::MAX)))]
+    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(x.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(x.slot_index).unwrap_or(i64::MAX)))]
     fn handle_timer_expired(&mut self, x: TimerExpired) {
         info!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);

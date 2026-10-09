@@ -197,6 +197,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         let height =
             i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX);
         let span = tracing::info_span!(
+            target: "scpd::slot",
             "scp_control_received_envelope",
             slot_index = height,
             "groundhog.block.height" = height
@@ -391,6 +392,7 @@ impl ControlKernel {
                         let height =
                             i64::try_from(slot_index).unwrap_or(i64::MAX);
                         let span = tracing::info_span!(
+                            target: "scpd::slot",
                             "slot_externalized",
                             slot_index = height,
                             "groundhog.block.height" = height
@@ -520,6 +522,7 @@ impl ControlKernel {
     fn handle_timer_expired(&mut self, x: TimerExpired) {
         let height = i64::try_from(x.slot_index).unwrap_or(i64::MAX);
         let span = tracing::info_span!(
+            target: "scpd::slot",
             "handle_timer_expired",
             slot_index = height,
             "groundhog.block.height" = height

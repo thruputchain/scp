@@ -2,7 +2,9 @@
 //! typically port 4317; http only). OTEL_EXPORTER_OTLP_PROTOCOL supports only grpc.
 //! OTEL_SDK_DISABLED disables tracing. OTEL_TRACES_SAMPLER / OTEL_TRACES_SAMPLER_ARG
 //! default to parentbased_traceidratio 0.05. OTEL_SPAN_FILTER defaults to info,
-//! independently of RUST_LOG. OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES
+//! independently of RUST_LOG. Slot spans (target scpd::slot) are always exported
+//! so correlation holds; OTEL_SPAN_FILTER controls the rest (subject to sampling).
+//! OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES
 //! configure the service resource.
 //! GROUNDHOG_NETWORK_HASH (set by chuckd, 64 hex characters) correlates slot
 //! spans with block traces and samples their deterministic IDs at the configured
@@ -96,8 +98,7 @@ pub fn link_slot(span: &tracing::Span, slot_index: u64) {
         return;
     };
     let trace_id = block_trace_id(&traces.network_hash, slot_index);
-    if tracing::Span::current()
-        .context()
+    if opentelemetry::Context::current()
         .span()
         .span_context()
         .trace_id()
@@ -133,6 +134,7 @@ pub fn link_slot(span: &tracing::Span, slot_index: u64) {
 pub fn slot_span(slot_index: u64) -> tracing::Span {
     let height = i64::try_from(slot_index).unwrap_or(i64::MAX);
     let span = tracing::info_span!(
+        target: "scpd::slot",
         "slot",
         slot_index = height,
         "groundhog.block.height" = height
@@ -309,7 +311,7 @@ fn parse_span_filter(
 ) -> (tracing_subscriber::EnvFilter, Option<String>) {
     use tracing_subscriber::EnvFilter;
     let value = value.filter(|value| !value.is_empty());
-    match value {
+    let (filter, warning) = match value {
         None => (EnvFilter::new("info"), None),
         Some(value) => match value
             .to_str()
@@ -321,7 +323,12 @@ fn parse_span_filter(
                 Some(format!("Invalid OTEL_SPAN_FILTER {value:?}; using info")),
             ),
         },
-    }
+    };
+    // Linking spans need OTel data even when the user's filter excludes scpd.
+    (
+        filter.add_directive("scpd::slot=info".parse().unwrap()),
+        warning,
+    )
 }
 
 pub async fn flush_unless_interrupted(
@@ -451,7 +458,15 @@ mod tests {
         use tracing_subscriber::prelude::*;
 
         let Ok(case) = std::env::var("SCP_SLOT_TRACE_TEST") else {
-            for case in ["on", "off", "missing", "invalid"] {
+            for case in [
+                "on",
+                "off",
+                "missing",
+                "invalid",
+                "ratio_drop",
+                "ratio_sample",
+                "filter",
+            ] {
                 let mut command = std::process::Command::new(
                     std::env::current_exe().unwrap(),
                 );
@@ -461,16 +476,36 @@ mod tests {
                         "telemetry::tests::correlated_slot_spans",
                     ])
                     .env("SCP_SLOT_TRACE_TEST", case)
-                    .env("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")
+                    .env(
+                        "OTEL_TRACES_SAMPLER",
+                        if case.starts_with("ratio_") {
+                            "traceidratio"
+                        } else {
+                            "parentbased_traceidratio"
+                        },
+                    )
                     .env(
                         "OTEL_TRACES_SAMPLER_ARG",
-                        if case == "off" { "0.0" } else { "1.0" },
+                        match case {
+                            "off" => "0.0",
+                            "ratio_drop" => "0.22",
+                            "ratio_sample" => "0.23",
+                            _ => "1.0",
+                        },
                     )
                     .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
                     .env_remove("OTEL_SDK_DISABLED")
                     .env_remove("OTEL_EXPORTER_OTLP_PROTOCOL")
                     .env_remove("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
                     .env_remove("GROUNDHOG_NETWORK_HASH");
+                command.env(
+                    "OTEL_SPAN_FILTER",
+                    if case == "filter" {
+                        "warn,scp_kernel=info"
+                    } else {
+                        "info"
+                    },
+                );
                 if case != "missing" {
                     command.env(
                         "GROUNDHOG_NETWORK_HASH",
@@ -494,7 +529,7 @@ mod tests {
         // provider; use an in-memory exporter for all assertions below.
         let (otel_provider, warnings) = provider(None);
         assert!(otel_provider.is_some());
-        let correlated = case == "on" || case == "off";
+        let correlated = !matches!(case.as_str(), "missing" | "invalid");
         assert_eq!(warnings.len(), usize::from(!correlated));
         if !correlated {
             assert!(warnings[0].contains("GROUNDHOG_NETWORK_HASH"));
@@ -507,8 +542,42 @@ mod tests {
             .with_simple_exporter(Exporter(spans.clone()))
             .build();
         let subscriber = tracing_subscriber::registry().with(
-            tracing_opentelemetry::layer().with_tracer(provider.tracer("test")),
+            tracing_opentelemetry::layer()
+                .with_tracer(provider.tracer("test"))
+                .with_filter(span_filter().0),
         );
+        if case.starts_with("ratio_") || case == "filter" {
+            let expected = block_trace_id(&[0x11; 32], 42);
+            let bytes = expected.to_bytes();
+            let fraction = (u64::from_be_bytes(bytes[8..].try_into().unwrap())
+                >> 1) as f64
+                / (1_u64 << 63) as f64;
+            assert!(0.22 < fraction && fraction < 0.23, "{fraction}");
+            tracing::subscriber::with_default(subscriber, || {
+                slot_span(42).in_scope(|| {
+                    tracing::info_span!(target: "scp_kernel", "filtered_child").in_scope(|| {});
+                });
+            });
+            provider.shutdown().unwrap();
+            let spans = spans.lock().unwrap();
+            if case == "ratio_drop" {
+                assert!(spans.is_empty(), "{spans:?}");
+            } else {
+                assert_eq!(spans.len(), 2, "{spans:?}");
+                assert_eq!(
+                    expected.to_string(),
+                    "553a3192399806a83a6f64004c4cab48"
+                );
+                assert!(
+                    spans.iter().all(|s| s.span_context.trace_id() == expected)
+                );
+                let slot = spans.iter().find(|s| s.name == "slot").unwrap();
+                let child =
+                    spans.iter().find(|s| s.name == "filtered_child").unwrap();
+                assert_eq!(child.parent_span_id, slot.span_context.span_id());
+            }
+            return;
+        }
         tracing::subscriber::with_default(subscriber, || {
             let disabled = tracing::Span::none();
             link_slot(&disabled, 42);
@@ -806,12 +875,20 @@ mod tests {
         for value in [None, Some(OsStr::new("")), Some(OsStr::new("[invalid"))]
         {
             let (filter, warning) = parse_span_filter(value);
-            assert_eq!(filter.to_string(), "info");
+            assert_eq!(filter.to_string(), "scpd::slot=info,info");
             assert_eq!(
                 warning.is_some(),
                 value == Some(OsStr::new("[invalid"))
             );
         }
+    }
+
+    #[test]
+    fn slot_filter_overrides_target_directive() {
+        let (filter, warning) =
+            parse_span_filter(Some(OsStr::new("warn,scpd::slot=off")));
+        assert!(warning.is_none());
+        assert_eq!(filter.to_string(), "scpd::slot=info,warn");
     }
 
     #[test]

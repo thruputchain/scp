@@ -54,9 +54,10 @@ is set. Restart scpd after changing these variables.
   derived from the network hash and slot index. Sampling uses that trace ID
   with the configured ratio so scpd and chuckd keep or drop the same blocks.
   Missing or invalid values log one error and leave independent traces.
-- `OTEL_SPAN_FILTER`: which spans are exported, in `EnvFilter` syntax
+- `OTEL_SPAN_FILTER`: which other spans are exported, in `EnvFilter` syntax
   (for example `warn,scp_kernel=info`). Default `info`. It is independent of
-  `RUST_LOG`, which only controls the log output.
+  `RUST_LOG`, which only controls the log output. Slot spans (target
+  `scpd::slot`) are always exported so correlation holds, subject to sampling.
 - `OTEL_SERVICE_NAME` (default `scpd`) and `OTEL_RESOURCE_ATTRIBUTES`. The
   resource also carries `service.version` and `service.instance.id` (the
   node's hex ed25519 public key).

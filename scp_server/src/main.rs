@@ -1,6 +1,5 @@
 use clap::Parser;
 use core::net::SocketAddr;
-use futures::future;
 use rpc_driver::{ConnectionConfig, RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
 use tokio::net::{TcpListener, TcpSocket};
@@ -21,6 +20,7 @@ mod handler;
 )]
 mod heap_profile;
 mod heap_profiling;
+mod telemetry;
 
 #[cfg(all(target_os = "linux", feature = "heap-profiling"))]
 #[global_allocator]
@@ -36,7 +36,7 @@ pub static MALLOC_CONF: &[u8] =
 #[command(
     version,
     about = "SCP Server - Stellar Consensus Protocol stand-alone server",
-    long_about = "Use `RUST_LOG=warn|info|debug|trace` to set logging level."
+    long_about = "Use `RUST_LOG=warn|info|debug|trace` to set logging level. Set OTEL_EXPORTER_OTLP_ENDPOINT to enable tracing and OTEL_SPAN_FILTER to filter spans."
 )]
 struct Args {
     #[arg(
@@ -86,8 +86,31 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+    use opentelemetry::trace::TracerProvider;
+    use tracing_subscriber::prelude::*;
+
+    let args = Args::parse();
+    let instance_id = scp_util::parse_secret_key_from_base64(&args.secret_key)
+        .ok()
+        .and_then(|key| match scp_util::derive_node_id(&key) {
+            scp_proto::SCPPublicKey::Ed25519 { ed25519 } => Some(
+                ed25519
+                    .into_inner()
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect(),
+            ),
+            _ => None,
+        });
+    let (provider, mut warnings) = telemetry::provider(instance_id);
+    let (span_filter, warning) = telemetry::span_filter();
+    warnings.extend(warning);
+    let otel_layer = provider.as_ref().map(|provider| {
+        tracing_opentelemetry::layer()
+            .with_tracer(provider.tracer("scpd"))
+            .with_filter(span_filter)
+    });
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(
             tracing_subscriber::fmt::format::FmtSpan::NEW
                 | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
@@ -98,16 +121,43 @@ async fn main() {
         .with_file(true)
         .with_line_number(true)
         .with_level(true)
-        .with_ansi(false)
-        // .compact()
+        .with_ansi(false);
+    tracing_subscriber::registry()
+        .with(
+            fmt_layer
+                .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
+        )
+        .with(otel_layer)
         .init();
-    let args = Args::parse();
+    // Error level so a misconfiguration shows under the default filter.
+    for error in warnings {
+        tracing::error!(%error, "OpenTelemetry tracing configuration problem");
+    }
 
     if let Err(err) = heap_profiling::start_from_env().await {
         eprintln!("scpd: failed to initialize heap profiling: {err}");
         std::process::exit(1);
     }
 
+    let termination = telemetry::termination_signal();
+    telemetry::run_until_termination(run(args), termination).await;
+    if let Some(provider) = provider {
+        let termination = telemetry::termination_signal();
+        // Shutdown drains the batch processor; keep its blocking wait off Tokio.
+        let flush = async move {
+            let _ = tokio::task::spawn_blocking(move || {
+                provider
+                    .shutdown_with_timeout(std::time::Duration::from_secs(5))
+            })
+            .await;
+        };
+        if !telemetry::flush_unless_interrupted(flush, termination).await {
+            std::process::exit(1);
+        }
+    }
+}
+
+async fn run(args: Args) {
     info!(
         "control_addr={} handle_addr={} reuse={}",
         args.control_addr, args.handle_addr, args.reuse
@@ -173,8 +223,6 @@ async fn main() {
     let control_server =
         RpcServer::new_with_config(control_listener, control_config);
     control_server.start().await;
-
-    future::pending::<()>().await;
 }
 
 async fn bind_control_listener(

@@ -11,7 +11,7 @@ use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
-use tracing::{debug, info};
+use tracing::{Instrument, debug, info};
 use xdr_common::*;
 
 // ValidateClient
@@ -160,173 +160,192 @@ impl HandleClient {
         }
     }
 
-    #[tracing::instrument(
-        skip(self, req),
-        fields(request_kind = %req.kind())
-    )]
     async fn handle_request(&self, req: HandleRequest) {
-        match req {
-            HandleRequest::EmitEnvelope(env) => {
-                self.scp_handle
-                    .scp_handle_emit_envelope(&env)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::EmitEnvelope())
-                    .await
-                    .unwrap();
-            }
-            // HandleRequest::ValidateBallotValue(slot_index, value) => {
-            //     let r = self
-            //         .scp_handle
-            //         .scp_handle_validate_ballot_value(&slot_index, &value)
-            //         .await
-            //         .unwrap();
-            //     self.tx_reply
-            //         .send(HandleReply::ValidateBallotValue(r))
-            //         .await
-            //         .unwrap();
-            // }
-            // HandleRequest::ValidateNominationValue(slot_index, value) => {
-            //     let r = self
-            //         .scp_handle
-            //         .scp_handle_validate_nomination_value(&slot_index, &value)
-            //         .await
-            //         .unwrap();
-            //     self.tx_reply
-            //         .send(HandleReply::ValidateNominationValue(r))
-            //         .await
-            //         .unwrap();
-            // }
-            HandleRequest::ExtractValidValue(slot_index, value) => {
-                let r = self
-                    .scp_handle
-                    .scp_handle_extract_valid_value(&slot_index, &value)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::ExtractValidValue(r))
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::CombineCandidates(slot_index, values) => {
-                let r = self
-                    .scp_handle
-                    .scp_handle_combine_candidates(&slot_index, &values)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::CombineCandidates(r))
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::GetQuorumSet(hash) => {
-                let r = self
-                    .scp_handle
-                    .scp_handle_get_quorum_set(&hash)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::GetQuorumSet(r))
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::ValueExternalized(slot_index, value) => {
-                info!(
-                    "calling scp_handle_value_externalized for slot {}",
-                    slot_index,
-                );
-                self.scp_handle
-                    .scp_handle_value_externalized(&slot_index, &value)
-                    .await
-                    .unwrap();
-                info!(
-                    "called scp_handle_value_externalized for slot {}",
-                    slot_index,
-                );
-                self.tx_reply
-                    .send(HandleReply::ValueExternalized())
-                    .await
-                    .unwrap();
-                info!(
-                    "acked scp_handle_value_externalized for slot {}",
-                    slot_index,
-                );
-            }
-            HandleRequest::StartedBallotProto(slot_index, ballot) => {
-                self.scp_handle
-                    .scp_handle_started_ballot_proto(&slot_index, &ballot)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::StartedBallotProto())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::AcceptedBallotPrepared(slot_index, ballot) => {
-                self.scp_handle
-                    .scp_handle_accepted_ballot_prepared(&slot_index, &ballot)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::AcceptedBallotPrepared())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::ConfirmedBallotPrepared(slot_index, ballot) => {
-                self.scp_handle
-                    .scp_handle_confirmed_ballot_prepared(&slot_index, &ballot)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::ConfirmedBallotPrepared())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::AcceptedCommit(slot_index, ballot) => {
-                self.scp_handle
-                    .scp_handle_accepted_commit(&slot_index, &ballot)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::AcceptedCommit())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::BallotDidHearFromQuorum(slot_index, ballot) => {
-                self.scp_handle
-                    .scp_handle_ballot_did_hear_from_quorum(
-                        &slot_index,
-                        &ballot,
-                    )
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::BallotDidHearFromQuorum())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::NominatingValue(slot_index, value) => {
-                self.scp_handle
-                    .scp_handle_nominating_value(&slot_index, &value)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::NominatingValue())
-                    .await
-                    .unwrap();
-            }
-            HandleRequest::UpdatedCandidateValue(slot_index, value) => {
-                self.scp_handle
-                    .scp_handle_updated_candidate_value(&slot_index, &value)
-                    .await
-                    .unwrap();
-                self.tx_reply
-                    .send(HandleReply::UpdatedCandidateValue())
-                    .await
-                    .unwrap();
+        let span = tracing::info_span!(
+            target: "scpd::slot",
+            "handle_request",
+            request_kind = %req.kind(),
+            slot_index = tracing::field::Empty,
+            "groundhog.block.height" = tracing::field::Empty
+        );
+        if let Some(slot) = req.slot_index() {
+            let height = i64::try_from(slot).unwrap_or(i64::MAX);
+            span.record("slot_index", height);
+            span.record("groundhog.block.height", height);
+            crate::telemetry::link_slot(&span, slot);
+        }
+        async {
+            match req {
+                HandleRequest::EmitEnvelope(env) => {
+                    self.scp_handle
+                        .scp_handle_emit_envelope(&env)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::EmitEnvelope())
+                        .await
+                        .unwrap();
+                }
+                // HandleRequest::ValidateBallotValue(slot_index, value) => {
+                //     let r = self
+                //         .scp_handle
+                //         .scp_handle_validate_ballot_value(&slot_index, &value)
+                //         .await
+                //         .unwrap();
+                //     self.tx_reply
+                //         .send(HandleReply::ValidateBallotValue(r))
+                //         .await
+                //         .unwrap();
+                // }
+                // HandleRequest::ValidateNominationValue(slot_index, value) => {
+                //     let r = self
+                //         .scp_handle
+                //         .scp_handle_validate_nomination_value(&slot_index, &value)
+                //         .await
+                //         .unwrap();
+                //     self.tx_reply
+                //         .send(HandleReply::ValidateNominationValue(r))
+                //         .await
+                //         .unwrap();
+                // }
+                HandleRequest::ExtractValidValue(slot_index, value) => {
+                    let r = self
+                        .scp_handle
+                        .scp_handle_extract_valid_value(&slot_index, &value)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::ExtractValidValue(r))
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::CombineCandidates(slot_index, values) => {
+                    let r = self
+                        .scp_handle
+                        .scp_handle_combine_candidates(&slot_index, &values)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::CombineCandidates(r))
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::GetQuorumSet(hash) => {
+                    let r = self
+                        .scp_handle
+                        .scp_handle_get_quorum_set(&hash)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::GetQuorumSet(r))
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::ValueExternalized(slot_index, value) => {
+                    info!(
+                        "calling scp_handle_value_externalized for slot {}",
+                        slot_index,
+                    );
+                    self.scp_handle
+                        .scp_handle_value_externalized(&slot_index, &value)
+                        .await
+                        .unwrap();
+                    info!(
+                        "called scp_handle_value_externalized for slot {}",
+                        slot_index,
+                    );
+                    self.tx_reply
+                        .send(HandleReply::ValueExternalized())
+                        .await
+                        .unwrap();
+                    info!(
+                        "acked scp_handle_value_externalized for slot {}",
+                        slot_index,
+                    );
+                }
+                HandleRequest::StartedBallotProto(slot_index, ballot) => {
+                    self.scp_handle
+                        .scp_handle_started_ballot_proto(&slot_index, &ballot)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::StartedBallotProto())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::AcceptedBallotPrepared(slot_index, ballot) => {
+                    self.scp_handle
+                        .scp_handle_accepted_ballot_prepared(
+                            &slot_index,
+                            &ballot,
+                        )
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::AcceptedBallotPrepared())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::ConfirmedBallotPrepared(slot_index, ballot) => {
+                    self.scp_handle
+                        .scp_handle_confirmed_ballot_prepared(
+                            &slot_index,
+                            &ballot,
+                        )
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::ConfirmedBallotPrepared())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::AcceptedCommit(slot_index, ballot) => {
+                    self.scp_handle
+                        .scp_handle_accepted_commit(&slot_index, &ballot)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::AcceptedCommit())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::BallotDidHearFromQuorum(slot_index, ballot) => {
+                    self.scp_handle
+                        .scp_handle_ballot_did_hear_from_quorum(
+                            &slot_index,
+                            &ballot,
+                        )
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::BallotDidHearFromQuorum())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::NominatingValue(slot_index, value) => {
+                    self.scp_handle
+                        .scp_handle_nominating_value(&slot_index, &value)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::NominatingValue())
+                        .await
+                        .unwrap();
+                }
+                HandleRequest::UpdatedCandidateValue(slot_index, value) => {
+                    self.scp_handle
+                        .scp_handle_updated_candidate_value(&slot_index, &value)
+                        .await
+                        .unwrap();
+                    self.tx_reply
+                        .send(HandleReply::UpdatedCandidateValue())
+                        .await
+                        .unwrap();
+                }
             }
         }
+        .instrument(span)
+        .await;
     }
 
     pub async fn start(mut self) {
@@ -368,6 +387,23 @@ pub enum HandleRequest {
 }
 
 impl HandleRequest {
+    fn slot_index(&self) -> Option<u64> {
+        match self {
+            Self::EmitEnvelope(env) => Some(env.statement.slot_index),
+            Self::GetQuorumSet(_) => None,
+            Self::ExtractValidValue(slot, _)
+            | Self::CombineCandidates(slot, _)
+            | Self::ValueExternalized(slot, _)
+            | Self::StartedBallotProto(slot, _)
+            | Self::AcceptedBallotPrepared(slot, _)
+            | Self::ConfirmedBallotPrepared(slot, _)
+            | Self::AcceptedCommit(slot, _)
+            | Self::BallotDidHearFromQuorum(slot, _)
+            | Self::NominatingValue(slot, _)
+            | Self::UpdatedCandidateValue(slot, _) => Some(*slot),
+        }
+    }
+
     fn kind(&self) -> &'static str {
         match self {
             HandleRequest::EmitEnvelope(..) => "EmitEnvelope",
@@ -410,6 +446,45 @@ pub enum HandleReply {
     BallotDidHearFromQuorum(),
     NominatingValue(),
     UpdatedCandidateValue(),
+}
+
+#[cfg(test)]
+mod slot_tests {
+    use super::*;
+
+    #[test]
+    fn request_slots() {
+        let value = SCPValue::default();
+        let ballot = SCPBallot {
+            counter: 1,
+            value: value.clone(),
+        };
+        let envelope = scp_kernel::make_externalize(
+            &scp_util::generate_secret_key(b"handler-slot-test"),
+            [0; 32],
+            42,
+            ballot.clone(),
+            1,
+        )
+        .unwrap();
+        let requests = [
+            HandleRequest::EmitEnvelope(envelope),
+            HandleRequest::ExtractValidValue(42, value.clone()),
+            HandleRequest::CombineCandidates(42, SCPValues::default()),
+            HandleRequest::ValueExternalized(42, value.clone()),
+            HandleRequest::StartedBallotProto(42, ballot.clone()),
+            HandleRequest::AcceptedBallotPrepared(42, ballot.clone()),
+            HandleRequest::ConfirmedBallotPrepared(42, ballot.clone()),
+            HandleRequest::AcceptedCommit(42, ballot.clone()),
+            HandleRequest::BallotDidHearFromQuorum(42, ballot),
+            HandleRequest::NominatingValue(42, value.clone()),
+            HandleRequest::UpdatedCandidateValue(42, value),
+        ];
+        for request in requests {
+            assert_eq!(request.slot_index(), Some(42), "{}", request.kind());
+        }
+        assert_eq!(HandleRequest::GetQuorumSet([0; 32]).slot_index(), None);
+    }
 }
 
 // HandleKernel
@@ -576,14 +651,14 @@ impl HandleKernel {
         slot_index >= self.lock().lowest_non_externalized_slot
     }
 
-    #[tracing::instrument(skip(self), fields(slot_index = slot_index))]
+    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     pub fn update_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot =
             std::cmp::max(slot_index, lk.lowest_non_externalized_slot);
     }
 
-    #[tracing::instrument(skip(self), fields(slot_index = slot_index))]
+    #[tracing::instrument(skip(self), fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     pub fn set_lowest_non_externalized_slot(&self, slot_index: SlotIndex) {
         let mut lk = self.lock_mut();
         lk.lowest_non_externalized_slot = slot_index;
@@ -606,7 +681,7 @@ impl Consensus for HandleKernel {
 
     #[tracing::instrument(
         skip(self, value),
-        fields(slot_index = slot_index, value = %scp_kernel::hah(value))
+        fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX), value = %scp_kernel::hah(value))
     )]
     fn validate_nomination_value(
         &self,
@@ -668,7 +743,7 @@ impl Consensus for HandleKernel {
 }
 
 impl ConsensusNotify for HandleKernel {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(slot_index).unwrap_or(i64::MAX)))]
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
@@ -1024,7 +1099,7 @@ impl Driver for HandleKernel {
         Duration::from_millis(timeout_ms)
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
         info!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()

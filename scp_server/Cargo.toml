@@ -35,10 +35,17 @@ scp_util = { workspace = true }
 scp_kernel = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
 tokio = { version = "1.47.1", features = ["full"] }
 console-subscriber = "0.5"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+tracing-opentelemetry = "0.34"
+# internal-logs is off so the SDK does not log every failed export batch;
+# telemetry.rs reports collector failures once.
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["grpc-tonic", "trace"] }
 
 xdr-common = { workspace = true }
 rpc_driver = { workspace = true }

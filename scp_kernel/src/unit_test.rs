@@ -14,6 +14,79 @@ mod unit_tests {
     }
 
     #[test]
+    fn nomination_span_labels_entry_round() {
+        use tracing_subscriber::prelude::*;
+
+        // Isolate tracing callsite interest from concurrent kernel tests.
+        if std::env::var_os("SCP_NOMINATION_SPAN_TEST").is_none() {
+            assert!(std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "unit_test::unit_tests::nomination_span_labels_entry_round"])
+                .env("SCP_NOMINATION_SPAN_TEST", "1")
+                .status().unwrap().success());
+            return;
+        }
+
+        #[derive(Clone)]
+        struct Capture(std::sync::Arc<std::sync::Mutex<Vec<(String, i64)>>>);
+        impl tracing::field::Visit for Capture {
+            fn record_debug(
+                &mut self,
+                _: &tracing::field::Field,
+                _: &dyn std::fmt::Debug,
+            ) {
+            }
+            fn record_i64(
+                &mut self,
+                field: &tracing::field::Field,
+                value: i64,
+            ) {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((field.name().to_string(), value));
+            }
+        }
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Capture {
+            fn on_new_span(
+                &self,
+                attrs: &tracing::span::Attributes<'_>,
+                _: &tracing::Id,
+                _: tracing_subscriber::layer::Context<'_, S>,
+            ) {
+                if attrs.metadata().name() == "nominate" {
+                    attrs.record(&mut self.clone());
+                }
+            }
+        }
+        let fields = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let subscriber =
+            tracing_subscriber::registry()
+                .with(Capture(fields.clone()).with_filter(
+                    tracing_subscriber::filter::LevelFilter::INFO,
+                ));
+        tracing::subscriber::with_default(subscriber, || {
+            let nodes = TestNode::new_batch(2);
+            let qset = make_qset(
+                &[nodes[0].node_id().clone(), nodes[1].node_id().clone()],
+                2,
+                2,
+                0,
+            );
+            let mut kernel =
+                TestKernel::new(nodes[0].node_id().clone(), qset, true);
+            kernel.driver().priority_lookup = Box::new(|_| 1000);
+            let value = SCPValue::default();
+            kernel.nominate(42, &value, false);
+            kernel.nominate(42, &value, true);
+        });
+        let fields = fields.lock().unwrap();
+        assert!(fields.contains(&("slot_index".into(), 42)));
+        assert!(fields.contains(&("entry_round_number".into(), 0)));
+        assert!(fields.iter().any(|(name, value)| name == "entry_round_number" && *value > 0));
+        assert!(!fields.iter().any(|(name, _)| name == "round_number"));
+    }
+
+    #[test]
     fn nomination_weight() {
         let nodes = TestNode::new_batch(6);
         let mut q_set = SCPQuorumSet {

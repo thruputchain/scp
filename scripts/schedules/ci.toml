@@ -44,7 +44,11 @@ cargo test --offline --locked -p scp_server --features heap-profiling --release
     export CARGO_TARGET_DIR
     cargo --config "$release_config" build --release --offline --locked -p scp_server --bin scpd -v 2>&1 | tee release-build.log
     # Check flags on the binary's actual compiler invocation, not a dependency.
-    grep -E '^ *Running `.*--crate-name scpd ' release-build.log | grep -F -- '-C force-frame-pointers=yes'
+    # Debian's linker adds a build ID by default, so readelf alone cannot show
+    # that the repository's link argument was applied.
+    grep -E '^ *Running `.*--crate-name scpd ' release-build.log > scpd-rustc.log
+    grep -F -- '-C force-frame-pointers=yes' scpd-rustc.log
+    grep -F -- '-C link-arg=-Wl,--build-id=sha1' scpd-rustc.log
     readelf -n "$CARGO_TARGET_DIR/release/scpd" > release-notes.log
     grep -Eq 'Build ID: [[:xdigit:]]+' release-notes.log
 )

@@ -13,10 +13,17 @@ Heap profiling is opt-in at build time and at run time:
   fails startup rather than ignoring it.
 - Set `SCPD_PPROF_LISTEN=127.0.0.1:9646` to open a separate HTTP listener.
   Without it no profiling socket or task exists. The listener has no
-  authentication; use a private address.
+  authentication and allows only loopback by default (`127.0.0.0/8`, `::1`,
+  `localhost`). Hostnames are resolved and every result must be loopback.
+  `SCPD_PPROF_ALLOW_REMOTE=1` permits other addresses (including `0.0.0.0`
+  inside a container whose published port is restricted) and logs a warning.
 - `GET /debug/pprof/heap` returns an uncompressed pprof protobuf converted from
-  jemalloc `heap_v2`. Without activation, and for other paths and methods, the
-  listener returns 404.
+  jemalloc `heap_v2`; `HEAD` returns the same headers without a body. Without
+  activation, or for other paths, the listener returns 404; other methods get 405.
+- The route requires a `Host` of `localhost` or a loopback IP literal.
+  `SCPD_PPROF_ALLOW_REMOTE=1` also accepts any IP-literal Host, so remote scrapes
+  must use an IP address, not a hostname (DNS-rebinding protection). A missing
+  Host, DNS-name Host, or cross-origin `Origin` header gets 403.
 - Profiles are symbolized in process: function names, plus file and line when
   debuginfo is present, innermost inlined frame first. Mappings carry GNU build
   IDs.

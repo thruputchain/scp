@@ -30,14 +30,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # Loaded after the repo checkout, but before the actions checkout,
-      # which authenticates through the agent via the insteadOf rewrite below.
+      # Loaded after checkout for the private source dependencies.
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
-            ${{ secrets.SCP_TO_ACTIONS_KEY }}
             ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
             ${{ secrets.SCP_TO_PROTOCOL_KEY }}
             ${{ secrets.SCP_TO_XDR_COMMON_KEY }}
@@ -49,23 +47,15 @@ jobs:
         run: |
           git config --global url."git@github.com:".insteadOf "https://github.com/"
 
-      - name: Checkout actions repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          repository: groundhogchain/actions
-          path: actions
-          ref: af074672d3a6f3ddedcacd758224ea5a5cf2a8f3 # v0
-          persist-credentials: false
-
       - name: dry run
-        uses: ./actions/cargo-publish-dry-run
+        uses: thruputchain/actions/cargo-publish-dry-run@6693fac8133585728ad3a4ca14e3441073b6def8
         with:
           skip-clippy: false
           cargo-hack-feature-options: '--feature-powerset'
 
       - name: tag commit with version
         id: publish-tag
-        uses: ./actions/cargo-version-tag
+        uses: thruputchain/actions/cargo-version-tag@6693fac8133585728ad3a4ca14e3441073b6def8
 
       - name: push tag
         env:
@@ -95,7 +85,7 @@ jobs:
           git remote set-url origin "git@github.com:$REPOSITORY.git"
 
       - name: publish
-        uses: ./actions/cargo-publish
+        uses: thruputchain/actions/cargo-publish@6693fac8133585728ad3a4ca14e3441073b6def8
         with:
           git-tag: ${{ steps.publish-tag.outputs.tag }}
           registry-name: groundhog

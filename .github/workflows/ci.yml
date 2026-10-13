@@ -13,7 +13,7 @@ jobs:
   dependency-policy:
     permissions:
       contents: read
-    uses: groundhogchain/actions/.github/workflows/rust-dependency-policy.yml@af074672d3a6f3ddedcacd758224ea5a5cf2a8f3 # v0
+    uses: thruputchain/actions/.github/workflows/rust-dependency-policy.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v0
     with:
       registry-name: groundhog
     secrets:
@@ -22,7 +22,7 @@ jobs:
   workflow-lint:
     permissions:
       contents: read
-    uses: groundhogchain/actions/.github/workflows/workflow-lint.yml@af074672d3a6f3ddedcacd758224ea5a5cf2a8f3 # v0
+    uses: thruputchain/actions/.github/workflows/workflow-lint.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v0
     with:
       shellcheck-scripts: true
 

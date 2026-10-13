@@ -12,7 +12,7 @@ jobs:
   scan:
     permissions:
       contents: read
-    uses: thruputchain/actions/.github/workflows/rust-dependency-policy.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v0
+    uses: thruputchain/actions/.github/workflows/rust-dependency-policy.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v1
     with:
       checks: advisories
       registry-name: groundhog
@@ -25,4 +25,4 @@ jobs:
     permissions:
       contents: read
       issues: write # files the advisory issue
-    uses: thruputchain/actions/.github/workflows/rust-advisory-issue.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v0
+    uses: thruputchain/actions/.github/workflows/rust-advisory-issue.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v1

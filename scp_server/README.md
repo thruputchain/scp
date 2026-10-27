@@ -42,6 +42,16 @@ platform. On Linux, `cargo test -p scp_server --features heap-profiling` also
 takes a real jemalloc dump and checks that a retained allocation resolves by
 function name and that the test executable's mapping has a build ID.
 
+## Logging
+
+- `RUST_LOG` controls log output using `EnvFilter` syntax; when unset the
+  default is ERROR.
+- `SCPD_LOG_SPAN_EVENTS=1` enables span NEW/CLOSE log events for spans
+  selected by `RUST_LOG`. Unset or any other value disables these events.
+  This does not change OpenTelemetry export.
+
+Restart scpd after changing these environment variables.
+
 ## Tracing
 
 scpd exports its `tracing` spans over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT`

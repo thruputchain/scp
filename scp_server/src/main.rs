@@ -110,11 +110,16 @@ async fn main() {
             .with_tracer(provider.tracer("scpd"))
             .with_filter(span_filter)
     });
+    let span_events = if std::env::var_os("SCPD_LOG_SPAN_EVENTS").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        tracing_subscriber::fmt::format::FmtSpan::NEW
+            | tracing_subscriber::fmt::format::FmtSpan::CLOSE
+    } else {
+        tracing_subscriber::fmt::format::FmtSpan::NONE
+    };
     let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_span_events(
-            tracing_subscriber::fmt::format::FmtSpan::NEW
-                | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-        )
+        .with_span_events(span_events)
         .event_format(tracing_subscriber::fmt::format())
         // .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
         .with_target(false)

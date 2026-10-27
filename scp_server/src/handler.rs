@@ -80,7 +80,7 @@ impl ValidateClient {
                             .await
                             .unwrap(),
                     );
-                    info!(
+                    debug!(
                         "validated nomination value {} for slot {} as {:#?}",
                         scp_kernel::hah(&v),
                         slot_index,
@@ -107,7 +107,7 @@ impl ValidateClient {
                             .await
                             .unwrap(),
                     );
-                    info!(
+                    debug!(
                         "validated ballot value {} for slot {} as {:#?}",
                         scp_kernel::hah(&v),
                         slot_index,
@@ -242,7 +242,7 @@ impl HandleClient {
                         .unwrap();
                 }
                 HandleRequest::ValueExternalized(slot_index, value) => {
-                    info!(
+                    debug!(
                         "calling scp_handle_value_externalized for slot {}",
                         slot_index,
                     );
@@ -258,7 +258,7 @@ impl HandleClient {
                         .send(HandleReply::ValueExternalized())
                         .await
                         .unwrap();
-                    info!(
+                    debug!(
                         "acked scp_handle_value_externalized for slot {}",
                         slot_index,
                     );
@@ -749,7 +749,7 @@ impl ConsensusNotify for HandleKernel {
         slot_index: SlotIndex,
         value: &scp_proto::SCPValue,
     ) {
-        info!(
+        debug!(
             "externalizing value {} for slot {}",
             scp_kernel::hah(value),
             slot_index
@@ -1101,16 +1101,16 @@ impl Driver for HandleKernel {
 
     #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
     fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
-        info!("emitting envelope {}", self.envelope_to_str(&env));
+        debug!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::EmitEnvelope(env.clone()))
             .unwrap();
-        info!("sent emit envelope request {}", self.envelope_to_str(&env));
+        debug!("sent emit envelope request {}", self.envelope_to_str(&env));
         if let HandleReply::EmitEnvelope() =
             self.lock_mut().rx_handle_reply.blocking_recv().unwrap()
         {
-            info!("emitted envelope {}", self.envelope_to_str(&env));
+            debug!("emitted envelope {}", self.envelope_to_str(&env));
         } else {
             panic!("bug")
         }

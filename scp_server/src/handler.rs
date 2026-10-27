@@ -251,8 +251,9 @@ impl HandleClient {
                         .await
                         .unwrap();
                     info!(
-                        "called scp_handle_value_externalized for slot {}",
+                        "called scp_handle_value_externalized for slot {} value {}",
                         slot_index,
+                        scp_kernel::hah(&value),
                     );
                     self.tx_reply
                         .send(HandleReply::ValueExternalized())

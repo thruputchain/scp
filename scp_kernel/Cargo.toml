@@ -1,24 +1,28 @@
 [package]
-name = "scp_kernel"
+name = "thruput-scp-kernel"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 keywords.workspace = true
-categories.workspace = true
+categories = ["cryptography::cryptocurrencies", "algorithms"]
 description = "SCP consensus kernel implementation"
 
+# Published as thruput-scp-kernel. The library keeps its name, so
+# `use scp_kernel::...` is unchanged.
 [lib]
 name = "scp_kernel"
 path = "src/lib.rs"
 
 [dependencies]
-scp_proto = { workspace = true }
+thruput-scp = { workspace = true }
+thruput-xdr = { workspace = true }
 scp_util = { workspace = true }
-shfix = { workspace = true }
 async-trait = "0.1"
 #derive_more = { version = "2", features = ["full"] }
 serde_json = "1.0"
@@ -31,4 +35,5 @@ rand = "0.9.3"
 xdr-common = { workspace = true }
 
 [dev-dependencies]
+shfix = { workspace = true }
 tracing-subscriber = "0.3"

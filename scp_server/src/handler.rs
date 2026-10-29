@@ -1,7 +1,6 @@
 use crate::controller::*;
 use futures::future::join_all;
 use scp_kernel::*;
-use scp_proto::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -9,6 +8,7 @@ use std::sync::RwLock as StdRwLock;
 use std::sync::RwLockReadGuard as StdRwLockReadGuard;
 use std::sync::RwLockWriteGuard as StdRwLockWriteGuard;
 use std::time::Duration;
+use thruput_scp::*;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedSender};
 use tracing::{Instrument, debug, info};
@@ -502,10 +502,10 @@ struct HandleKernelState {
     initial_nomination_timeout: Duration,
     increment_nomination_timeout: Duration,
     //
-    secret_key: scp_proto::SCPSecretKey,
+    secret_key: thruput_xdr::types::SecretKey,
     //
     validated_values: ValidatedValues,
-    known_qsets: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>,
+    known_qsets: HashMap<thruput_scp::SCPHash, thruput_scp::SCPQuorumSet>,
     //
     tx_switch_timer: UnboundedSender<SwitchTimer>,
     //
@@ -547,8 +547,8 @@ impl HandleKernel {
         tx_handle_request: Sender<HandleRequest>,
         rx_handle_reply: Receiver<HandleReply>,
         tx_switch_timer: UnboundedSender<SwitchTimer>,
-        cfg: &scp_proto::SCPConfig,
-        secret_key: &scp_proto::SCPSecretKey,
+        cfg: &thruput_scp::SCPConfig,
+        secret_key: &thruput_xdr::types::SecretKey,
     ) -> HandleKernel {
         HandleKernel(Arc::new(StdRwLock::new(HandleKernelState {
             tx_handle_request,
@@ -582,7 +582,7 @@ impl HandleKernel {
         self.0.write().unwrap()
     }
 
-    fn envelope_to_str(&self, env: &scp_proto::SCPEnvelope) -> String {
+    fn envelope_to_str(&self, env: &thruput_scp::SCPEnvelope) -> String {
         let cd = ConsensusDriver::<HandleKernel, HandleKernel>::new(
             self.clone(),
             self.clone(),
@@ -593,7 +593,7 @@ impl HandleKernel {
     pub fn set_cached_validation(
         &self,
         slot_index: SlotIndex,
-        v: scp_proto::SCPValue,
+        v: thruput_scp::SCPValue,
         l: ValidationLevel,
     ) {
         let mut state = self.lock_mut();
@@ -604,7 +604,7 @@ impl HandleKernel {
     pub fn get_cached_validation(
         &self,
         slot_index: SlotIndex,
-        v: &scp_proto::SCPValue,
+        v: &thruput_scp::SCPValue,
     ) -> Option<ValidationLevel> {
         let state = self.lock();
         assert!(
@@ -622,8 +622,8 @@ impl HandleKernel {
 
     pub fn set_known_qset(
         &self,
-        qset: scp_proto::SCPQuorumSet,
-    ) -> Option<scp_proto::SCPQuorumSet> {
+        qset: thruput_scp::SCPQuorumSet,
+    ) -> Option<thruput_scp::SCPQuorumSet> {
         self.lock_mut()
             .known_qsets
             .insert(scp_util::hash_xdr_scp(&qset).unwrap(), qset)
@@ -631,15 +631,15 @@ impl HandleKernel {
 
     pub fn get_known_qset(
         &self,
-        hash: &scp_proto::SCPHash,
-    ) -> Option<scp_proto::SCPQuorumSet> {
+        hash: &thruput_scp::SCPHash,
+    ) -> Option<thruput_scp::SCPQuorumSet> {
         self.lock().known_qsets.get(hash).cloned()
     }
 
     pub fn remove_known_qset(
         &self,
-        hash: &scp_proto::SCPHash,
-    ) -> Option<scp_proto::SCPQuorumSet> {
+        hash: &thruput_scp::SCPHash,
+    ) -> Option<thruput_scp::SCPQuorumSet> {
         self.lock_mut().known_qsets.remove(hash)
     }
 
@@ -669,7 +669,7 @@ impl Consensus for HandleKernel {
     fn validate_ballot_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         debug!(
             "validate_ballot_value XXX: slot_index = {}, value = {}",
@@ -686,7 +686,7 @@ impl Consensus for HandleKernel {
     fn validate_nomination_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         debug!(
             "validate_nomination_value XXX: slot_index = {}, value = {}",
@@ -699,8 +699,8 @@ impl Consensus for HandleKernel {
     fn extract_valid_value(
         &self,
         slot_index: SCPSlotIndex,
-        value: &scp_proto::SCPValue,
-    ) -> Option<scp_proto::SCPValue> {
+        value: &thruput_scp::SCPValue,
+    ) -> Option<thruput_scp::SCPValue> {
         self.lock()
             .tx_handle_request
             .blocking_send(HandleRequest::ExtractValidValue(
@@ -720,8 +720,8 @@ impl Consensus for HandleKernel {
     fn combine_candidates(
         &self,
         slot_index: SCPSlotIndex,
-        candidates: &HashSet<scp_proto::SCPValue>,
-    ) -> Option<scp_proto::SCPValue> {
+        candidates: &HashSet<thruput_scp::SCPValue>,
+    ) -> Option<thruput_scp::SCPValue> {
         let mut candidates_vec =
             VecM::<SCPValue>(candidates.iter().cloned().collect());
         candidates_vec.0.sort();
@@ -747,7 +747,7 @@ impl ConsensusNotify for HandleKernel {
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) {
         info!(
             "externalizing value {} for slot {}",
@@ -779,12 +779,12 @@ impl ConsensusNotify for HandleKernel {
     }
 
     #[cfg(not(feature = "info_callbacks"))]
-    fn started_ballot_proto(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    fn started_ballot_proto(&self, _: SlotIndex, _: &thruput_scp::SCPBallot) {}
     #[cfg(feature = "info_callbacks")]
     fn started_ballot_proto(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.lock()
             .tx_handle_request
@@ -802,13 +802,17 @@ impl ConsensusNotify for HandleKernel {
     }
 
     #[cfg(not(feature = "info_callbacks"))]
-    fn accepted_ballot_prepared(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {
+    fn accepted_ballot_prepared(
+        &self,
+        _: SlotIndex,
+        _: &thruput_scp::SCPBallot,
+    ) {
     }
     #[cfg(feature = "info_callbacks")]
     fn accepted_ballot_prepared(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.lock()
             .tx_handle_request
@@ -829,14 +833,14 @@ impl ConsensusNotify for HandleKernel {
     fn confirmed_ballot_prepared(
         &self,
         _: SlotIndex,
-        _: &scp_proto::SCPBallot,
+        _: &thruput_scp::SCPBallot,
     ) {
     }
     #[cfg(feature = "info_callbacks")]
     fn confirmed_ballot_prepared(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.lock()
             .tx_handle_request
@@ -854,12 +858,12 @@ impl ConsensusNotify for HandleKernel {
     }
 
     #[cfg(not(feature = "info_callbacks"))]
-    fn accepted_commit(&self, _: SlotIndex, _: &scp_proto::SCPBallot) {}
+    fn accepted_commit(&self, _: SlotIndex, _: &thruput_scp::SCPBallot) {}
     #[cfg(feature = "info_callbacks")]
     fn accepted_commit(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.lock()
             .tx_handle_request
@@ -880,14 +884,14 @@ impl ConsensusNotify for HandleKernel {
     fn ballot_did_hear_from_quorum(
         &self,
         _: SlotIndex,
-        _: &scp_proto::SCPBallot,
+        _: &thruput_scp::SCPBallot,
     ) {
     }
     #[cfg(feature = "info_callbacks")]
     fn ballot_did_hear_from_quorum(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.lock()
             .tx_handle_request
@@ -905,12 +909,12 @@ impl ConsensusNotify for HandleKernel {
     }
 
     #[cfg(not(feature = "info_callbacks"))]
-    fn nominating_value(&self, _: SlotIndex, _: &scp_proto::SCPValue) {}
+    fn nominating_value(&self, _: SlotIndex, _: &thruput_scp::SCPValue) {}
     #[cfg(feature = "info_callbacks")]
     fn nominating_value(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) {
         self.lock()
             .tx_handle_request
@@ -928,12 +932,13 @@ impl ConsensusNotify for HandleKernel {
     }
 
     #[cfg(not(feature = "info_callbacks"))]
-    fn updated_candidate_value(&self, _: SlotIndex, _: &scp_proto::SCPValue) {}
+    fn updated_candidate_value(&self, _: SlotIndex, _: &thruput_scp::SCPValue) {
+    }
     #[cfg(feature = "info_callbacks")]
     fn updated_candidate_value(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) {
         self.lock()
             .tx_handle_request
@@ -954,13 +959,13 @@ impl ConsensusNotify for HandleKernel {
 impl Driver for HandleKernel {
     fn get_qset(
         &self,
-        h: &scp_proto::SCPHash,
-    ) -> Option<scp_proto::SCPQuorumSet> {
+        h: &thruput_scp::SCPHash,
+    ) -> Option<thruput_scp::SCPQuorumSet> {
         self.get_known_qset(h)
     }
 
     // Alternatively, call into the app at the cost of network latency on the critical path.
-    // fn get_qset(&self, h: &scp_proto::SCPHash) -> Option<scp_proto::SCPQuorumSet> {
+    // fn get_qset(&self, h: &thruput_scp::SCPHash) -> Option<thruput_scp::SCPQuorumSet> {
     //     self.lock()
     //         .tx_handle_request
     //         .blocking_send(HandleRequest::GetQuorumSet(h.clone()))
@@ -974,39 +979,39 @@ impl Driver for HandleKernel {
     //     }
     // }
 
-    fn to_short_string(&self, pk: &scp_proto::SCPNodeID) -> String {
+    fn to_short_string(&self, pk: &thruput_scp::SCPNodeID) -> String {
         self.to_str_key(pk, false)
     }
 
-    fn to_str_key(&self, pk: &scp_proto::SCPNodeID, full_key: bool) -> String {
-        match pk {
-            SCPPublicKey::Ed25519 { ed25519 } => {
-                if full_key {
-                    hex_full(&ed25519.into_inner()[..])
-                } else {
-                    hex_abbrev(&ed25519.into_inner()[..])
-                }
-            }
-            _ => panic!("unreachable"),
+    fn to_str_key(
+        &self,
+        pk: &thruput_scp::SCPNodeID,
+        full_key: bool,
+    ) -> String {
+        let bytes = scp_util::public_key_bytes(pk);
+        if full_key {
+            hex_full(bytes)
+        } else {
+            hex_abbrev(bytes)
         }
     }
 
-    fn from_str_key(&self, s: &str) -> Result<scp_proto::SCPNodeID, String> {
+    fn from_str_key(&self, s: &str) -> Result<thruput_scp::SCPNodeID, String> {
         parse_node_id_from_hex(s)
     }
 
-    fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
+    fn get_value_string(&self, value: &thruput_scp::SCPValue) -> String {
         hah(&value.0)
     }
 
-    fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {
+    fn get_hash_of(&self, opaque: &[u8]) -> thruput_scp::SCPHash {
         hash_bytes(opaque)
     }
 
     fn get_node_weight(
         &self,
-        node_id: &scp_proto::SCPNodeID,
-        qset: &scp_proto::SCPQuorumSet,
+        node_id: &thruput_scp::SCPNodeID,
+        qset: &thruput_scp::SCPQuorumSet,
         is_local_node: bool,
     ) -> u64 {
         get_node_weight(node_id, qset, is_local_node)
@@ -1014,11 +1019,11 @@ impl Driver for HandleKernel {
 
     fn compute_hash_node(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        prev: &scp_proto::SCPValue,
+        slot_index: thruput_scp::SCPSlotIndex,
+        prev: &thruput_scp::SCPValue,
         is_priority: bool,
-        round_number: scp_proto::SCPCount,
-        node_id: &scp_proto::SCPNodeID,
+        round_number: thruput_scp::SCPCount,
+        node_id: &thruput_scp::SCPNodeID,
     ) -> u64 {
         hash_helper(
             slot_index,
@@ -1046,10 +1051,10 @@ impl Driver for HandleKernel {
 
     fn compute_value_hash(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        prev: &scp_proto::SCPValue,
-        round_number: scp_proto::SCPCount,
-        value: &scp_proto::SCPValue,
+        slot_index: thruput_scp::SCPSlotIndex,
+        prev: &thruput_scp::SCPValue,
+        round_number: thruput_scp::SCPCount,
+        value: &thruput_scp::SCPValue,
     ) -> u64 {
         hash_helper(
             slot_index,
@@ -1067,14 +1072,14 @@ impl Driver for HandleKernel {
         )
     }
 
-    fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope) {
+    fn sign_envelope(&self, env: &mut thruput_scp::SCPEnvelope) {
         env.signature =
             sign_xdr(&self.lock().secret_key, &env.statement).unwrap()
     }
 
     fn compute_timeout(
         &self,
-        round_number: scp_proto::SCPCount,
+        round_number: thruput_scp::SCPCount,
         is_nomination: bool,
     ) -> Duration {
         let (initial_timeout_ms, increment_ms) = if is_nomination {
@@ -1100,7 +1105,7 @@ impl Driver for HandleKernel {
     }
 
     #[tracing::instrument(skip_all, fields(slot_index = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX), groundhog.block.height = i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX)))]
-    fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
+    fn emit_envelope(&self, env: thruput_scp::SCPEnvelope) {
         info!("emitting envelope {}", self.envelope_to_str(&env));
         self.lock()
             .tx_handle_request
@@ -1137,7 +1142,7 @@ impl Driver for HandleKernel {
     }
 }
 
-fn to_validation_level(x: scp_proto::SCPValidationLevel) -> ValidationLevel {
+fn to_validation_level(x: thruput_scp::SCPValidationLevel) -> ValidationLevel {
     match x {
         SCPValidationLevel::SCP_INVALID => ValidationLevel::Invalid,
         SCPValidationLevel::SCP_MAYBE_VALID => ValidationLevel::MaybeValid,

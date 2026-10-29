@@ -5,9 +5,9 @@ use tracing::{debug, instrument};
 
 pub use qset::{QSetError, is_qset_sane};
 
-pub fn for_all_nodes<F>(qset: &scp_proto::SCPQuorumSet, proc: &mut F) -> bool
+pub fn for_all_nodes<F>(qset: &thruput_scp::SCPQuorumSet, proc: &mut F) -> bool
 where
-    F: FnMut(&scp_proto::SCPNodeID) -> bool,
+    F: FnMut(&thruput_scp::SCPNodeID) -> bool,
 {
     for node in qset.validators.iter() {
         if !proc(node) {
@@ -25,8 +25,8 @@ where
 }
 
 fn is_quorum_slice_internal(
-    qset: &scp_proto::SCPQuorumSet,
-    node_set: &[scp_proto::SCPNodeID],
+    qset: &thruput_scp::SCPQuorumSet,
+    node_set: &[thruput_scp::SCPNodeID],
 ) -> bool {
     let mut threshold_left = qset.threshold;
 
@@ -52,15 +52,15 @@ fn is_quorum_slice_internal(
 }
 
 pub fn is_quorum_slice(
-    qset: &scp_proto::SCPQuorumSet,
-    node_set: &[scp_proto::SCPNodeID],
+    qset: &thruput_scp::SCPQuorumSet,
+    node_set: &[thruput_scp::SCPNodeID],
 ) -> bool {
     is_quorum_slice_internal(qset, node_set)
 }
 
 fn is_vblocking_internal(
-    qset: &scp_proto::SCPQuorumSet,
-    node_set: &[scp_proto::SCPNodeID],
+    qset: &thruput_scp::SCPQuorumSet,
+    node_set: &[thruput_scp::SCPNodeID],
 ) -> bool {
     // There is no v-blocking set for 0-threshold
     if qset.threshold == 0 {
@@ -96,8 +96,8 @@ fn is_vblocking_internal(
 }
 
 pub fn is_vblocking_nodes(
-    qset: &scp_proto::SCPQuorumSet,
-    nodes: &[scp_proto::SCPNodeID],
+    qset: &thruput_scp::SCPQuorumSet,
+    nodes: &[thruput_scp::SCPNodeID],
 ) -> bool {
     is_vblocking_internal(qset, nodes)
 }
@@ -105,15 +105,15 @@ pub fn is_vblocking_nodes(
 /// Check if filtered envelopes form a v-blocking set
 #[instrument(skip(qset, envs, filter))]
 pub fn is_vblocking_envelopes<F>(
-    qset: &scp_proto::SCPQuorumSet,
-    envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
+    qset: &thruput_scp::SCPQuorumSet,
+    envs: &HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope>,
     filter: F,
 ) -> bool
 where
-    F: Fn(&scp_proto::SCPStatement) -> bool,
+    F: Fn(&thruput_scp::SCPStatement) -> bool,
 {
     // Collect node IDs where the envelope passes the filter
-    let filtered_nodes: Vec<scp_proto::SCPNodeID> = envs
+    let filtered_nodes: Vec<thruput_scp::SCPNodeID> = envs
         .iter()
         .filter_map(|(node_id, envelope)| {
             if filter(&envelope.statement) {
@@ -130,22 +130,22 @@ where
 
 /// Check if filtered envelopes form a quorum
 pub fn is_quorum<GetStmtQSet, FilterStmts>(
-    qset: &scp_proto::SCPQuorumSet,
-    envelopes: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
+    qset: &thruput_scp::SCPQuorumSet,
+    envelopes: &HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope>,
     get_stmt_qset: &GetStmtQSet,
     filter: &FilterStmts,
 ) -> bool
 where
     GetStmtQSet:
-        Fn(&scp_proto::SCPStatement) -> Option<scp_proto::SCPQuorumSet>,
-    FilterStmts: Fn(&scp_proto::SCPStatement) -> bool,
+        Fn(&thruput_scp::SCPStatement) -> Option<thruput_scp::SCPQuorumSet>,
+    FilterStmts: Fn(&thruput_scp::SCPStatement) -> bool,
 {
     // TODO(frost): Add an internal bound or bounded input type for consensus
 
     // quorum evaluation; external proof payloads are bounded at the verifier
     // boundary.
     // Start with nodes that pass the filter
-    let mut p_nodes: Vec<scp_proto::SCPNodeID> = envelopes
+    let mut p_nodes: Vec<thruput_scp::SCPNodeID> = envelopes
         .iter()
         .filter_map(|(node_id, envelope)| {
             if filter(&envelope.statement) {
@@ -191,10 +191,10 @@ where
 // Computes the distance to the set of v-blocking sets given a set of nodes
 // that agree but can fail. `excluded`, if set, will be skipped altogether.
 pub fn find_closest_v_blocking_nodes(
-    qset: &scp_proto::SCPQuorumSet,
-    nodes: &HashSet<scp_proto::SCPNodeID>,
-    excluded: Option<&scp_proto::SCPNodeID>,
-) -> Vec<scp_proto::SCPNodeID> {
+    qset: &thruput_scp::SCPQuorumSet,
+    nodes: &HashSet<thruput_scp::SCPNodeID>,
+    excluded: Option<&thruput_scp::SCPNodeID>,
+) -> Vec<thruput_scp::SCPNodeID> {
     // Calculate nodes needed to block: total_entries - threshold + 1
     let total_entries = qset.validators.len() + qset.inner_sets.len();
     let mut left_till_block =
@@ -224,7 +224,7 @@ pub fn find_closest_v_blocking_nodes(
     }
 
     // Collect results from inner sets, ordered by size
-    let mut res_internals: Vec<Vec<scp_proto::SCPNodeID>> = Vec::new();
+    let mut res_internals: Vec<Vec<thruput_scp::SCPNodeID>> = Vec::new();
 
     for inner_qset in qset.inner_sets.iter() {
         let inner_result =
@@ -263,16 +263,16 @@ pub fn find_closest_v_blocking_nodes(
 
 /// Find the closest v-blocking set from filtered envelopes
 pub fn find_closest_v_blocking_envelopes<F>(
-    qset: &scp_proto::SCPQuorumSet,
-    envs: &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
+    qset: &thruput_scp::SCPQuorumSet,
+    envs: &HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope>,
     filter: F,
-    excluded: Option<&scp_proto::SCPNodeID>,
-) -> Vec<scp_proto::SCPNodeID>
+    excluded: Option<&thruput_scp::SCPNodeID>,
+) -> Vec<thruput_scp::SCPNodeID>
 where
-    F: Fn(&scp_proto::SCPStatement) -> bool,
+    F: Fn(&thruput_scp::SCPStatement) -> bool,
 {
     // Collect nodes that pass the filter into a HashSet
-    let nodes: HashSet<scp_proto::SCPNodeID> = envs
+    let nodes: HashSet<thruput_scp::SCPNodeID> = envs
         .iter()
         .filter_map(|(node_id, envelope)| {
             if filter(&envelope.statement) {
@@ -297,19 +297,19 @@ pub enum CompanionQuorumSetHashError {
 ///
 /// For EXTERNALIZE statements this is `commit_quorum_set_hash`.
 pub fn try_get_companion_quorum_set_hash_from_statement(
-    statement: &scp_proto::SCPStatement,
-) -> Result<scp_proto::SCPHash, CompanionQuorumSetHashError> {
+    statement: &thruput_scp::SCPStatement,
+) -> Result<thruput_scp::SCPHash, CompanionQuorumSetHashError> {
     match &statement.pledges {
-        scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+        thruput_scp::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
             Ok(prepare.quorum_set_hash)
         }
-        scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+        thruput_scp::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
             Ok(confirm.quorum_set_hash)
         }
-        scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
-            Ok(externalize.commit_quorum_set_hash)
-        }
-        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+        thruput_scp::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+            externalize,
+        } => Ok(externalize.commit_quorum_set_hash),
+        thruput_scp::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
             Ok(nominate.quorum_set_hash)
         }
         _ => Err(CompanionQuorumSetHashError::MissingStatementPledge),
@@ -319,8 +319,8 @@ pub fn try_get_companion_quorum_set_hash_from_statement(
 // Legacy infallible wrapper for kernel paths where malformed statement arms are
 // treated as internal bugs rather than peer-proof validation failures.
 pub fn get_companion_quorum_set_hash_from_statement(
-    statement: &scp_proto::SCPStatement,
-) -> scp_proto::SCPHash {
+    statement: &thruput_scp::SCPStatement,
+) -> thruput_scp::SCPHash {
     try_get_companion_quorum_set_hash_from_statement(statement)
         .expect("bug: statement does not carry a companion quorum-set hash")
 }

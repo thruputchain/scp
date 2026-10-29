@@ -22,18 +22,19 @@ pub const MAX_TOTAL_COMPANION_QSET_BYTES: usize = 4 * 1024 * 1024;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExternalizedSlotProof {
     /// Latest proof envelope by signer node id.
-    envelopes_by_node: HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>,
+    envelopes_by_node:
+        HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope>,
     /// XDR-encoded companion quorum sets keyed by SCP hash.
-    companion_qsets: HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
+    companion_qsets: HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes>,
 }
 
 impl ExternalizedSlotProof {
     pub(crate) fn new(
         envelopes_by_node: HashMap<
-            scp_proto::SCPNodeID,
-            scp_proto::SCPEnvelope,
+            thruput_scp::SCPNodeID,
+            thruput_scp::SCPEnvelope,
         >,
-        companion_qsets: HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
+        companion_qsets: HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes>,
     ) -> Self {
         Self {
             envelopes_by_node,
@@ -44,14 +45,14 @@ impl ExternalizedSlotProof {
     /// Latest proof envelope by signer node id.
     pub fn envelopes_by_node(
         &self,
-    ) -> &HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope> {
+    ) -> &HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope> {
         &self.envelopes_by_node
     }
 
     /// XDR-encoded companion quorum sets keyed by SCP hash.
     pub fn companion_qsets(
         &self,
-    ) -> &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes> {
+    ) -> &HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes> {
         &self.companion_qsets
     }
 }
@@ -90,20 +91,20 @@ impl From<federated::CompanionQuorumSetHashError> for MalformedEnvelopeReason {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ExternalizedSlotProofError {
     #[error("duplicate statement from node {node_id:?}")]
-    DuplicateNodeStatement { node_id: scp_proto::SCPNodeID },
+    DuplicateNodeStatement { node_id: thruput_scp::SCPNodeID },
     #[error("missing companion quorum set {hash:?}")]
-    MissingCompanionQuorumSet { hash: scp_proto::SCPHash },
+    MissingCompanionQuorumSet { hash: thruput_scp::SCPHash },
     #[error(
         "companion quorum set hash mismatch: claimed {claimed:?}, actual {actual:?}"
     )]
     CompanionQuorumSetHashMismatch {
-        claimed: scp_proto::SCPHash,
-        actual: scp_proto::SCPHash,
+        claimed: thruput_scp::SCPHash,
+        actual: thruput_scp::SCPHash,
     },
     #[error("failed to hash companion quorum set {hash:?}")]
-    CompanionQuorumSetHashFailed { hash: scp_proto::SCPHash },
+    CompanionQuorumSetHashFailed { hash: thruput_scp::SCPHash },
     #[error("failed to encode companion quorum set {hash:?}")]
-    CompanionQuorumSetEncodingFailed { hash: scp_proto::SCPHash },
+    CompanionQuorumSetEncodingFailed { hash: thruput_scp::SCPHash },
     #[error("malformed proof envelope: {reason}")]
     MalformedEnvelope { reason: MalformedEnvelopeReason },
 }
@@ -112,18 +113,18 @@ pub enum ExternalizedSlotProofError {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum VerifyError {
     #[error("bad signature from node {node_id:?}")]
-    BadSignature { node_id: scp_proto::SCPNodeID },
+    BadSignature { node_id: thruput_scp::SCPNodeID },
     #[error("duplicate statement from node {node_id:?}")]
-    DuplicateNodeStatement { node_id: scp_proto::SCPNodeID },
+    DuplicateNodeStatement { node_id: thruput_scp::SCPNodeID },
     #[error("unknown quorum set {hash:?}")]
-    UnknownQuorumSet { hash: scp_proto::SCPHash },
+    UnknownQuorumSet { hash: thruput_scp::SCPHash },
     #[error("quorum set hash mismatch: claimed {claimed:?}, actual {actual:?}")]
     QuorumSetHashMismatch {
-        claimed: scp_proto::SCPHash,
-        actual: scp_proto::SCPHash,
+        claimed: thruput_scp::SCPHash,
+        actual: thruput_scp::SCPHash,
     },
     #[error("malformed quorum set {hash:?}")]
-    MalformedQuorumSet { hash: scp_proto::SCPHash },
+    MalformedQuorumSet { hash: thruput_scp::SCPHash },
     #[error("too many proof envelopes: max {max}, actual {actual}")]
     TooManyEnvelopes { max: usize, actual: usize },
     #[error("too many companion quorum sets: max {max}, actual {actual}")]
@@ -138,8 +139,8 @@ pub enum VerifyError {
     CompanionQuorumSetsTooLarge { max: usize, actual: usize },
     #[error("slot mismatch: expected {expected}, found {found}")]
     SlotMismatch {
-        expected: scp_proto::SCPSlotIndex,
-        found: scp_proto::SCPSlotIndex,
+        expected: thruput_scp::SCPSlotIndex,
+        found: thruput_scp::SCPSlotIndex,
     },
     #[error("proof statements do not bind to the supplied value")]
     ValueMismatch,
@@ -157,9 +158,9 @@ pub enum VerifyError {
 /// by those statements. The verifier rejects oversized proof material before
 /// allocating or decoding it.
 pub fn verify_externalized_proof(
-    trust_qset: &scp_proto::SCPQuorumSet,
-    slot_index: scp_proto::SCPSlotIndex,
-    value: &scp_proto::SCPValue,
+    trust_qset: &thruput_scp::SCPQuorumSet,
+    slot_index: thruput_scp::SCPSlotIndex,
+    value: &thruput_scp::SCPValue,
     proof: &ExternalizedSlotProof,
 ) -> Result<(), VerifyError> {
     let envelopes: Vec<_> = proof.envelopes_by_node.values().cloned().collect();
@@ -173,11 +174,11 @@ pub fn verify_externalized_proof(
 }
 
 fn verify_externalized_envelopes(
-    trust_qset: &scp_proto::SCPQuorumSet,
-    peer_qsets: &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
-    slot_index: scp_proto::SCPSlotIndex,
-    value: &scp_proto::SCPValue,
-    envelopes: &[scp_proto::SCPEnvelope],
+    trust_qset: &thruput_scp::SCPQuorumSet,
+    peer_qsets: &HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes>,
+    slot_index: thruput_scp::SCPSlotIndex,
+    value: &thruput_scp::SCPValue,
+    envelopes: &[thruput_scp::SCPEnvelope],
 ) -> Result<(), VerifyError> {
     validate_proof_bounds(peer_qsets, envelopes)?;
 
@@ -217,8 +218,8 @@ fn verify_externalized_envelopes(
 }
 
 fn validate_proof_bounds(
-    peer_qsets: &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
-    envelopes: &[scp_proto::SCPEnvelope],
+    peer_qsets: &HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes>,
+    envelopes: &[thruput_scp::SCPEnvelope],
 ) -> Result<(), VerifyError> {
     if envelopes.len() > MAX_PROOF_ENVELOPES {
         return Err(VerifyError::TooManyEnvelopes {
@@ -261,12 +262,13 @@ fn validate_proof_bounds(
 }
 
 fn decode_peer_qsets(
-    peer_qsets: &HashMap<scp_proto::SCPHash, SCPQuorumSetBytes>,
-) -> Result<HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>, VerifyError> {
+    peer_qsets: &HashMap<thruput_scp::SCPHash, SCPQuorumSetBytes>,
+) -> Result<HashMap<thruput_scp::SCPHash, thruput_scp::SCPQuorumSet>, VerifyError>
+{
     let mut decoded = HashMap::with_capacity(peer_qsets.len());
 
     for (claimed, bytes) in peer_qsets {
-        let qset: scp_proto::SCPQuorumSet = scp_util::unmarshal_xdr(bytes)
+        let qset: thruput_scp::SCPQuorumSet = scp_util::unmarshal_xdr(bytes)
             .map_err(|_| VerifyError::MalformedQuorumSet { hash: *claimed })?;
 
         federated::is_qset_sane(&qset, false)
@@ -288,10 +290,12 @@ fn decode_peer_qsets(
 }
 
 fn verify_envelopes(
-    slot_index: scp_proto::SCPSlotIndex,
-    envelopes: &[scp_proto::SCPEnvelope],
-) -> Result<HashMap<scp_proto::SCPNodeID, scp_proto::SCPEnvelope>, VerifyError>
-{
+    slot_index: thruput_scp::SCPSlotIndex,
+    envelopes: &[thruput_scp::SCPEnvelope],
+) -> Result<
+    HashMap<thruput_scp::SCPNodeID, thruput_scp::SCPEnvelope>,
+    VerifyError,
+> {
     let mut by_node = HashMap::with_capacity(envelopes.len());
 
     for envelope in envelopes {
@@ -319,11 +323,11 @@ fn verify_envelopes(
 }
 
 fn proof_companion_qset_hash(
-    statement: &scp_proto::SCPStatement,
-) -> Result<scp_proto::SCPHash, VerifyError> {
+    statement: &thruput_scp::SCPStatement,
+) -> Result<thruput_scp::SCPHash, VerifyError> {
     if matches!(
         statement.pledges,
-        scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
+        thruput_scp::SCPStatement_pledges::SCP_ST_NOMINATE { .. }
     ) {
         return Err(VerifyError::MalformedEnvelope {
             reason: MalformedEnvelopeReason::UnsupportedStatementType,
@@ -337,17 +341,17 @@ fn proof_companion_qset_hash(
 }
 
 fn commit_boundaries<'a>(
-    value: &scp_proto::SCPValue,
-    envelopes: impl Iterator<Item = &'a scp_proto::SCPEnvelope>,
-) -> Result<std::collections::HashSet<scp_proto::SCPCount>, VerifyError> {
+    value: &thruput_scp::SCPValue,
+    envelopes: impl Iterator<Item = &'a thruput_scp::SCPEnvelope>,
+) -> Result<std::collections::HashSet<thruput_scp::SCPCount>, VerifyError> {
     let mut res = std::collections::HashSet::new();
     let mut saw_ballot_statement = false;
     let mut saw_value_match = false;
 
     for envelope in envelopes {
         match &envelope.statement.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { .. } => {}
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+            thruput_scp::SCPStatement_pledges::SCP_ST_PREPARE { .. } => {}
+            thruput_scp::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                 saw_ballot_statement = true;
                 check_confirm_sane(confirm)?;
                 if confirm_value_matches(value, confirm) {
@@ -356,7 +360,7 @@ fn commit_boundaries<'a>(
                     res.insert(confirm.n_h);
                 }
             }
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+            thruput_scp::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
                 externalize,
             } => {
                 saw_ballot_statement = true;
@@ -368,7 +372,7 @@ fn commit_boundaries<'a>(
                     res.insert(u32::MAX);
                 }
             }
-            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
+            thruput_scp::SCPStatement_pledges::SCP_ST_NOMINATE { .. } => {
                 return Err(malformed_envelope(
                     MalformedEnvelopeReason::UnsupportedStatementType,
                 ));
@@ -393,7 +397,7 @@ fn malformed_envelope(reason: MalformedEnvelopeReason) -> VerifyError {
 }
 
 fn check_confirm_sane(
-    confirm: &scp_proto::SCPStatementConfirm,
+    confirm: &thruput_scp::SCPStatementConfirm,
 ) -> Result<(), VerifyError> {
     if confirm.ballot.counter == 0 {
         return Err(malformed_envelope(
@@ -414,7 +418,7 @@ fn check_confirm_sane(
 }
 
 fn check_externalize_sane(
-    externalize: &scp_proto::SCPStatementExternalize,
+    externalize: &thruput_scp::SCPStatementExternalize,
 ) -> Result<(), VerifyError> {
     if externalize.commit.counter == 0 {
         return Err(malformed_envelope(
@@ -430,33 +434,35 @@ fn check_externalize_sane(
 }
 
 fn confirm_value_matches(
-    value: &scp_proto::SCPValue,
-    confirm: &scp_proto::SCPStatementConfirm,
+    value: &thruput_scp::SCPValue,
+    confirm: &thruput_scp::SCPStatementConfirm,
 ) -> bool {
     &confirm.ballot.value == value
 }
 
 fn externalize_value_matches(
-    value: &scp_proto::SCPValue,
-    externalize: &scp_proto::SCPStatementExternalize,
+    value: &thruput_scp::SCPValue,
+    externalize: &thruput_scp::SCPStatementExternalize,
 ) -> bool {
     &externalize.commit.value == value
 }
 
 fn commit_predicate(
-    value: &scp_proto::SCPValue,
+    value: &thruput_scp::SCPValue,
     check: &Interval,
-    st: &scp_proto::SCPStatement,
+    st: &thruput_scp::SCPStatement,
 ) -> bool {
     match &st.pledges {
-        scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { .. } => false,
-        scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+        thruput_scp::SCPStatement_pledges::SCP_ST_PREPARE { .. } => false,
+        thruput_scp::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
             check_confirm_sane(confirm).is_ok()
                 && confirm_value_matches(value, confirm)
                 && confirm.n_commit <= check.lo
                 && check.hi <= confirm.n_h
         }
-        scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE { externalize } => {
+        thruput_scp::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+            externalize,
+        } => {
             check_externalize_sane(externalize).is_ok()
                 && externalize_value_matches(value, externalize)
                 && externalize.commit.counter <= check.lo
@@ -467,12 +473,12 @@ fn commit_predicate(
 
 fn find_extended_interval<F>(
     candidate: &mut Interval,
-    boundaries: &std::collections::HashSet<scp_proto::SCPCount>,
+    boundaries: &std::collections::HashSet<thruput_scp::SCPCount>,
     pred: F,
 ) where
     F: Fn(&Interval) -> bool,
 {
-    let mut sorted_boundaries: Vec<scp_proto::SCPCount> =
+    let mut sorted_boundaries: Vec<thruput_scp::SCPCount> =
         boundaries.iter().copied().collect();
     sorted_boundaries.sort();
 
@@ -502,7 +508,8 @@ mod tests {
     use crate::driver::DriverCb;
     use crate::testkernel::TestKernel;
     use crate::testutil::*;
-    use scp_proto::*;
+    use thruput_scp::*;
+    use thruput_xdr::types::{Ed25519Signature, Signature};
     use xdr_common::VecM;
 
     struct ProofFixture {
@@ -686,12 +693,12 @@ mod tests {
     fn rejects_bad_signature() {
         let mut fixture = fixture();
         let SCPEnvelope { signature, .. } = &mut fixture.envelopes[0];
-        let SCPSignature::Ed25519 { ed25519 } = signature else {
+        let Signature::Ed25519 { ed25519 } = signature else {
             panic!("expected ed25519 signature")
         };
         let mut bytes = ed25519.into_inner();
         bytes[0] ^= 0xff;
-        *ed25519 = SCPEd25519Signature::new(bytes);
+        *ed25519 = Ed25519Signature::new(bytes);
         assert!(matches!(
             verify(&fixture),
             Err(VerifyError::BadSignature { .. })

@@ -13,14 +13,14 @@ pub enum QSetError {
 
 struct QuorumSetSanityChecker {
     extra_checks: bool,
-    known_nodes: HashSet<scp_proto::SCPNodeID>,
+    known_nodes: HashSet<thruput_scp::SCPNodeID>,
     is_sane: bool,
     count: usize,
 }
 
 impl QuorumSetSanityChecker {
     fn new(
-        qset: &scp_proto::SCPQuorumSet,
+        qset: &thruput_scp::SCPQuorumSet,
         extra_checks: bool,
     ) -> Result<Self, QSetError> {
         let mut checker = QuorumSetSanityChecker {
@@ -48,7 +48,7 @@ impl QuorumSetSanityChecker {
 
     fn check_sanity(
         &mut self,
-        qset: &scp_proto::SCPQuorumSet,
+        qset: &thruput_scp::SCPQuorumSet,
         depth: u32,
     ) -> Result<bool, QSetError> {
         if depth > MAXIMUM_QUORUM_NESTING_LEVEL {
@@ -103,7 +103,7 @@ impl QuorumSetSanityChecker {
 }
 
 pub fn is_qset_sane(
-    qset: &scp_proto::SCPQuorumSet,
+    qset: &thruput_scp::SCPQuorumSet,
     extra_checks: bool,
 ) -> Result<(), QSetError> {
     let checker = QuorumSetSanityChecker::new(qset, extra_checks)?;
@@ -115,8 +115,8 @@ pub fn is_qset_sane(
 }
 
 fn normalize_qset_simplify(
-    qset: &mut scp_proto::SCPQuorumSet,
-    id_to_remove: Option<&scp_proto::SCPNodeID>,
+    qset: &mut thruput_scp::SCPQuorumSet,
+    id_to_remove: Option<&thruput_scp::SCPNodeID>,
 ) {
     // remove the specified node ID if provided
     if let Some(id_to_remove) = id_to_remove {
@@ -159,21 +159,17 @@ fn normalize_qset_simplify(
 }
 
 pub fn compare_public_key(
-    l: &scp_proto::SCPPublicKey,
-    r: &scp_proto::SCPPublicKey,
+    l: &thruput_xdr::types::PublicKey,
+    r: &thruput_xdr::types::PublicKey,
 ) -> Ordering {
-    match (l, r) {
-        (
-            scp_proto::SCPPublicKey::Ed25519 { ed25519: l_key },
-            scp_proto::SCPPublicKey::Ed25519 { ed25519: r_key },
-        ) => l_key.as_ref().cmp(r_key.as_ref()),
-        _ => panic!("unreachable"),
-    }
+    // By scheme, then by key bytes: Ed25519 keys compare as their bytes.
+    // Node IDs of other schemes decode too, so the order must cover them.
+    l.cmp(r)
 }
 
 fn qset_compare(
-    l: &scp_proto::SCPQuorumSet,
-    r: &scp_proto::SCPQuorumSet,
+    l: &thruput_scp::SCPQuorumSet,
+    r: &thruput_scp::SCPQuorumSet,
 ) -> Ordering {
     // Compare by validators first - lexicographically (element by element)
     for (l_validator, r_validator) in
@@ -209,7 +205,7 @@ fn qset_compare(
     l.threshold.cmp(&r.threshold)
 }
 
-fn normalize_quorum_set_reorder(qset: &mut scp_proto::SCPQuorumSet) {
+fn normalize_quorum_set_reorder(qset: &mut thruput_scp::SCPQuorumSet) {
     // Sort validators using custom comparison
     qset.validators.0.sort_by(compare_public_key);
 
@@ -223,8 +219,8 @@ fn normalize_quorum_set_reorder(qset: &mut scp_proto::SCPQuorumSet) {
 }
 
 pub fn normalize_qset(
-    qset: &mut scp_proto::SCPQuorumSet,
-    id_to_remove: Option<&scp_proto::SCPNodeID>,
+    qset: &mut thruput_scp::SCPQuorumSet,
+    id_to_remove: Option<&thruput_scp::SCPNodeID>,
 ) {
     normalize_qset_simplify(qset, id_to_remove);
     normalize_quorum_set_reorder(qset);

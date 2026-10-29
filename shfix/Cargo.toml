@@ -4,7 +4,8 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish.workspace = true
+# Test-only: scp_kernel uses it as a dev-dependency.
+publish = false
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true

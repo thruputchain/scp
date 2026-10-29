@@ -5,9 +5,10 @@
 use crate::controller::*;
 use crate::handler::*;
 use core::net::SocketAddr;
-use rpc_driver::*;
 use scp_kernel::*;
-use scp_proto::*;
+use thruput_rpc_driver::*;
+use thruput_scp::*;
+use thruput_xdr::types::SecretKey;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
@@ -15,11 +16,11 @@ use tokio::sync::mpsc;
 pub async fn start_server(
     handler_sockaddr: SocketAddr,
     bind_controller_sockaddr: SocketAddr,
-    cfg: scp_proto::SCPConfig,
-    secret_key: &SCPSecretKey,
+    cfg: thruput_scp::SCPConfig,
+    secret_key: &SecretKey,
     is_validator: bool,
 ) -> SocketAddr {
-    let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+    let handle_client = thruput_scp::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler_sockaddr)
             .await
             .unwrap()
@@ -32,8 +33,8 @@ pub async fn start_server(
 
 pub async fn start_service(
     handle_rpc_client: SCP_Handle_SCP_Handle1_Client,
-    cfg: scp_proto::SCPConfig,
-    secret_key: &SCPSecretKey,
+    cfg: thruput_scp::SCPConfig,
+    secret_key: &SecretKey,
     is_validator: bool,
 ) -> ControlService {
     // construct
@@ -119,7 +120,7 @@ async fn start_control_server<S: SCP_Control_SCP_Control1 + 'static>(
 
     let mut service_map = ServiceMap::new();
     service_map.add_service(Box::new(
-        scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
+        thruput_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(svc)),
     ));
 
     RpcServer::new(listener, service_map).start().await;
@@ -137,7 +138,7 @@ pub async fn start_handle_server<S: SCP_Handle_SCP_Handle1 + 'static>(
 
     let mut service_map = ServiceMap::new();
     service_map.add_service(Box::new(
-        scp_proto::SCP_Handle_SCP_Handle1_Dispatcher::new(Box::new(svc)),
+        thruput_scp::SCP_Handle_SCP_Handle1_Dispatcher::new(Box::new(svc)),
     ));
 
     RpcServer::new(listener, service_map).start().await;

@@ -15,4 +15,4 @@ echo 'rustfmt and clippy components'
 rustup component add rustfmt clippy
 
 echo 'cargo fetch'
-CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch
+cargo fetch

@@ -12,13 +12,13 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
         ConsensusDriver { consensus, driver }
     }
 
-    pub fn ballot_to_str(&self, b: &scp_proto::SCPBallot) -> String {
+    pub fn ballot_to_str(&self, b: &thruput_scp::SCPBallot) -> String {
         format!("<{},{}>", b.counter, self.driver.get_value_string(&b.value),)
     }
 
     pub fn opt_ballot_to_str(
         &self,
-        b: Option<&scp_proto::SCPBallot>,
+        b: Option<&thruput_scp::SCPBallot>,
     ) -> String {
         match b {
             Some(b) => self.ballot_to_str(b),
@@ -28,7 +28,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
 
     pub fn envelope_to_str(
         &self,
-        env: &scp_proto::SCPEnvelope,
+        env: &thruput_scp::SCPEnvelope,
         full_keys: bool,
     ) -> String {
         self.statement_to_str(&env.statement, full_keys)
@@ -36,7 +36,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
 
     pub fn statement_to_str(
         &self,
-        st: &scp_proto::SCPStatement,
+        st: &thruput_scp::SCPStatement,
         full_keys: bool,
     ) -> String {
         let qset_hash =
@@ -46,7 +46,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
         let mut result = format!("{{ENV@{} |  i: {}", node_id, st.slot_index);
 
         match &st.pledges {
-            scp_proto::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
+            thruput_scp::SCPStatement_pledges::SCP_ST_PREPARE { prepare } => {
                 result.push_str(&format!(
                     " | PREPARE | D: {} | b: {} | p: {} | p': {} | c.n: {} | h.n: {}",
                     hex_abbrev(&qset_hash),
@@ -57,7 +57,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
                     prepare.n_h
                 ));
             }
-            scp_proto::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
+            thruput_scp::SCPStatement_pledges::SCP_ST_CONFIRM { confirm } => {
                 result.push_str(&format!(
                     " | CONFIRM | D: {} | b: {} | p.n: {} | c.n: {} | h.n: {}",
                     hex_abbrev(&qset_hash),
@@ -67,7 +67,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
                     confirm.n_h
                 ));
             }
-            scp_proto::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+            thruput_scp::SCPStatement_pledges::SCP_ST_EXTERNALIZE {
                 externalize,
             } => {
                 result.push_str(&format!(
@@ -77,7 +77,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
                     hex_abbrev(&qset_hash)
                 ));
             }
-            scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
+            thruput_scp::SCPStatement_pledges::SCP_ST_NOMINATE { nominate } => {
                 result.push_str(&format!(
                     " | NOMINATE | D: {} | X: {{",
                     hex_abbrev(&qset_hash)
@@ -114,7 +114,7 @@ impl<C: Consensus, D: Driver> ConsensusDriver<C, D> {
         result
     }
 
-    pub fn node_ids_to_str(&self, ns: &[scp_proto::SCPNodeID]) -> String {
+    pub fn node_ids_to_str(&self, ns: &[thruput_scp::SCPNodeID]) -> String {
         let mut s = "[".to_string();
         for (i, n) in ns.iter().enumerate() {
             s.push_str(&self.driver.to_str_key(n, false));
@@ -134,10 +134,10 @@ pub struct StellarState {
 
 impl StellarState {
     pub fn new(
-        node_id: scp_proto::SCPNodeID,
+        node_id: thruput_scp::SCPNodeID,
         is_validator: bool,
-        qset: scp_proto::SCPQuorumSet,
-        get_hash_of: impl Fn(&[u8]) -> scp_proto::SCPHash,
+        qset: thruput_scp::SCPQuorumSet,
+        get_hash_of: impl Fn(&[u8]) -> thruput_scp::SCPHash,
     ) -> StellarState {
         StellarState {
             local: LocalState::new(node_id, is_validator, qset, get_hash_of),
@@ -203,8 +203,8 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     /// returns (nom values, ballot values)
     pub fn get_statement_values(
-        statement: &scp_proto::SCPStatement,
-    ) -> (Vec<scp_proto::SCPValue>, Vec<scp_proto::SCPValue>) {
+        statement: &thruput_scp::SCPStatement,
+    ) -> (Vec<thruput_scp::SCPValue>, Vec<thruput_scp::SCPValue>) {
         SlotProto::<'a, C, D>::get_statement_values(statement)
     }
 
@@ -215,8 +215,8 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn nominate(
         &mut self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
-        prev_value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
+        prev_value: &thruput_scp::SCPValue,
     ) -> bool {
         assert!(self.is_validator());
         self.slot_proto_or_create(slot_index)
@@ -229,15 +229,18 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         }
     }
 
-    pub fn update_local_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
+    pub fn update_local_quorum_set(
+        &mut self,
+        qset: &thruput_scp::SCPQuorumSet,
+    ) {
         self.local_proto_mut().update_quorum_set(qset);
     }
 
-    pub fn get_local_quorum_set(&self) -> scp_proto::SCPQuorumSet {
+    pub fn get_local_quorum_set(&self) -> thruput_scp::SCPQuorumSet {
         self.local_proto().get_qset().clone()
     }
 
-    pub fn get_local_node_id(&self) -> scp_proto::SCPNodeID {
+    pub fn get_local_node_id(&self) -> thruput_scp::SCPNodeID {
         self.local_proto().get_node_id().clone()
     }
 
@@ -289,7 +292,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn get_state(
         &mut self,
-        node: &scp_proto::SCPNodeID,
+        node: &thruput_scp::SCPNodeID,
         slot_index: SlotIndex,
     ) -> QuorumInfoNodeState {
         const NUM_SLOTS_TO_CHECK_FOR_REPORTING: i32 = 2;
@@ -316,7 +319,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn get_json_quorum_info(
         &mut self,
-        id: &scp_proto::SCPNodeID,
+        id: &thruput_scp::SCPNodeID,
         summary: bool,
         full_keys: bool,
         index: SlotIndex,
@@ -445,7 +448,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn get_latest_messages_send(
         &mut self,
         slot_index: SlotIndex,
-    ) -> Vec<scp_proto::SCPEnvelope> {
+    ) -> Vec<thruput_scp::SCPEnvelope> {
         if let Some(mut slot) = self.slot_proto(slot_index) {
             slot.get_latest_messages_send()
         } else {
@@ -463,7 +466,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         f: &mut F,
         force_self: bool,
     ) where
-        F: FnMut(&scp_proto::SCPEnvelope) -> bool,
+        F: FnMut(&thruput_scp::SCPEnvelope) -> bool,
     {
         if let Some(mut slot) = self.slot_proto(slot_index) {
             slot.process_current_state(f, force_self)
@@ -520,8 +523,8 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn get_latest_message(
         &mut self,
-        id: &scp_proto::SCPNodeID,
-    ) -> Option<scp_proto::SCPEnvelope> {
+        id: &thruput_scp::SCPNodeID,
+    ) -> Option<thruput_scp::SCPEnvelope> {
         // Iterate through slots in reverse order (highest to lowest)
         let mut slot_indices: Vec<SlotIndex> =
             self.state.known_slots.keys().cloned().collect();
@@ -539,8 +542,8 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn is_newer_nomination_or_ballot_st(
         &mut self,
-        old_st: &scp_proto::SCPStatement,
-        new_st: &scp_proto::SCPStatement,
+        old_st: &thruput_scp::SCPStatement,
+        new_st: &thruput_scp::SCPStatement,
     ) -> bool {
         if old_st.slot_index != new_st.slot_index
             || old_st.node_id != new_st.node_id
@@ -558,7 +561,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     pub fn get_externalizing_state(
         &mut self,
         slot_index: SlotIndex,
-    ) -> Vec<scp_proto::SCPEnvelope> {
+    ) -> Vec<thruput_scp::SCPEnvelope> {
         if let Some(mut slot) = self.slot_proto(slot_index) {
             slot.get_externalizing_state()
         } else {
@@ -580,13 +583,13 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
         }
     }
 
-    pub fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
+    pub fn get_value_string(&self, value: &thruput_scp::SCPValue) -> String {
         self.cd.driver.get_value_string(value)
     }
 
     pub fn should_process_envelope(
         &mut self,
-        env: &scp_proto::SCPEnvelope,
+        env: &thruput_scp::SCPEnvelope,
     ) -> bool {
         let slot_index = env.statement.slot_index;
         self.slot_proto_or_create(slot_index)
@@ -595,7 +598,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn envelope_to_str(
         &self,
-        env: &scp_proto::SCPEnvelope,
+        env: &thruput_scp::SCPEnvelope,
         full_keys: bool,
     ) -> String {
         self.cd.envelope_to_str(env, full_keys)
@@ -603,7 +606,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 
     pub fn statement_to_str(
         &self,
-        st: &scp_proto::SCPStatement,
+        st: &thruput_scp::SCPStatement,
         full_keys: bool,
     ) -> String {
         self.cd.statement_to_str(st, full_keys)
@@ -611,7 +614,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
 }
 
 impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
-    fn received_envelope(&mut self, env: &scp_proto::SCPEnvelope) {
+    fn received_envelope(&mut self, env: &thruput_scp::SCPEnvelope) {
         // println!(
         //     "{}<--{}",
         //     self.cd
@@ -643,7 +646,7 @@ impl<'a, C: Consensus, D: Driver> DriverCb for StellarProto<'a, C, D> {
     fn set_state_from_envelope(
         &mut self,
         slot_index: SlotIndex,
-        envelope: &scp_proto::SCPEnvelope,
+        envelope: &thruput_scp::SCPEnvelope,
     ) {
         let mut slot = self.slot_proto_or_create(slot_index);
         slot.set_state_from_envelope(envelope);

@@ -1,7 +1,9 @@
 use clap::Parser;
 use core::net::SocketAddr;
-use rpc_driver::{ConnectionConfig, RpcServer, ServiceMap, connect_client};
 use scp_kernel as _;
+use thruput_rpc_driver::{
+    ConnectionConfig, RpcServer, ServiceMap, connect_client,
+};
 use tokio::net::{TcpListener, TcpSocket};
 use tracing::info;
 use xdr_common::*;
@@ -93,7 +95,7 @@ async fn main() {
     let instance_id = scp_util::parse_secret_key_from_base64(&args.secret_key)
         .ok()
         .and_then(|key| match scp_util::derive_node_id(&key) {
-            scp_proto::SCPPublicKey::Ed25519 { ed25519 } => Some(
+            thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => Some(
                 ed25519
                     .into_inner()
                     .iter()
@@ -180,7 +182,7 @@ async fn run(args: Args) {
     // handle client
 
     let handle_socket_addr: SocketAddr = args.handle_addr.parse().unwrap();
-    let handle_client = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+    let handle_client = thruput_scp::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handle_socket_addr)
             .await
             .unwrap()
@@ -211,7 +213,9 @@ async fn run(args: Args) {
 
     let mut control_service_map = ServiceMap::new();
     control_service_map.add_service(Box::new(
-        scp_proto::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(service)),
+        thruput_scp::SCP_Control_SCP_Control1_Dispatcher::new(Box::new(
+            service,
+        )),
     ));
 
     // Cap incoming control RPC messages at 10 MiB.

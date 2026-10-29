@@ -1,14 +1,53 @@
+# Releases every published crate in this repository to crates.io in one
+# idempotent pass, with the shared thruputchain/actions release actions.
+#
+# The crates share the workspace version and release together under the
+# `v<version>` tag, in dependency order: `thruput-scp-util`, then
+# `thruput-scp-kernel`, then `thruput-scp-server` (the scpd binary). The SCP
+# protocol bindings come from `thruput-scp`, published from
+# thruputchain/thruput-protocol-rs.
+#
+# Nothing is tagged until the dry run and the release check pass, so a run
+# that fails before tagging leaves the repository untouched. Publishing skips
+# versions crates.io already has, so a run that fails partway is resumed by
+# dispatching it again on the tagged commit.
+#
+# Authentication: crates.io trusted publishing (GitHub OIDC) for existing
+# crates; see crates-io-publish's README in thruputchain/actions. The job runs
+# in the `release` environment, and every crate's trusted publisher requires
+# it, so only runs that environment's protection rules admit can publish.
+# Creating a crate needs the CRATESIO_CREATE_PACKAGE_TOKEN secret, a crates.io
+# API token with the scopes publish-new, trusted-publishing and
+# change-owners; keep it a secret of `release`, not of the repository. The
+# publish step registers this workflow, in that environment, as each new
+# crate's trusted publisher and adds CRATE_OWNERS as its owners, so remove
+# the secret and revoke the token once every crate exists.
+#
+# Dispatch with dry_run for the dry run and the check, with no tagging or
+# publishing.
 name: Release package
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run only (no tag/publish)'
+        required: false
+        type: boolean
+        default: false
+
+# Two concurrent releases would race on tags and registry state; queue them.
+concurrency:
+  group: publish
 
 env:
-  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  CARGO_REGISTRIES_GROUNDHOG_TOKEN: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
-  CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: cargo:token
-  CARGO_REGISTRIES_GROUNDHOG_INDEX: sparse+https://crates.thruput.network/api/v1/crates/
-  CARGO_REGISTRIES_GROUNDHOG_SOURCE: sparse+https://crates.thruput.network/api/v1/crates/
+  # Owners added to each crate a run creates, besides the token's owner.
+  CRATE_OWNERS: github:thruputchain:core-maintainers
+  # Published under the `v<version>` tag, in dependency order.
+  PUBLISH_PACKAGES: >-
+    thruput-scp-util
+    thruput-scp-kernel
+    thruput-scp-server
 
 permissions:
   contents: read
@@ -16,77 +55,83 @@ permissions:
 jobs:
   publish:
     permissions:
-      contents: write # pushes the version tag
-    runs-on: hog1
+      contents: write # pushes the release tag
+      id-token: write # crates.io trusted publishing
+    environment: release
+    runs-on: namespace-profile-hogd-linux-2604
 
     steps:
-      - name: Clean up .gitconfig
-        run: |
-            echo "Cleaning up .gitconfig"
-            rm -f /home/hogci/.gitconfig
-
+      # No persisted credentials: the tag action pushes with github.token
+      # itself. Full history brings every tag, which the check reads.
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      # Loaded after checkout for the private source dependencies.
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
-        with:
-          ssh-private-key: |
-            ${{ secrets.SCP_TO_SELF_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_KEY }}
-            ${{ secrets.SCP_TO_XDR_COMMON_KEY }}
-            ${{ secrets.SCP_TO_XDRS_KEY }}
-            ${{ secrets.SCP_TO_XDR_RPC_KEY }}
-            ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
-
-      - name: Configure git to use SSH
+      - name: Install rustup if needed
         run: |
-          git config --global url."git@github.com:".insteadOf "https://github.com/"
-
-      - name: dry run
-        uses: thruputchain/actions/cargo-publish-dry-run@6693fac8133585728ad3a4ca14e3441073b6def8
-        with:
-          skip-clippy: false
-          cargo-hack-feature-options: '--feature-powerset'
-
-      - name: tag commit with version
-        id: publish-tag
-        uses: thruputchain/actions/cargo-version-tag@6693fac8133585728ad3a4ca14e3441073b6def8
-
-      - name: push tag
-        env:
-          ACTOR: ${{ github.actor }}
-          TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          TAG: ${{ steps.publish-tag.outputs.tag }}
-        run: |
-          git remote set-url origin "https://$ACTOR:$TOKEN@github.com/$REPOSITORY.git"
-          LOCAL_COMMIT=$(git rev-parse "$TAG")
-          # Check if tag exists on remote and get its commit SHA
-          REMOTE_TAG_REF=$(git ls-remote origin "refs/tags/$TAG" | cut -f1)
-          if [ -n "$REMOTE_TAG_REF" ]; then
-            # Tag exists on remote, verify it points to the same commit
-            if [ "$REMOTE_TAG_REF" = "$LOCAL_COMMIT" ]; then
-              echo "Tag $TAG already exists on remote and points to the same commit ($LOCAL_COMMIT). Skipping push."
-            else
-              echo "Error: Tag $TAG exists on remote but points to different commit!"
-              echo "Remote: $REMOTE_TAG_REF"
-              echo "Local: $LOCAL_COMMIT"
-              exit 1
-            fi
-          else
-            # Tag doesn't exist on remote, push it
-            git push origin "$TAG"
+          if ! command -v rustup >/dev/null 2>&1; then
+            CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused \
+              --location --silent --show-error --fail https://sh.rustup.rs \
+              | sh -s -- --default-toolchain none --profile minimal -y
+            echo "CARGO_HOME=$CARGO_HOME" >> "$GITHUB_ENV"
+            echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
           fi
-          git remote set-url origin "git@github.com:$REPOSITORY.git"
 
-      - name: publish
-        uses: thruputchain/actions/cargo-publish@6693fac8133585728ad3a4ca14e3441073b6def8
+      - name: Set up Rust 1.96
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --no-self-update
+          rustup default 1.96.0
+
+      - name: Install cargo-hack
+        env:
+          CARGO_HACK_VERSION: '0.6.45'
+        run: |
+          source "$HOME/.cargo/env"
+          if [ "$(cargo hack --version 2>/dev/null | awk '{print $2}')" != "$CARGO_HACK_VERSION" ]; then
+            cargo install cargo-hack --version "=$CARGO_HACK_VERSION" --locked
+          fi
+          cargo hack --version
+
+      # Verifies every crate offline, in dependency order: the action
+      # packages each listed crate into vendor/ before the next one resolves
+      # against it.
+      - name: Publish dry run
+        uses: thruputchain/actions/cargo-publish-dry-run@484be875e4e630d26594110bcc0ab6bf42eeaba7
         with:
-          git-tag: ${{ steps.publish-tag.outputs.tag }}
-          registry-name: groundhog
-          registry-token: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
+          packages: ${{ env.PUBLISH_PACKAGES }}
+          cargo-hack-feature-options: --feature-powerset
+          registry-name: crates-io
+
+      # `v<version>` must be free or already on HEAD: a new commit needs a
+      # version bump.
+      - name: Check release
+        id: check
+        uses: thruputchain/actions/crates-io-publish@484be875e4e630d26594110bcc0ab6bf42eeaba7
+        with:
+          mode: check
+          packages: ${{ env.PUBLISH_PACKAGES }}
+          bootstrap-token: ${{ secrets.CRATESIO_CREATE_PACKAGE_TOKEN }}
+
+      - name: Tag commit with version
+        id: tag
+        if: ${{ inputs.dry_run == false && steps.check.outputs.release == 'true' }}
+        uses: thruputchain/actions/cargo-release-tag@484be875e4e630d26594110bcc0ab6bf42eeaba7
+        with:
+          packages: ${{ env.PUBLISH_PACKAGES }}
+          github-token: ${{ github.token }}
+
+      # Unlike the dry run, publishing resolves deps against crates.io, hence
+      # the order: each crate must be live before the next one's publish-time
+      # verify build.
+      - name: Publish
+        if: ${{ inputs.dry_run == false && steps.check.outputs.release == 'true' }}
+        uses: thruputchain/actions/crates-io-publish@484be875e4e630d26594110bcc0ab6bf42eeaba7
+        with:
+          mode: publish
+          packages: ${{ env.PUBLISH_PACKAGES }}
+          git-tag: ${{ steps.tag.outputs.tag }}
+          bootstrap-token: ${{ secrets.CRATESIO_CREATE_PACKAGE_TOKEN }}
+          crate-owners: ${{ env.CRATE_OWNERS }}

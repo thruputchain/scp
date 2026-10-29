@@ -1,21 +1,27 @@
 [package]
-name = "scp_util"
+name = "thruput-scp-util"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "SCP protocol manipulation utilities"
 
+# Published as thruput-scp-util. The library keeps its name, so
+# `use scp_util::...` is unchanged.
 [lib]
+name = "scp_util"
 crate-type = ["rlib"]
 
 [dependencies]
-scp_proto = { workspace = true }
+thruput-scp = { workspace = true }
+thruput-xdr = { workspace = true }
 ed25519-dalek = { version = "3.0.0-pre.0", features = ["digest"] }
 thiserror = "2.0"
 sha2 = "0.10"

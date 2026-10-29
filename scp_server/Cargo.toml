@@ -1,14 +1,16 @@
 [package]
-name = "scp_server"
+name = "thruput-scp-server"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 keywords.workspace = true
-categories.workspace = true
+categories = ["cryptography::cryptocurrencies", "network-programming"]
 description = "SCP consensus server"
 
 [features]
@@ -27,10 +29,10 @@ name = "scpd"
 path = "src/main.rs"
 
 [dependencies]
-async-trait = "0.1"
 clap = { version = "4.5.47", features = ["derive"] }
 futures = "0.3"
-scp_proto = { workspace = true }
+thruput-scp = { workspace = true }
+thruput-xdr = { workspace = true }
 scp_util = { workspace = true }
 scp_kernel = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -48,7 +50,7 @@ opentelemetry_sdk = { version = "0.33", default-features = false, features = ["t
 opentelemetry-otlp = { version = "0.33", default-features = false, features = ["grpc-tonic", "trace"] }
 
 xdr-common = { workspace = true }
-rpc_driver = { workspace = true }
+thruput-rpc-driver = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"], optional = true }

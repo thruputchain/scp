@@ -5,9 +5,9 @@ use thiserror::Error;
 use xdrs::txs;
 use xdrs::write_xdr::WriteXDR;
 
-/// Creates an ed25519_dalek::SigningKey from a scp_proto::SCPEd25519SecretKey
+/// Creates an ed25519_dalek::SigningKey from a thruput_xdr::types::Ed25519SecretKey
 fn signing_key_from_secret_key(
-    secret_key: &scp_proto::SCPEd25519SecretKey,
+    secret_key: &thruput_xdr::types::Ed25519SecretKey,
 ) -> SigningKey {
     // Ed25519SecretKey contains 64 bytes, but SigningKey expects 32 bytes
     // The first 32 bytes are the secret key, the last 32 bytes are typically the public key
@@ -16,26 +16,26 @@ fn signing_key_from_secret_key(
 }
 
 fn verifying_key_from_public_key(
-    public_key: &scp_proto::SCPEd25519PublicKey,
+    public_key: &thruput_xdr::types::Ed25519PublicKey,
 ) -> VerifyingKey {
     VerifyingKey::from_bytes(public_key[..].try_into().unwrap()).unwrap()
 }
 
 fn sign_bytes_ed25519(
-    secret_key: &scp_proto::SCPEd25519SecretKey,
+    secret_key: &thruput_xdr::types::Ed25519SecretKey,
     msg: &[u8],
-) -> scp_proto::SCPEd25519Signature {
+) -> thruput_xdr::types::Ed25519Signature {
     let prehash = Sha512::new_with_prefix(msg);
     let signature = signing_key_from_secret_key(secret_key)
         .sign_prehashed(prehash, None)
         .expect("sign_prehashed should not fail");
-    scp_proto::SCPEd25519Signature::from(signature.to_bytes())
+    thruput_xdr::types::Ed25519Signature::from(signature.to_bytes())
 }
 
 fn verify_bytes_ed25519(
-    public_key: &scp_proto::SCPEd25519PublicKey,
+    public_key: &thruput_xdr::types::Ed25519PublicKey,
     msg: &[u8],
-    signature: &scp_proto::SCPEd25519Signature,
+    signature: &thruput_xdr::types::Ed25519Signature,
 ) -> Result<(), SignatureError> {
     let prehash = Sha512::new_with_prefix(msg);
     verifying_key_from_public_key(public_key).verify_prehashed(
@@ -46,36 +46,32 @@ fn verify_bytes_ed25519(
 }
 
 pub fn verify_bytes(
-    public_key: &scp_proto::SCPPublicKey,
+    public_key: &thruput_xdr::types::PublicKey,
     msg: &[u8],
-    signature: &scp_proto::SCPSignature,
+    signature: &thruput_xdr::types::Signature,
 ) -> Result<(), SignatureError> {
-    let ed25519_key = match public_key {
-        scp_proto::SCPPublicKey::Ed25519 { ed25519 } => Some(ed25519),
-        _ => panic!("Unsupported public key type"),
+    match (public_key, signature) {
+        (
+            thruput_xdr::types::PublicKey::Ed25519 { ed25519: key },
+            thruput_xdr::types::Signature::Ed25519 { ed25519: sig },
+        ) => verify_bytes_ed25519(key, msg, sig),
+        // Only Ed25519 is supported. The key and signature types also decode
+        // other schemes, which a peer can send, so those fail verification.
+        _ => Err(SignatureError::new()),
     }
-    .unwrap();
-
-    let ed25519_signature = match signature {
-        scp_proto::SCPSignature::Ed25519 { ed25519 } => Some(ed25519),
-        _ => panic!("Unsupported signature type"),
-    }
-    .unwrap();
-
-    verify_bytes_ed25519(ed25519_key, msg, ed25519_signature)
 }
 
 pub fn sign_bytes(
-    secret_key: &scp_proto::SCPSecretKey,
+    secret_key: &thruput_xdr::types::SecretKey,
     msg: &[u8],
-) -> scp_proto::SCPSignature {
+) -> thruput_xdr::types::Signature {
     let ed25519_key = match secret_key {
-        scp_proto::SCPSecretKey::Ed25519 { ed25519 } => Some(ed25519),
+        thruput_xdr::types::SecretKey::Ed25519 { ed25519 } => Some(ed25519),
         _ => panic!("Unsupported secret key type"),
     }
     .unwrap();
 
-    scp_proto::SCPSignature::Ed25519 {
+    thruput_xdr::types::Signature::Ed25519 {
         ed25519: sign_bytes_ed25519(ed25519_key, msg),
     }
 }
@@ -96,9 +92,9 @@ pub enum VerifyingError {
 }
 
 pub fn sign_xdr<T>(
-    secret_key: &scp_proto::SCPSecretKey,
+    secret_key: &thruput_xdr::types::SecretKey,
     v: &T,
-) -> Result<scp_proto::SCPSignature, SigningError>
+) -> Result<thruput_xdr::types::Signature, SigningError>
 where
     T: WriteXDR + ?Sized,
 {
@@ -107,9 +103,9 @@ where
 }
 
 pub fn verify_xdr<T>(
-    public_key: &scp_proto::SCPPublicKey,
+    public_key: &thruput_xdr::types::PublicKey,
     v: &T,
-    signature: &scp_proto::SCPSignature,
+    signature: &thruput_xdr::types::Signature,
 ) -> Result<(), VerifyingError>
 where
     T: WriteXDR + ?Sized,
@@ -123,7 +119,7 @@ where
 /// encoding of `envelope.statement` produced by the secret key matching
 /// `envelope.statement.node_id`.
 pub fn verify_envelope(
-    envelope: &scp_proto::SCPEnvelope,
+    envelope: &thruput_scp::SCPEnvelope,
 ) -> Result<(), VerifyingError> {
     verify_xdr(
         &envelope.statement.node_id,
@@ -141,13 +137,13 @@ mod tests {
     use xdr_common::{BytesM, VecM};
 
     fn make_statement(
-        node_id: scp_proto::SCPNodeID,
-    ) -> scp_proto::SCPStatement {
-        scp_proto::SCPStatement {
+        node_id: thruput_scp::SCPNodeID,
+    ) -> thruput_scp::SCPStatement {
+        thruput_scp::SCPStatement {
             node_id,
             slot_index: 42,
-            pledges: scp_proto::SCPStatement_pledges::SCP_ST_NOMINATE {
-                nominate: scp_proto::SCPStatementNominate {
+            pledges: thruput_scp::SCPStatement_pledges::SCP_ST_NOMINATE {
+                nominate: thruput_scp::SCPStatementNominate {
                     quorum_set_hash: [7u8; 32],
                     votes: VecM(vec![BytesM(b"vote-1".to_vec())]),
                     accepted: VecM(vec![]),
@@ -172,11 +168,11 @@ mod tests {
         let sig1 = sign_bytes(&sk, msg);
         let sig2 = sign_bytes(&sk, msg);
         let bytes1 = match &sig1 {
-            scp_proto::SCPSignature::Ed25519 { ed25519 } => ed25519,
+            thruput_xdr::types::Signature::Ed25519 { ed25519 } => ed25519,
             _ => panic!("unexpected signature variant"),
         };
         let bytes2 = match &sig2 {
-            scp_proto::SCPSignature::Ed25519 { ed25519 } => ed25519,
+            thruput_xdr::types::Signature::Ed25519 { ed25519 } => ed25519,
             _ => panic!("unexpected signature variant"),
         };
         assert_eq!(&bytes1[..], &bytes2[..]);
@@ -201,13 +197,30 @@ mod tests {
     }
 
     #[test]
+    fn verify_bytes_rejects_unsupported_schemes() {
+        let sk = generate_secret_key(b"sign-unsupported");
+        let pk = derive_public_key(&sk);
+        let msg = b"hello";
+        let sig = sign_bytes(&sk, msg);
+        let mldsa_pk = thruput_xdr::types::PublicKey::MlDsa65 {
+            mldsa65: Box::new([0u8; 1952].into()),
+        };
+        let mldsa_sig = thruput_xdr::types::Signature::MlDsa65 {
+            mldsa65: Box::new([0u8; 3309].into()),
+        };
+        assert!(verify_bytes(&mldsa_pk, msg, &sig).is_err());
+        assert!(verify_bytes(&pk, msg, &mldsa_sig).is_err());
+        assert!(verify_bytes(&mldsa_pk, msg, &mldsa_sig).is_err());
+    }
+
+    #[test]
     fn verify_envelope_roundtrip() {
         let sk = generate_secret_key(b"envelope-roundtrip");
         let node_id = derive_node_id(&sk);
         let statement = make_statement(node_id);
         let signature =
             sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
-        let envelope = scp_proto::SCPEnvelope {
+        let envelope = thruput_scp::SCPEnvelope {
             statement,
             signature,
         };
@@ -222,7 +235,7 @@ mod tests {
         let statement = make_statement(claimed_node_id);
         let signature =
             sign_xdr(&signer_sk, &statement).expect("sign_xdr should succeed");
-        let envelope = scp_proto::SCPEnvelope {
+        let envelope = thruput_scp::SCPEnvelope {
             statement,
             signature,
         };
@@ -236,7 +249,7 @@ mod tests {
         let statement = make_statement(node_id);
         let signature =
             sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
-        let mut envelope = scp_proto::SCPEnvelope {
+        let mut envelope = thruput_scp::SCPEnvelope {
             statement,
             signature,
         };

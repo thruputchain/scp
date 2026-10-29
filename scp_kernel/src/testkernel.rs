@@ -1,10 +1,10 @@
 use crate::*;
-use scp_proto::*;
 use std::cell::{RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::Duration;
+use thruput_scp::*;
 
 pub type TestH = Rc<RefCell<TestDriver>>;
 
@@ -14,18 +14,18 @@ pub struct TestKernel {
 
 impl TestKernel {
     pub fn new(
-        node_id: scp_proto::SCPNodeID,
-        qset: scp_proto::SCPQuorumSet,
+        node_id: thruput_scp::SCPNodeID,
+        qset: thruput_scp::SCPQuorumSet,
         is_validator: bool,
     ) -> TestKernel {
         let node_id_clone = node_id.clone();
         let driver = Rc::new(RefCell::new(TestDriver::new(
             Box::new(
-                move |q: &scp_proto::SCPNodeID| {
+                move |q: &thruput_scp::SCPNodeID| {
                     if q == &node_id_clone { 1000 } else { 1 }
                 },
             ),
-            Box::new(|_: &scp_proto::SCPValue| 0),
+            Box::new(|_: &thruput_scp::SCPValue| 0),
         )));
         driver.borrow_mut().store_quorum_set(&qset);
         TestKernel {
@@ -51,7 +51,7 @@ impl TestKernel {
     pub fn bump_state(
         &mut self,
         slot_index: SlotIndex,
-        v: &scp_proto::SCPValue,
+        v: &thruput_scp::SCPValue,
     ) -> bool {
         self.kernel
             .proto()
@@ -62,7 +62,7 @@ impl TestKernel {
     pub fn nominate(
         &mut self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
         timed_out: bool,
     ) -> bool {
         self.kernel
@@ -74,7 +74,7 @@ impl TestKernel {
     pub fn get_latest_composite_candidate(
         &mut self,
         slot_index: SlotIndex,
-    ) -> Option<scp_proto::SCPValue> {
+    ) -> Option<thruput_scp::SCPValue> {
         self.kernel
             .proto()
             .slot_proto_or_create(slot_index)
@@ -84,7 +84,7 @@ impl TestKernel {
     pub fn get_entire_current_state(
         &mut self,
         slot_index: SlotIndex,
-    ) -> Vec<scp_proto::SCPEnvelope> {
+    ) -> Vec<thruput_scp::SCPEnvelope> {
         if let Some(mut s) = self.kernel.proto().slot_proto(slot_index) {
             s.get_entire_current_state()
         } else {
@@ -95,8 +95,8 @@ impl TestKernel {
     pub fn get_current_envelope(
         &mut self,
         slot_index: SlotIndex,
-        node_id: &scp_proto::SCPNodeID,
-    ) -> scp_proto::SCPEnvelope {
+        node_id: &thruput_scp::SCPNodeID,
+    ) -> thruput_scp::SCPEnvelope {
         let envelopes = self.get_entire_current_state(slot_index);
         envelopes
             .into_iter()
@@ -107,7 +107,7 @@ impl TestKernel {
     pub fn get_nomination_leaders(
         &mut self,
         slot_index: SlotIndex,
-    ) -> HashSet<scp_proto::SCPNodeID> {
+    ) -> HashSet<thruput_scp::SCPNodeID> {
         if let Some(mut s) = self.kernel.proto().slot_proto(slot_index) {
             s.get_nomination_leaders()
         } else {
@@ -132,23 +132,23 @@ pub struct TestDriver {
     pub increment_nomination_timeout_ms: u32,
 
     // Callback functions
-    pub priority_lookup: Box<dyn Fn(&scp_proto::SCPNodeID) -> u64>,
-    pub hash_value_calculator: Box<dyn Fn(&scp_proto::SCPValue) -> u64>,
+    pub priority_lookup: Box<dyn Fn(&thruput_scp::SCPNodeID) -> u64>,
+    pub hash_value_calculator: Box<dyn Fn(&thruput_scp::SCPValue) -> u64>,
 
     // State storage
-    pub quorum_sets: HashMap<scp_proto::SCPHash, scp_proto::SCPQuorumSet>,
-    pub envelopes: Vec<scp_proto::SCPEnvelope>,
-    pub externalized_values: HashMap<SlotIndex, scp_proto::SCPValue>,
-    pub heard_from_quorums: HashMap<SlotIndex, Vec<scp_proto::SCPBallot>>,
+    pub quorum_sets: HashMap<thruput_scp::SCPHash, thruput_scp::SCPQuorumSet>,
+    pub envelopes: Vec<thruput_scp::SCPEnvelope>,
+    pub externalized_values: HashMap<SlotIndex, thruput_scp::SCPValue>,
+    pub heard_from_quorums: HashMap<SlotIndex, Vec<thruput_scp::SCPBallot>>,
 
     // Timer management
     pub timers: HashMap<Timer, TimerData>,
     pub current_timer_offset: Duration,
 
     // Test-specific fields
-    pub expected_candidates: HashSet<scp_proto::SCPValue>,
-    pub composite_value: Option<scp_proto::SCPValue>,
-    pub secret_key: Option<scp_proto::SCPSecretKey>,
+    pub expected_candidates: HashSet<thruput_scp::SCPValue>,
+    pub composite_value: Option<thruput_scp::SCPValue>,
+    pub secret_key: Option<thruput_xdr::types::SecretKey>,
 }
 
 impl TestDriver {
@@ -157,8 +157,8 @@ impl TestDriver {
         hash_value_calculator: Box<Q>,
     ) -> Self
     where
-        P: Fn(&scp_proto::SCPNodeID) -> u64 + 'static,
-        Q: Fn(&scp_proto::SCPValue) -> u64 + 'static,
+        P: Fn(&thruput_scp::SCPNodeID) -> u64 + 'static,
+        Q: Fn(&thruput_scp::SCPValue) -> u64 + 'static,
     {
         Self {
             initial_ballot_timeout_ms: 1000,
@@ -179,11 +179,14 @@ impl TestDriver {
         }
     }
 
-    pub fn set_secret_key(&mut self, secret_key: scp_proto::SCPSecretKey) {
+    pub fn set_secret_key(
+        &mut self,
+        secret_key: thruput_xdr::types::SecretKey,
+    ) {
         self.secret_key = Some(secret_key);
     }
 
-    pub fn store_quorum_set(&mut self, qset: &scp_proto::SCPQuorumSet) {
+    pub fn store_quorum_set(&mut self, qset: &thruput_scp::SCPQuorumSet) {
         self.quorum_sets
             .insert(scp_util::hash_xdr_scp(qset).unwrap(), qset.clone());
     }
@@ -228,40 +231,39 @@ impl Debug for TestDriver {
 impl Driver for Rc<RefCell<TestDriver>> {
     fn get_qset(
         &self,
-        qset_hash: &scp_proto::SCPHash,
-    ) -> Option<scp_proto::SCPQuorumSet> {
+        qset_hash: &thruput_scp::SCPHash,
+    ) -> Option<thruput_scp::SCPQuorumSet> {
         self.borrow().quorum_sets.get(qset_hash).cloned()
     }
 
-    fn to_short_string(&self, _pk: &scp_proto::SCPNodeID) -> String {
+    fn to_short_string(&self, _pk: &thruput_scp::SCPNodeID) -> String {
         panic!("not used")
     }
 
-    fn to_str_key(&self, pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
-        match pk {
-            scp_proto::SCPPublicKey::Ed25519 { ed25519 } => {
-                hex_abbrev(&ed25519.into_inner()[..])
-            }
-            _ => panic!("unreachable"),
-        }
+    fn to_str_key(
+        &self,
+        pk: &thruput_scp::SCPNodeID,
+        _full_key: bool,
+    ) -> String {
+        hex_abbrev(scp_util::public_key_bytes(pk))
     }
 
-    fn from_str_key(&self, _s: &str) -> Result<scp_proto::SCPNodeID, String> {
+    fn from_str_key(&self, _s: &str) -> Result<thruput_scp::SCPNodeID, String> {
         panic!("not used")
     } // XXX: get from KeyUtils.cpp
 
-    fn get_value_string(&self, value: &scp_proto::SCPValue) -> String {
+    fn get_value_string(&self, value: &thruput_scp::SCPValue) -> String {
         hah(&value.0)
     }
 
-    fn get_hash_of(&self, opaque: &[u8]) -> scp_proto::SCPHash {
+    fn get_hash_of(&self, opaque: &[u8]) -> thruput_scp::SCPHash {
         hash_bytes(opaque)
     }
 
     fn get_node_weight(
         &self,
-        node_id: &scp_proto::SCPNodeID,
-        qset: &scp_proto::SCPQuorumSet,
+        node_id: &thruput_scp::SCPNodeID,
+        qset: &thruput_scp::SCPQuorumSet,
         is_local_node: bool,
     ) -> u64 {
         get_node_weight(node_id, qset, is_local_node)
@@ -269,11 +271,11 @@ impl Driver for Rc<RefCell<TestDriver>> {
 
     fn compute_hash_node(
         &self,
-        _slot_index: scp_proto::SCPSlotIndex,
-        _prev: &scp_proto::SCPValue,
+        _slot_index: thruput_scp::SCPSlotIndex,
+        _prev: &thruput_scp::SCPValue,
         is_priority: bool,
-        _round_number: scp_proto::SCPCount,
-        node_id: &scp_proto::SCPNodeID,
+        _round_number: thruput_scp::SCPCount,
+        node_id: &thruput_scp::SCPNodeID,
     ) -> u64 {
         if is_priority {
             (self.borrow().priority_lookup)(node_id)
@@ -284,28 +286,28 @@ impl Driver for Rc<RefCell<TestDriver>> {
 
     fn compute_value_hash(
         &self,
-        _slot_index: scp_proto::SCPSlotIndex,
-        _prev: &scp_proto::SCPValue,
-        _round_number: scp_proto::SCPCount,
-        value: &scp_proto::SCPValue,
+        _slot_index: thruput_scp::SCPSlotIndex,
+        _prev: &thruput_scp::SCPValue,
+        _round_number: thruput_scp::SCPCount,
+        value: &thruput_scp::SCPValue,
     ) -> u64 {
         (self.borrow().hash_value_calculator)(value)
     }
 
-    fn sign_envelope(&self, env: &mut scp_proto::SCPEnvelope) {
+    fn sign_envelope(&self, env: &mut thruput_scp::SCPEnvelope) {
         if let Some(secret_key) = &self.borrow().secret_key {
             env.signature =
                 scp_util::sign_xdr(secret_key, &env.statement).unwrap();
         }
     }
 
-    fn emit_envelope(&self, env: scp_proto::SCPEnvelope) {
+    fn emit_envelope(&self, env: thruput_scp::SCPEnvelope) {
         self.borrow_mut().envelopes.push(env);
     }
 
     fn compute_timeout(
         &self,
-        round_number: scp_proto::SCPCount,
+        round_number: thruput_scp::SCPCount,
         is_nomination: bool,
     ) -> Duration {
         let driver = self.borrow();
@@ -358,7 +360,7 @@ impl Consensus for Rc<RefCell<TestDriver>> {
     fn validate_ballot_value(
         &self,
         _: SCPSlotIndex,
-        _: &scp_proto::SCPValue,
+        _: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         ValidationLevel::FullyValid
     }
@@ -366,7 +368,7 @@ impl Consensus for Rc<RefCell<TestDriver>> {
     fn validate_nomination_value(
         &self,
         _: SCPSlotIndex,
-        _: &scp_proto::SCPValue,
+        _: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         ValidationLevel::FullyValid
     }
@@ -374,16 +376,16 @@ impl Consensus for Rc<RefCell<TestDriver>> {
     fn extract_valid_value(
         &self,
         _slot_index: SCPSlotIndex,
-        _value: &scp_proto::SCPValue,
-    ) -> Option<scp_proto::SCPValue> {
+        _value: &thruput_scp::SCPValue,
+    ) -> Option<thruput_scp::SCPValue> {
         todo!()
     }
 
     fn combine_candidates(
         &self,
         _slot_index: SCPSlotIndex,
-        candidates: &HashSet<scp_proto::SCPValue>,
-    ) -> Option<scp_proto::SCPValue> {
+        candidates: &HashSet<thruput_scp::SCPValue>,
+    ) -> Option<thruput_scp::SCPValue> {
         let driver = self.borrow();
 
         assert_eq!(candidates, &driver.expected_candidates);
@@ -401,7 +403,7 @@ impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     ) {
         let x = self
             .borrow_mut()
@@ -413,35 +415,35 @@ impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn started_ballot_proto(
         &self,
         _slot_index: SlotIndex,
-        _ballot: &scp_proto::SCPBallot,
+        _ballot: &thruput_scp::SCPBallot,
     ) {
     }
 
     fn accepted_ballot_prepared(
         &self,
         _slot_index: SlotIndex,
-        _ballot: &scp_proto::SCPBallot,
+        _ballot: &thruput_scp::SCPBallot,
     ) {
     }
 
     fn confirmed_ballot_prepared(
         &self,
         _slot_index: SlotIndex,
-        _ballot: &scp_proto::SCPBallot,
+        _ballot: &thruput_scp::SCPBallot,
     ) {
     }
 
     fn accepted_commit(
         &self,
         _slot_index: SlotIndex,
-        _ballot: &scp_proto::SCPBallot,
+        _ballot: &thruput_scp::SCPBallot,
     ) {
     }
 
     fn ballot_did_hear_from_quorum(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     ) {
         self.borrow_mut()
             .heard_from_quorums
@@ -453,14 +455,14 @@ impl ConsensusNotify for Rc<RefCell<TestDriver>> {
     fn nominating_value(
         &self,
         _slot_index: SlotIndex,
-        _value: &scp_proto::SCPValue,
+        _value: &thruput_scp::SCPValue,
     ) {
     }
 
     fn updated_candidate_value(
         &self,
         _slot_index: SlotIndex,
-        _value: &scp_proto::SCPValue,
+        _value: &thruput_scp::SCPValue,
     ) {
     }
 }

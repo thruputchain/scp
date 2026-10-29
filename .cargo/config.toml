@@ -1,9 +1,3 @@
-[registries]
-groundhog = { index = "sparse+https://crates.thruput.network/api/v1/crates/" }
-
-[source]
-groundhog = { registry = "sparse+https://crates.thruput.network/api/v1/crates/" }
-
 # Stable Cargo scopes rustflags by target, not profile; these also apply to dev.
 # An environment RUSTFLAGS (or CARGO_ENCODED_RUSTFLAGS) overrides these flags.
 [build]

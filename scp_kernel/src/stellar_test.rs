@@ -5,7 +5,6 @@ mod stellar_tests {
     use crate::*;
     use shfix::shfix;
     use std::collections::HashSet;
-    use std::u32;
     use thruput_scp::*;
     use thruput_xdr::types::PublicKey;
     use xdr_common::VecM;
@@ -28,47 +27,39 @@ mod stellar_tests {
         let mut node_set = Vec::new();
         node_set.push(nodes[0].node_id());
 
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_quorum_slice(&qset, &node_set),
-            false,
-        );
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_vblocking_nodes(&qset, &node_set),
-            false,
-        );
+        assert!(!LocalProto::<TestH, TestH>::is_quorum_slice(
+            &qset, &node_set
+        ),);
+        assert!(!LocalProto::<TestH, TestH>::is_vblocking_nodes(
+            &qset, &node_set
+        ),);
 
         node_set.push(nodes[2].node_id());
 
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_quorum_slice(&qset, &node_set),
-            false,
-        );
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_vblocking_nodes(&qset, &node_set),
-            true,
-        );
+        assert!(!LocalProto::<TestH, TestH>::is_quorum_slice(
+            &qset, &node_set
+        ),);
+        assert!(LocalProto::<TestH, TestH>::is_vblocking_nodes(
+            &qset, &node_set
+        ),);
 
         node_set.push(nodes[3].node_id());
 
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_quorum_slice(&qset, &node_set),
-            true,
-        );
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_vblocking_nodes(&qset, &node_set),
-            true,
-        );
+        assert!(LocalProto::<TestH, TestH>::is_quorum_slice(
+            &qset, &node_set
+        ),);
+        assert!(LocalProto::<TestH, TestH>::is_vblocking_nodes(
+            &qset, &node_set
+        ),);
 
         node_set.push(nodes[1].node_id());
 
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_quorum_slice(&qset, &node_set),
-            true,
-        );
-        assert_eq!(
-            LocalProto::<TestH, TestH>::is_vblocking_nodes(&qset, &node_set),
-            true,
-        );
+        assert!(LocalProto::<TestH, TestH>::is_quorum_slice(
+            &qset, &node_set
+        ),);
+        assert!(LocalProto::<TestH, TestH>::is_vblocking_nodes(
+            &qset, &node_set
+        ),);
     }
 
     #[test]
@@ -320,7 +311,7 @@ mod stellar_tests {
             net_cfg.apply_to(&mut tk);
             //
             tk.driver().store_quorum_set(&q_set);
-            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
+            let qset_hash0 = *tk.proto().local_proto().get_qset_hash();
 
             // Verify value ordering
             assert!(values.x_value < values.y_value);
@@ -5458,7 +5449,7 @@ mod stellar_tests {
                     );
                     tk_nv.driver().store_quorum_set(&q_set);
                     let qset_hash_nv =
-                        tk_nv.proto().local_proto().get_qset_hash().clone();
+                        *tk_nv.proto().local_proto().get_qset_hash();
 
                     let b = thruput_scp::SCPBallot {
                         counter: 1,
@@ -5650,7 +5641,7 @@ mod stellar_tests {
             net_cfg.apply_to(&mut tk);
             tk.driver().store_quorum_set(&q_set);
             #[allow(unused_variables)]
-            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
+            let qset_hash0 = *tk.proto().local_proto().get_qset_hash();
 
             assert!(values.x_value < values.y_value);
             assert!(values.y_value < values.z_value);
@@ -5963,7 +5954,7 @@ mod stellar_tests {
                     );
                     tk_nns.driver().store_quorum_set(&q_set);
                     let qset_hash_node_ns =
-                        tk_nns.proto().local_proto().get_qset_hash().clone();
+                        *tk_nns.proto().local_proto().get_qset_hash();
 
                     tk_nns.proto().received_envelope(
                         &make_prepare(
@@ -6082,7 +6073,7 @@ mod stellar_tests {
             net_cfg.apply_to(&mut tk);
             tk.driver().store_quorum_set(&q_set);
             #[allow(unused_variables)]
-            let qset_hash0 = tk.proto().local_proto().get_qset_hash().clone();
+            let qset_hash0 = *tk.proto().local_proto().get_qset_hash();
 
             assert!(values.x_value < values.y_value);
             assert!(values.y_value < values.z_value);
@@ -6865,21 +6856,21 @@ mod stellar_tests {
                 #[allow(unused_variables)]
                 let votes_y = vec![values.y_value.clone()];
                 #[allow(unused_variables)]
-                let votes_k = vec![values.k_value.clone()];
+                let votes_k = [values.k_value.clone()];
                 let empty_v: Vec<thruput_scp::SCPValue> = vec![];
 
                 let votes_xy =
                     vec![values.x_value.clone(), values.y_value.clone()];
 
                 let mut votes_yk =
-                    vec![values.y_value.clone(), values.k_value.clone()];
+                    [values.y_value.clone(), values.k_value.clone()];
                 votes_yk.sort();
 
                 let mut votes_xk =
                     vec![values.x_value.clone(), values.k_value.clone()];
                 votes_xk.sort();
 
-                let mut values_hash = vec![
+                let mut values_hash = [
                     values.x_value.clone(),
                     values.y_value.clone(),
                     values.k_value.clone(),

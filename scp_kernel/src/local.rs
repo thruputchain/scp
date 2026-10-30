@@ -323,10 +323,8 @@ impl<'a, C: Consensus, D: Driver> LocalProto<'a, C, D> {
                 }
             } else if entry.is_object() {
                 // Recursively parse inner quorum set
-                match Self::from_json_with_parser(entry, from_str_key) {
-                    Ok(inner_qset) => inner_sets.push(inner_qset),
-                    Err(e) => return Err(e),
-                }
+                inner_sets
+                    .push(Self::from_json_with_parser(entry, from_str_key)?);
             } else {
                 return Err("Each entry in 'v' must be either a string (validator key) or an object (inner quorum set)".to_string());
             }

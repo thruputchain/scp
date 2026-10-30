@@ -24,6 +24,7 @@ cargo fetch
 cargo fmt --check
 cargo build --offline --locked
 cargo test --offline --locked
+cargo clippy --offline --locked --workspace --all-targets --all-features -- -D warnings
 
 # heap-profiling is off by default; keep the gated Linux code compiled and tested.
 cargo clippy --offline --locked -p thruput-scp-server --no-deps -- -D warnings

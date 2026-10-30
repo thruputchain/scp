@@ -80,50 +80,25 @@ struct Args {
 
     #[arg(
         long,
-        default_value = "",
-        help = "Base64-std encoded secret key for this SCP node. Prefer --secret-key-file: command-line arguments are readable by every process on the host"
+        help = "Inherited file descriptor to read the base64-std encoded secret key from, up to EOF; surrounding whitespace is ignored. A launcher passes a pipe that nothing else can read; from a shell, `scpd --secret-key-fd 3 3<key` reads a file. The key is never taken on the command line, which every process on the host can read"
     )]
-    secret_key: String,
-
-    #[arg(
-        long,
-        conflicts_with_all = ["secret_key", "secret_key_fd"],
-        help = "Path to a file holding the base64-std encoded secret key for this SCP node, surrounding whitespace ignored"
-    )]
-    secret_key_file: Option<String>,
-
-    #[arg(
-        long,
-        conflicts_with_all = ["secret_key", "secret_key_file"],
-        help = "Inherited file descriptor to read the base64-std encoded secret key from, up to EOF; for launchers, which can pass a pipe that nothing else can read"
-    )]
-    secret_key_fd: Option<i32>,
+    secret_key_fd: i32,
 }
 
-/// The secret key as base64 text, from --secret-key-file or --secret-key-fd
-/// when given, else from --secret-key (which may be empty). Read once: a
+/// The secret key as base64 text, read from --secret-key-fd. Read once: a
 /// descriptor can only be consumed once, and its number is reused afterwards.
 fn secret_key_text(args: &Args) -> String {
     use std::io::Read;
-    let text = if let Some(path) = &args.secret_key_file {
-        std::fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read secret key file {path}: {e}")
-        })
-    } else if let Some(fd) = args.secret_key_fd {
-        assert!(fd >= 0, "invalid secret key file descriptor {fd}");
-        // SAFETY: the launcher handed us this descriptor to read; taking
-        // ownership here closes it once the key is read.
-        let mut file = unsafe {
-            <std::fs::File as std::os::fd::FromRawFd>::from_raw_fd(fd)
-        };
-        let mut text = String::new();
-        file.read_to_string(&mut text).unwrap_or_else(|e| {
-            panic!("failed to read secret key from fd {fd}: {e}")
-        });
-        text
-    } else {
-        args.secret_key.clone()
-    };
+    let fd = args.secret_key_fd;
+    assert!(fd >= 0, "invalid secret key file descriptor {fd}");
+    // SAFETY: the launcher handed us this descriptor to read; taking
+    // ownership here closes it once the key is read.
+    let mut file =
+        unsafe { <std::fs::File as std::os::fd::FromRawFd>::from_raw_fd(fd) };
+    let mut text = String::new();
+    file.read_to_string(&mut text).unwrap_or_else(|e| {
+        panic!("failed to read secret key from fd {fd}: {e}")
+    });
     text.trim().to_string()
 }
 
@@ -310,34 +285,9 @@ mod secret_key_tests {
     }
 
     #[test]
-    fn from_argument() {
-        let args = parse(&["--secret-key", KEY]).unwrap();
-        assert_eq!(secret_key_text(&args), KEY);
-    }
-
-    #[test]
-    fn absent_is_empty() {
-        let args = parse(&[]).unwrap();
-        assert_eq!(secret_key_text(&args), "");
-    }
-
-    #[test]
-    fn from_file_trimmed() {
-        let dir = std::env::temp_dir()
-            .join(format!("scpd-key-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("key");
-        std::fs::write(&path, format!("  {KEY}\n")).unwrap();
-        let args =
-            parse(&["--secret-key-file", path.to_str().unwrap()]).unwrap();
-        assert_eq!(secret_key_text(&args), KEY);
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
     fn from_descriptor_trimmed() {
         let (reader, mut writer) = std::io::pipe().unwrap();
-        writeln!(writer, "{KEY}").unwrap();
+        writeln!(writer, "  {KEY}").unwrap();
         drop(writer);
         // secret_key_text takes ownership of the descriptor and closes it.
         let fd = reader.into_raw_fd();
@@ -355,18 +305,8 @@ mod secret_key_tests {
     }
 
     #[test]
-    fn sources_are_mutually_exclusive() {
-        for pair in [
-            ["--secret-key", KEY, "--secret-key-file", "/dev/null"],
-            ["--secret-key", KEY, "--secret-key-fd", "0"],
-            ["--secret-key-file", "/dev/null", "--secret-key-fd", "0"],
-        ] {
-            let err = parse(&pair).unwrap_err();
-            assert_eq!(
-                err.kind(),
-                clap::error::ErrorKind::ArgumentConflict,
-                "{pair:?}"
-            );
-        }
+    fn descriptor_is_required() {
+        let err = parse(&[]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 }

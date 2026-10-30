@@ -15,10 +15,13 @@ fn signing_key_from_secret_key(
     SigningKey::from_bytes(secret_bytes)
 }
 
+/// Any 32 bytes decode as an `Ed25519PublicKey`, but not every 32 bytes are
+/// a valid curve point, and a peer can send such a key: decoding fails like
+/// any other bad signature instead of panicking.
 fn verifying_key_from_public_key(
     public_key: &thruput_xdr::types::Ed25519PublicKey,
-) -> VerifyingKey {
-    VerifyingKey::from_bytes(public_key[..].try_into().unwrap()).unwrap()
+) -> Result<VerifyingKey, SignatureError> {
+    VerifyingKey::from_bytes(public_key)
 }
 
 fn sign_bytes_ed25519(
@@ -38,13 +41,18 @@ fn verify_bytes_ed25519(
     signature: &thruput_xdr::types::Ed25519Signature,
 ) -> Result<(), SignatureError> {
     let prehash = Sha512::new_with_prefix(msg);
-    verifying_key_from_public_key(public_key).verify_prehashed(
+    verifying_key_from_public_key(public_key)?.verify_prehashed(
         prehash,
         None,
         &Signature::from_bytes(signature),
     )
 }
 
+/// Verifies `signature` over `msg` with `public_key`.
+///
+/// Fails for a bad signature, for a key or signature in a scheme other than
+/// Ed25519, and for an Ed25519 key whose 32 bytes are not a valid curve
+/// point; none of these panic.
 pub fn verify_bytes(
     public_key: &thruput_xdr::types::PublicKey,
     msg: &[u8],
@@ -61,6 +69,12 @@ pub fn verify_bytes(
     }
 }
 
+/// Signs `msg` with `secret_key`: Ed25519ph, the message pre-hashed with
+/// SHA-512.
+///
+/// # Panics
+///
+/// If `secret_key` is not an Ed25519 key.
 pub fn sign_bytes(
     secret_key: &thruput_xdr::types::SecretKey,
     msg: &[u8],
@@ -211,6 +225,28 @@ mod tests {
         assert!(verify_bytes(&mldsa_pk, msg, &sig).is_err());
         assert!(verify_bytes(&pk, msg, &mldsa_sig).is_err());
         assert!(verify_bytes(&mldsa_pk, msg, &mldsa_sig).is_err());
+    }
+
+    #[test]
+    fn verify_rejects_malformed_public_key() {
+        // Decodes as an Ed25519PublicKey but is not a point on the curve.
+        let malformed = thruput_xdr::types::PublicKey::Ed25519 {
+            ed25519: thruput_xdr::types::Ed25519PublicKey::from([0x02u8; 32]),
+        };
+        let sk = generate_secret_key(b"malformed-key");
+        let msg = b"hello";
+        let sig = sign_bytes(&sk, msg);
+        assert!(verify_bytes(&malformed, msg, &sig).is_err());
+
+        // The same key as a statement's node_id, the path a peer controls.
+        let statement = make_statement(malformed);
+        let signature =
+            sign_xdr(&sk, &statement).expect("sign_xdr should succeed");
+        let envelope = thruput_scp::SCPEnvelope {
+            statement,
+            signature,
+        };
+        assert!(verify_envelope(&envelope).is_err());
     }
 
     #[test]

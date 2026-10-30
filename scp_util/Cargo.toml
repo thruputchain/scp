@@ -11,7 +11,12 @@ homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "SCP protocol manipulation utilities"
+description = "Hashing, Ed25519 signing and XDR helpers for the Stellar Consensus Protocol (SCP)"
+
+# docs.rs builds the default features only; document the whole API.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 # Published as thruput-scp-util. The library keeps its name, so
 # `use scp_util::...` is unchanged.
@@ -29,9 +34,3 @@ base64 = "0.22"
 
 xdr-common = { workspace = true }
 xdrs = { workspace = true }
-
-[dependencies.serde]
-optional = true
-version = "1.0.219"
-default-features = false
-features = ["derive"]

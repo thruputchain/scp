@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-10-30
 
 ### All crates
 
@@ -31,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 #### Changed
 - `verify_bytes`, `verify_xdr` and `verify_envelope` return an error for a
-  key or signature in a scheme other than Ed25519, instead of panicking.
+  key or signature in a scheme other than Ed25519, and for an Ed25519 key
+  whose bytes are not a valid curve point, instead of panicking.
 - Ed25519 signing and verification pre-hash the message with SHA-512, for
   compatibility with the application side.
 
@@ -47,8 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   Ed25519 keys order and print as before.
 - No longer depends on `tokio`, `tokio-util` or `async-trait`, which it did
   not use.
-- The test harness (`TestKernel`, `UnitTestKernel`, `testutil`) is behind the
-  new `test-support` feature instead of always public.
+- The test harness (`TestKernel`, `UnitTestKernel`, `testutil`) is no longer
+  part of the public API; it is compiled only for the crate's own tests.
 
 ### scp_server
 
@@ -69,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   strictly below the lowest non-externalized slot are ignored.
 - Release builds keep overflow checks and line tables.
 - Logs print values as `hov:<sha256 prefix>` instead of raw bytes.
+- `HandleKernel`'s `Debug` output no longer includes the secret key.
 - The `GROUNDHOG_HEAP_PROFILING` and `GROUNDHOG_NETWORK_HASH` variables and
   the `groundhog.block.height` span attribute are renamed to
   `THRUPUT_HEAP_PROFILING`, `THRUPUT_NETWORK_HASH` and

@@ -1,3 +1,18 @@
+//! Helpers shared by the SCP kernel and `scpd`: XDR marshalling
+//! ([`marshal_xdr`], [`unmarshal_xdr`]), SHA-256 hashing ([`hash_bytes`],
+//! [`hash_xdr`]), Ed25519 signing and verification of XDR structures and SCP
+//! envelopes ([`sign_xdr`], [`verify_xdr`], [`verify_envelope`]) and key
+//! helpers ([`generate_secret_key`], [`derive_public_key`],
+//! [`parse_secret_key_from_base64`]).
+//!
+//! Keys and signatures are `thruput-xdr`'s
+//! [`PublicKey`](thruput_xdr::types::PublicKey) and
+//! [`Signature`](thruput_xdr::types::Signature) unions. Only their Ed25519
+//! arms are supported: signing with another scheme panics, and verifying a
+//! key or signature of another scheme fails like any bad signature.
+//! Signatures are Ed25519ph (the message pre-hashed with SHA-512) over the
+//! XDR encoding of the signed value.
+
 pub mod xdr;
 pub use xdr::*;
 

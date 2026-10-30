@@ -95,9 +95,37 @@ pub trait Driver: Clone + Debug {
     fn stop_timer(&self, slot_index: SlotIndex, timer: Timer);
 }
 
+/// The entry points through which the application drives the protocol.
+///
+/// The kernel does not verify envelope signatures. Every envelope passed to
+/// [`received_envelope`](Self::received_envelope) or
+/// [`set_state_from_envelope`](Self::set_state_from_envelope) must already be
+/// authenticated by the caller, normally with [`scp_util::verify_envelope`],
+/// which checks the signature against the statement's `node_id`:
+///
+/// ```no_run
+/// # fn forward(
+/// #     kernel: &mut impl scp_kernel::DriverCb,
+/// #     env: &thruput_scp::SCPEnvelope,
+/// # ) {
+/// if scp_util::verify_envelope(env).is_ok() {
+///     kernel.received_envelope(env);
+/// }
+/// # }
+/// ```
+///
+/// An unverified envelope lets whoever sent it speak for any node in the
+/// quorum set.
 pub trait DriverCb {
+    /// Processes an envelope received from a peer. The envelope must be
+    /// authenticated; see the trait documentation.
     fn received_envelope(&mut self, env: &thruput_scp::SCPEnvelope);
+    /// Delivers an expired nomination or ballot timer, with the callback the
+    /// driver was given in [`Driver::start_timer`].
     fn driver_calling_back(&mut self, cb: DriverCallback);
+    /// Restores a slot's state from one of this node's own earlier envelopes,
+    /// for example after a restart. The envelope must be authenticated like
+    /// any other.
     fn set_state_from_envelope(
         &mut self,
         slot_index: SlotIndex,

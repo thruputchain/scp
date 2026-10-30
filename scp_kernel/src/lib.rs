@@ -1,3 +1,26 @@
+//! The Stellar Consensus Protocol (SCP) kernel: federated voting, nomination
+//! and the ballot protocol, following stellar-core's implementation, over
+//! Thruput's protocol types from [`thruput_scp`].
+//!
+//! The application supplies two things. A [`Consensus`] validates and
+//! combines its values and receives progress notifications through
+//! [`ConsensusNotify`]. A [`Driver`] supplies quorum sets by hash, hashes and
+//! signs for the node, emits envelopes to peers and runs the timers.
+//! [`StellarKernel::new`] takes both, with the node ID, the validator flag
+//! and the local quorum set. [`StellarKernel::proto`] returns the
+//! [`StellarProto`] through which envelopes from peers arrive
+//! ([`DriverCb::received_envelope`]), values are nominated
+//! ([`StellarProto::nominate`]) and expired timers are delivered
+//! ([`DriverCb::driver_calling_back`]).
+//!
+//! The kernel does not verify envelope signatures. Envelopes must be
+//! authenticated before they reach it; see [`DriverCb`].
+//!
+//! [`verifier`] checks, outside a running kernel, that a set of
+//! `EXTERNALIZE` envelopes proves a slot externalized under a quorum set.
+//!
+//! Everything in [`scp_util`] is re-exported.
+
 pub use scp_util::*;
 
 mod consensus;
@@ -51,21 +74,20 @@ pub use heuristic::*;
 pub mod util;
 pub use util::*;
 
-// The test harness: the kernel's own tests use it, and downstream tests can
-// opt in with the `test-support` feature.
-#[cfg(any(test, feature = "test-support"))]
+// The test harness, for this crate's tests only.
+#[cfg(test)]
 pub mod unitkernel;
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub use unitkernel::*;
 
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub mod testkernel;
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub use testkernel::*;
 
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub mod testutil;
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub use testutil::*;
 
 #[cfg(test)]
@@ -76,3 +98,6 @@ mod unit_test;
 
 #[cfg(test)]
 mod stellar_test;
+
+#[cfg(test)]
+mod span_test;

@@ -1,6 +1,15 @@
 use ed25519_dalek::SigningKey;
 use sha2::{Digest, Sha256};
 
+/// Derives an Ed25519 secret key deterministically from `seed`: the key's
+/// 32-byte seed is `SHA-256(seed)`.
+///
+/// The same input always gives the same key and nothing random is added, so
+/// this is neither random key generation nor a password-based derivation: a
+/// short or guessable `seed` gives a guessable key. It is meant for tests and
+/// fixtures. For a production key, pass 32 bytes from a cryptographically
+/// secure random source, or build the `SecretKey` from an Ed25519 key
+/// generated elsewhere (64 bytes: the seed followed by the public key).
 pub fn generate_secret_key(seed: &[u8]) -> thruput_xdr::types::SecretKey {
     let mut hasher = Sha256::new();
     hasher.update(seed);

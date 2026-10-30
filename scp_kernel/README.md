@@ -2,15 +2,23 @@
 
 This crate implements a state machine for the SCP protocol.
 
-## Compatibility with Stellar's SCP
+## Relation to stellar-core
 
-The wire format of Stellar's SCP implementation and this one is the same.
+The protocol logic follows stellar-core's SCP implementation and the test
+suite is a port of stellar-core's, but envelopes are not interchangeable with
+stellar-core's: node IDs and signatures are Thruput's `PublicKey` and
+`Signature` unions, and signatures are Ed25519ph over the statement's XDR
+alone. Two parts of the logic also differ deliberately:
 
-However, note that there are some semantic differences:
+- __Quorum set normalization__ The function used here guarantees: _if two
+  quorum sets are semantically identical, their normalized forms are equal
+  and maximally compressed_. In principle, it is possible to add support for
+  either normalization function.
 
-- __Quorum set normalization function__ The function used here differs from Stellar's in that it guarantees: _If two quorum sets are semantically identical, their normalized analogs will be equal and maximally compressed_. In principle, it is possible to add support for either one normalization function.
-
-- __Hash function__ Stellar defers hashing of multiple opaque values to the application. This implementation defers hashing of a single opaque value to the application, and uses an internal implementation of hashing multiple values based on that.
+- __Hash function__ stellar-core defers hashing of a list of opaque values to
+  the application. This implementation defers hashing of a single opaque
+  value to the application (`Driver::get_hash_of`) and hashes lists
+  internally on top of it.
 
 ## Usage
 
@@ -22,6 +30,10 @@ The kernel is driven by the application through two traits:
   node, emits envelopes to peers and manages the nomination and ballot
   timers.
 
+The kernel does not verify envelope signatures: authenticate every envelope
+before passing it in (`scp_util::verify_envelope`), or anyone can speak for
+any node in the quorum set.
+
 `StellarKernel::new` takes the local node ID, whether it is a validator, its
 quorum set and implementations of both traits. `kernel.proto()` returns the
 `StellarProto` the application drives: envelopes from peers go to
@@ -29,7 +41,3 @@ quorum set and implementations of both traits. `kernel.proto()` returns the
 through `driver_calling_back` with the `DriverCallback` the driver was given
 when the timer was started. `scp_server` in this repository is a complete
 driver that exposes the kernel over ONC-RPC.
-
-The `test-support` feature exposes the kernel's test harness (`TestKernel`,
-`UnitTestKernel` and the envelope builders in `testutil`) for downstream
-tests. It is not part of the protocol implementation and is off by default.

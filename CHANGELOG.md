@@ -65,8 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 #### Changed
 - Control RPC messages are capped at 10 MiB.
-- Nominations, timer callbacks and `set_state_from_envelope` for slots at or
-  below the lowest non-externalized slot are ignored.
+- Nominations, timer callbacks and `set_state_from_envelope` for slots
+  strictly below the lowest non-externalized slot are ignored.
 - Release builds keep overflow checks and line tables.
 - Logs print values as `hov:<sha256 prefix>` instead of raw bytes.
 - The `GROUNDHOG_HEAP_PROFILING` and `GROUNDHOG_NETWORK_HASH` variables and

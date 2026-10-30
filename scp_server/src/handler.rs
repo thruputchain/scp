@@ -536,7 +536,7 @@ impl fmt::Debug for HandleKernelState {
                 "increment_nomination_timeout",
                 &self.increment_nomination_timeout,
             )
-            .field("secret_key", &self.secret_key)
+            .field("secret_key", &"[REDACTED]")
             .field("validated_values", &self.validated_values)
             .field("known_qsets", &self.known_qsets)
             // skipping driver_calling_back

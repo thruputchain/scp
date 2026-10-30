@@ -4,7 +4,6 @@ mod unit_tests {
     use crate::*;
     use shfix::shfix;
     use std::collections::{HashMap, HashSet};
-    use std::u32;
     use thruput_scp::*;
     use xdr_common::VecM;
 
@@ -332,12 +331,12 @@ mod unit_tests {
                             id_voted && other_leaders.contains(node_id)
                         };
 
-                    update_voted(&node_ids[0], &l0, &mut v0_voted);
-                    update_voted(&node_ids[1], &l1, &mut v1_voted);
+                    update_voted(&node_ids[0], l0, &mut v0_voted);
+                    update_voted(&node_ids[1], l1, &mut v1_voted);
 
                     // either both vote for v0 or both vote for v1
-                    res = find_node(&node_ids[0], v0_voted, &l1);
-                    res = res || find_node(&node_ids[1], v1_voted, &l0);
+                    res = find_node(&node_ids[0], v0_voted, l1);
+                    res = res || find_node(&node_ids[1], v1_voted, l0);
 
                     r += 1;
                     if res || r >= max_rounds {

@@ -8,7 +8,7 @@ Heap profiling is opt-in at build time and at run time:
   allocator, with `prof:true,prof_active:false,lg_prof_sample:19` (512 KiB
   average sampling interval, inactive until enabled). Default builds, including
   release builds, keep the system allocator.
-- Set `GROUNDHOG_HEAP_PROFILING=1` to activate sampling at startup. Only that
+- Set `THRUPUT_HEAP_PROFILING=1` to activate sampling at startup. Only that
   exact value enables it. On a build without the feature, or off Linux, scpd
   fails startup rather than ignoring it.
 - Set `SCPD_PPROF_LISTEN=127.0.0.1:9646` to open a separate HTTP listener.
@@ -56,10 +56,10 @@ is set. Restart scpd after changing these variables.
 - `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG`: default
   `parentbased_traceidratio` at `0.05`. An unknown sampler, or a ratio sampler
   with a missing or invalid argument, uses that default and logs an error.
-- `GROUNDHOG_NETWORK_HASH`: set by chuckd; 64 hex characters representing the
+- `THRUPUT_NETWORK_HASH`: set by the application that launches scpd; 64 hex characters representing the
   32-byte network hash. When set, slot spans join the block trace whose ID is
   derived from the network hash and slot index. Sampling uses that trace ID
-  with the configured ratio so scpd and chuckd keep or drop the same blocks.
+  with the configured ratio so scpd and the application keep or drop the same blocks.
   Missing or invalid values log one error and leave independent traces.
 - `OTEL_SPAN_FILTER`: which other spans are exported, in `EnvFilter` syntax
   (for example `warn,scp_kernel=info`). Default `info`. It is independent of

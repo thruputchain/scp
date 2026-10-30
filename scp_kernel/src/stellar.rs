@@ -251,7 +251,7 @@ impl<'a, C: Consensus, D: Driver> StellarProto<'a, C, D> {
     ) {
         let mut slots_to_remove = Vec::new();
 
-        for (&slot_index, _) in self.state.known_slots.iter() {
+        for &slot_index in self.state.known_slots.keys() {
             if slot_index < max_slot_index && slot_index != slot_to_keep {
                 slots_to_remove.push(slot_index);
             }

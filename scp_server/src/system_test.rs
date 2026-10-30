@@ -3,13 +3,11 @@ use std::future::Future;
 use std::sync::Arc;
 use thruput_rpc_driver::connect_client;
 use thruput_scp::*;
-use tokio;
 use tokio::sync::Mutex;
-use tracing_subscriber;
 use xdr_common::{BytesM, VecM};
 
 fn instrument_test() {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
         // .with_max_level(tracing::metadata::LevelFilter::DEBUG)
         .with_env_filter(
@@ -132,7 +130,7 @@ impl thruput_scp::SCP_Handle_SCP_Handle1 for TestHandler {
         _slot_index: SCPSlotIndex,
         mut values: SCPValues,
     ) -> Result<SCPOptValue, ::thruput_rpc_driver::ProgramError> {
-        if values.len() > 0 {
+        if !values.is_empty() {
             values.0.sort();
             Ok(Some(values.0[0].clone()))
         } else {
@@ -353,10 +351,8 @@ async fn five() {
     // future::pending::<()>().await;
 }
 
-async fn flush_emits<F, Fut>(
-    nodes: &Vec<(ControlService, TestHandler)>,
-    exit: F,
-) where
+async fn flush_emits<F, Fut>(nodes: &[(ControlService, TestHandler)], exit: F)
+where
     F: Fn() -> Fut,
     Fut: Future<Output = bool>,
 {
@@ -374,10 +370,7 @@ async fn flush_emits<F, Fut>(
                 }
             }
         }
-        if !delivered {
-            assert!(false);
-            break;
-        }
+        assert!(delivered, "no envelopes were delivered in this round");
         if exit().await {
             break;
         }

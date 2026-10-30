@@ -199,8 +199,8 @@ fn test_nested_quorum_sets() {
          expected_sanity: bool,
          expected_normalized_sanity: bool| {
             let mut qsets = Vec::new();
-            for i in 0..=nesting_level {
-                qsets.push(make_singleton(keys[i].clone()));
+            for key in &keys[..=nesting_level] {
+                qsets.push(make_singleton(key.clone()));
             }
 
             for i in (0..nesting_level).rev() {
@@ -213,9 +213,10 @@ fn test_nested_quorum_sets() {
                 validators: VecM(vec![]),
                 inner_sets: VecM(vec![]),
             };
-            for i in 0..=nesting_level {
-                expected_normalized.validators.0.push(keys[i].clone());
-            }
+            expected_normalized
+                .validators
+                .0
+                .extend_from_slice(&keys[..=nesting_level]);
 
             check_qset(
                 &qsets[0],

@@ -6,7 +6,7 @@
 //! so correlation holds; OTEL_SPAN_FILTER controls the rest (subject to sampling).
 //! OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES
 //! configure the service resource.
-//! GROUNDHOG_NETWORK_HASH (set by chuckd, 64 hex characters) correlates slot
+//! THRUPUT_NETWORK_HASH (set by the application, 64 hex characters) correlates slot
 //! spans with block traces and samples their deterministic IDs at the configured
 //! ratio. Missing or invalid hashes log one error and leave independent traces.
 
@@ -39,6 +39,8 @@ static SLOT_TRACES: OnceLock<SlotTraces> = OnceLock::new();
 
 pub fn block_trace_id(network_hash: &[u8; 32], height: u64) -> TraceId {
     let mut hash = Sha256::new();
+    // Domain separator shared with the application's trace-ID derivation;
+    // renaming it would decorrelate scpd's slot spans from its block traces.
     hash.update(b"groundhog.block-trace.v1\0");
     hash.update(network_hash);
     hash.update(height.to_be_bytes());
@@ -55,12 +57,12 @@ fn trace_id_from_digest(digest: [u8; 32]) -> TraceId {
 
 fn parse_network_hash(value: Option<&OsStr>) -> Result<[u8; 32], String> {
     let value = value.filter(|value| !value.is_empty()).ok_or_else(||
-        "GROUNDHOG_NETWORK_HASH is not set; slot spans are not correlated with chuckd block traces".to_owned())?;
+        "THRUPUT_NETWORK_HASH is not set; slot spans are not correlated with the application's block traces".to_owned())?;
     let value = value
         .to_str()
         .filter(|value| value.len() == 64)
         .ok_or_else(|| {
-            "GROUNDHOG_NETWORK_HASH must contain exactly 64 hex characters"
+            "THRUPUT_NETWORK_HASH must contain exactly 64 hex characters"
                 .to_owned()
         })?;
     let mut hash = [0; 32];
@@ -70,7 +72,7 @@ fn parse_network_hash(value: Option<&OsStr>) -> Result<[u8; 32], String> {
             .zip(digit(pair[1]))
             .map(|(hi, lo)| ((hi << 4) | lo) as u8)
             .ok_or_else(|| {
-                "GROUNDHOG_NETWORK_HASH contains non-hex characters".to_owned()
+                "THRUPUT_NETWORK_HASH contains non-hex characters".to_owned()
             })?;
     }
     Ok(hash)
@@ -78,7 +80,7 @@ fn parse_network_hash(value: Option<&OsStr>) -> Result<[u8; 32], String> {
 
 fn configure_slot_traces(sampler: &Sampler) -> Result<(), String> {
     let network_hash = parse_network_hash(
-        std::env::var_os("GROUNDHOG_NETWORK_HASH").as_deref(),
+        std::env::var_os("THRUPUT_NETWORK_HASH").as_deref(),
     )?;
     let root_sampler = match sampler {
         Sampler::ParentBased(root) => root.clone(),
@@ -137,7 +139,7 @@ pub fn slot_span(slot_index: u64) -> tracing::Span {
         target: "scpd::slot",
         "slot",
         slot_index = height,
-        "groundhog.block.height" = height
+        "thruput.block.height" = height
     );
     link_slot(&span, slot_index);
     span
@@ -405,7 +407,7 @@ mod tests {
         for value in [None, Some(OsStr::new(""))] {
             assert_eq!(
                 parse_network_hash(value).unwrap_err(),
-                "GROUNDHOG_NETWORK_HASH is not set; slot spans are not correlated with chuckd block traces"
+                "THRUPUT_NETWORK_HASH is not set; slot spans are not correlated with the application's block traces"
             );
         }
         for value in ["a".repeat(63), "a".repeat(65), "a".repeat(100_000)] {
@@ -497,7 +499,7 @@ mod tests {
                     .env_remove("OTEL_SDK_DISABLED")
                     .env_remove("OTEL_EXPORTER_OTLP_PROTOCOL")
                     .env_remove("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
-                    .env_remove("GROUNDHOG_NETWORK_HASH");
+                    .env_remove("THRUPUT_NETWORK_HASH");
                 command.env(
                     "OTEL_SPAN_FILTER",
                     if case == "filter" {
@@ -508,7 +510,7 @@ mod tests {
                 );
                 if case != "missing" {
                     command.env(
-                        "GROUNDHOG_NETWORK_HASH",
+                        "THRUPUT_NETWORK_HASH",
                         if case == "invalid" {
                             "bad".to_owned()
                         } else {
@@ -532,7 +534,7 @@ mod tests {
         let correlated = !matches!(case.as_str(), "missing" | "invalid");
         assert_eq!(warnings.len(), usize::from(!correlated));
         if !correlated {
-            assert!(warnings[0].contains("GROUNDHOG_NETWORK_HASH"));
+            assert!(warnings[0].contains("THRUPUT_NETWORK_HASH"));
             assert!(SLOT_TRACES.get().is_none());
         }
         otel_provider.unwrap().shutdown().unwrap();
@@ -604,7 +606,7 @@ mod tests {
                 s.name == "slot"
                     && s.span_context.span_id() == child.parent_span_id
                     && s.attributes.iter().any(|a| {
-                        a.key.as_str() == "groundhog.block.height"
+                        a.key.as_str() == "thruput.block.height"
                             && a.value == opentelemetry::Value::I64(42)
                     })
             })
@@ -632,7 +634,7 @@ mod tests {
                 .find(|s| {
                     s.name == "slot"
                         && s.attributes.iter().any(|a| {
-                            a.key.as_str() == "groundhog.block.height"
+                            a.key.as_str() == "thruput.block.height"
                                 && a.value == opentelemetry::Value::I64(43)
                         })
                 })
@@ -854,7 +856,7 @@ mod tests {
         let span = spans.iter().find(|span| span.name == "nominate").unwrap();
         for (key, value) in [
             ("slot_index", 42),
-            ("groundhog.block.height", 42),
+            ("thruput.block.height", 42),
             ("entry_round_number", 0),
         ] {
             assert!(span.attributes.iter().any(|attribute| {
@@ -1083,7 +1085,7 @@ mod tests {
                     .env("OTEL_BSP_SCHEDULE_DELAY", "100")
                     .env("OTEL_EXPORTER_OTLP_TIMEOUT", "200")
                     .env("OTEL_TRACES_SAMPLER", "always_on")
-                    .env("GROUNDHOG_NETWORK_HASH", "11".repeat(32))
+                    .env("THRUPUT_NETWORK_HASH", "11".repeat(32))
                     .env_remove("OTEL_SDK_DISABLED")
                     .env_remove("OTEL_EXPORTER_OTLP_PROTOCOL")
                     .env_remove("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
@@ -1268,7 +1270,7 @@ mod tests {
             command
                 .args(["--exact", "telemetry::tests::sampler_environment"])
                 .env("SCP_SAMPLER_TEST_CASE", expected)
-                .env("GROUNDHOG_NETWORK_HASH", "11".repeat(32))
+                .env("THRUPUT_NETWORK_HASH", "11".repeat(32))
                 .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
                 .env(
                     "OTEL_SDK_DISABLED",

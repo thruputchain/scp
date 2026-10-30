@@ -1,3 +1,14 @@
+//! Prints a deterministic Ed25519 public key and signature for a message, for
+//! generating signature test fixtures in other implementations:
+//!
+//! ```sh
+//! cargo run -p thruput-scp-util --example sign_bytes_fixture -- <seed> <message_hex>
+//! ```
+//!
+//! The key is `generate_secret_key(seed)`, so the same seed always gives the
+//! same key, and the signature is what `sign_bytes` produces (Ed25519ph, the
+//! message pre-hashed with SHA-512).
+
 use scp_util::{derive_public_key, generate_secret_key, sign_bytes};
 
 fn to_hex(bytes: &[u8]) -> String {

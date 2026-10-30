@@ -101,7 +101,8 @@ struct Args {
 }
 
 /// The secret key as base64 text, from --secret-key-file or --secret-key-fd
-/// when given, else from --secret-key (which may be empty).
+/// when given, else from --secret-key (which may be empty). Read once: a
+/// descriptor can only be consumed once, and its number is reused afterwards.
 fn secret_key_text(args: &Args) -> String {
     use std::io::Read;
     let text = if let Some(path) = &args.secret_key_file {
@@ -183,7 +184,8 @@ async fn main() {
     }
 
     let termination = telemetry::termination_signal();
-    telemetry::run_until_termination(run(args), termination).await;
+    telemetry::run_until_termination(run(args, secret_key_text), termination)
+        .await;
     if let Some(provider) = provider {
         let termination = telemetry::termination_signal();
         // Shutdown drains the batch processor; keep its blocking wait off Tokio.
@@ -200,7 +202,7 @@ async fn main() {
     }
 }
 
-async fn run(args: Args) {
+async fn run(args: Args, secret_key_text: String) {
     info!(
         "control_addr={} handle_addr={} reuse={}",
         args.control_addr, args.handle_addr, args.reuse
@@ -232,7 +234,6 @@ async fn run(args: Args) {
 
     // create server
 
-    let secret_key_text = secret_key_text(&args);
     assert!(!secret_key_text.is_empty(), "no secret key provided");
     let secret_key = scp_util::parse_secret_key_from_base64(&secret_key_text)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));

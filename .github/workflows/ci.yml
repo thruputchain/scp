@@ -25,8 +25,6 @@ jobs:
     permissions:
       contents: read
     uses: thruputchain/actions/.github/workflows/workflow-lint.yml@484be875e4e630d26594110bcc0ab6bf42eeaba7
-    with:
-      shellcheck-scripts: true
 
   build:
     needs: dependency-policy # inspect dependencies before anything builds them

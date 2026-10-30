@@ -1,11 +1,10 @@
 use crate::telemetry::{link_slot, slot_span};
-use async_trait::async_trait;
 use scp_kernel::*;
-use scp_proto::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use thruput_scp::*;
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::RwLockWriteGuard as TokioRwLockWriteGuard;
 use tokio::sync::mpsc;
@@ -44,7 +43,7 @@ impl ControlService {
     pub async fn control_set_qset(
         &self,
         qset: SCPQuorumSet,
-    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptQuorumSet, ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::SetKnownQSet(qset))
@@ -64,7 +63,7 @@ impl ControlService {
         slot_index: SCPSlotIndex,
         value: SCPValue,
         prev_value: SCPValue,
-    ) -> Result<bool, ::rpc_driver::ProgramError> {
+    ) -> Result<bool, ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::Nominate(slot_index, value, prev_value))
@@ -80,7 +79,7 @@ impl ControlService {
     pub async fn control_received_envelope(
         &self,
         env: SCPEnvelope,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::ReceivedEnvelope(env))
@@ -99,7 +98,7 @@ impl ControlService {
         &self,
         slot_index: SCPSlotIndex,
         env: SCPEnvelope,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::SetStateFromEnvelope(slot_index, env))
@@ -140,9 +139,13 @@ pub enum ControlReply {
     SetLowestNonExternalizedSlot(),
 }
 
-#[async_trait]
-impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
-    async fn scp_control_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
+// The handler trait returns `impl Future`; these async fns name their
+// concrete reply types.
+#[allow(refining_impl_trait)]
+impl thruput_scp::SCP_Control_SCP_Control1 for ControlService {
+    async fn scp_control_null(
+        &self,
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -151,14 +154,14 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         slot_index: SCPSlotIndex,
         value: SCPValue,
         prev_value: SCPValue,
-    ) -> Result<bool, ::rpc_driver::ProgramError> {
+    ) -> Result<bool, ::thruput_rpc_driver::ProgramError> {
         self.control_nominate(slot_index, value, prev_value).await
     }
 
     async fn scp_control_stop_nomination(
         &self,
         slot_index: SCPSlotIndex,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::StopNomination(slot_index))
@@ -175,7 +178,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_update_local_quorum_set(
         &self,
         qset: SCPQuorumSet,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::UpdateLocalQuorumSet(qset))
@@ -193,7 +196,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_received_envelope(
         &self,
         env: SCPEnvelope,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let height =
             i64::try_from(env.statement.slot_index).unwrap_or(i64::MAX);
         let span = tracing::info_span!(
@@ -210,21 +213,21 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
         &self,
         slot_index: SCPSlotIndex,
         env: SCPEnvelope,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         self.set_state_from_envelope(slot_index, env).await
     }
 
     async fn scp_control_set_qset(
         &self,
         qset: SCPQuorumSet,
-    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptQuorumSet, ::thruput_rpc_driver::ProgramError> {
         self.control_set_qset(qset).await
     }
 
     async fn scp_control_get_qset(
         &self,
         qhash: SCPHash,
-    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptQuorumSet, ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::GetKnownQSet(qhash))
@@ -242,7 +245,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_remove_qset(
         &self,
         qhash: SCPHash,
-    ) -> Result<SCPOptQuorumSet, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptQuorumSet, ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::RemoveKnownQSet(qhash))
@@ -260,7 +263,7 @@ impl scp_proto::SCP_Control_SCP_Control1 for ControlService {
     async fn scp_control_set_lowest_non_externalized_slot(
         &self,
         slot_index: SCPSlotIndex,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         let mut x = self.lock_mut().await;
         x.tx_request
             .send(ControlRequest::SetLowestNonExternalizedSlot(slot_index))
@@ -501,7 +504,7 @@ impl ControlKernel {
         }
     }
 
-    fn call_received_envelope(&mut self, env: &scp_proto::SCPEnvelope) {
+    fn call_received_envelope(&mut self, env: &thruput_scp::SCPEnvelope) {
         info!(
             "---> control kernel calling scp received envelope {}",
             self.kernel.proto().envelope_to_str(env, false),

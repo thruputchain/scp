@@ -1,5 +1,6 @@
-use scp_proto::{SCPConfig, SCPEd25519PublicKey, SCPPublicKey, SCPQuorumSet};
 use serde::{Deserialize, Serialize};
+use thruput_scp::{SCPConfig, SCPQuorumSet};
+use thruput_xdr::types::{Ed25519PublicKey, PublicKey};
 use xdr_common::VecM;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,8 +43,8 @@ impl SCPQuorumSetShim {
             validators: VecM::try_from(
                 self.validators
                     .into_iter()
-                    .map(|node_id| SCPPublicKey::Ed25519 {
-                        ed25519: SCPEd25519PublicKey::from(node_id),
+                    .map(|node_id| PublicKey::Ed25519 {
+                        ed25519: Ed25519PublicKey::from(node_id),
                     })
                     .collect::<Vec<_>>(),
             )

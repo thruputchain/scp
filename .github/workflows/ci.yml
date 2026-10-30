@@ -13,33 +13,21 @@ jobs:
   dependency-policy:
     permissions:
       contents: read
-    uses: thruputchain/actions/.github/workflows/rust-dependency-policy.yml@6693fac8133585728ad3a4ca14e3441073b6def8 # v1
-    with:
-      registry-name: groundhog
-    secrets:
-      registry-token: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
+    # (No registry credentials here: every dependency comes from crates.io.)
+    uses: thruputchain/actions/.github/workflows/rust-dependency-policy.yml@484be875e4e630d26594110bcc0ab6bf42eeaba7
 
   workflow-lint:
     permissions:
       contents: read
-    uses: thruputchain/actions/.github/workflows/workflow-lint.yml@f1b1a2cb8c69bab5f24f5f9976d50b6a9ab548fc
+    uses: thruputchain/actions/.github/workflows/workflow-lint.yml@484be875e4e630d26594110bcc0ab6bf42eeaba7
     with:
-      lint-app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
       shellcheck-scripts: true
-    secrets:
-      lint-app-private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
 
   build:
     needs: dependency-policy # inspect dependencies before anything builds them
     runs-on: self-hosted
     permissions:
       contents: read
-    env:
-      CARGO_REGISTRIES_GROUNDHOG_TOKEN: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
-      CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: cargo:token
-      # hog ci overwrites the .cargo directory
-      CARGO_REGISTRIES_GROUNDHOG_INDEX: sparse+https://crates.thruput.network/api/v1/crates/
-      CARGO_REGISTRIES_GROUNDHOG_SOURCE: sparse+https://crates.thruput.network/api/v1/crates/
     steps:
       - name: Clean up .gitconfig
         run: |
@@ -50,18 +38,13 @@ jobs:
         with:
           persist-credentials: false
 
-      # Loaded last: no earlier step needs the keys.
+      # Loaded last: no earlier step needs the key. hog_sched clones this
+      # repository with it; every dependency comes from crates.io.
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: |
             ${{ secrets.SCP_TO_SELF_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_KEY }}
-            ${{ secrets.SCP_TO_XDR_COMMON_KEY }}
-            ${{ secrets.SCP_TO_XDRS_KEY }}
-            ${{ secrets.SCP_TO_XDR_RPC_KEY }}
-            ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
 
       - name: Run hog schedule
         # Interpolations expand into the script *before* the shell sees it, so a
@@ -79,8 +62,4 @@ jobs:
             --key=github_repo --value="$REPOSITORY" \
             --key=git_commit --value="$SHA" \
             --key=git_branch --value="$BRANCH_NAME" \
-            --key=cargo_registry_global_credential_providers --value="$CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS" \
-            --key=cargo_registry_token --value="$CARGO_REGISTRIES_GROUNDHOG_TOKEN" \
-            --key=cargo_registry_index --value="$CARGO_REGISTRIES_GROUNDHOG_INDEX" \
-            --key=cargo_registry_source --value="$CARGO_REGISTRIES_GROUNDHOG_SOURCE" \
             ./scripts/schedules/ci.toml

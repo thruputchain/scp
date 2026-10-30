@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
 
 env:
-  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  CARGO_REGISTRIES_GROUNDHOG_TOKEN: ${{ secrets.GROUNDHOG_REGISTRY_TOKEN }}
-  CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: cargo:token
-  CARGO_REGISTRIES_GROUNDHOG_INDEX: sparse+https://crates.thruput.network/api/v1/crates/
-  CARGO_REGISTRIES_GROUNDHOG_SOURCE: sparse+https://crates.thruput.network/api/v1/crates/
+  # Dependency order: the action packages each listed crate into vendor/
+  # before the next one resolves against it. Keep in sync with publish.yml.
+  PUBLISH_PACKAGES: >-
+    thruput-scp-util
+    thruput-scp-kernel
+    thruput-scp-server
 
 permissions:
   contents: read
@@ -17,37 +18,43 @@ jobs:
   publish:
     permissions:
       contents: read
-    runs-on: hog1
+    runs-on: namespace-profile-hogd-linux-2604
 
     steps:
-      - name: Clean up .gitconfig
-        run: |
-            echo "Cleaning up .gitconfig"
-            rm -f /home/hogci/.gitconfig
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
 
-      # Loaded after checkout for the private source dependencies.
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
-        with:
-          ssh-private-key: |
-            ${{ secrets.SCP_TO_SELF_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_RS_KEY }}
-            ${{ secrets.SCP_TO_PROTOCOL_KEY }}
-            ${{ secrets.SCP_TO_XDR_COMMON_KEY }}
-            ${{ secrets.SCP_TO_XDRS_KEY }}
-            ${{ secrets.SCP_TO_XDR_RPC_KEY }}
-            ${{ secrets.SCP_TO_SERDE_ARRAYS_KEY }}
-
-      - name: Configure git to use SSH
+      - name: Install rustup if needed
         run: |
-          git config --global url."git@github.com:".insteadOf "https://github.com/"
+          if ! command -v rustup >/dev/null 2>&1; then
+            CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused \
+              --location --silent --show-error --fail https://sh.rustup.rs \
+              | sh -s -- --default-toolchain none --profile minimal -y
+            echo "CARGO_HOME=$CARGO_HOME" >> "$GITHUB_ENV"
+            echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+          fi
 
-      - name: publish dry run
-        uses: thruputchain/actions/cargo-publish-dry-run@6693fac8133585728ad3a4ca14e3441073b6def8
+      - name: Set up Rust 1.96
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --no-self-update
+          rustup default 1.96.0
+
+      - name: Install cargo-hack
+        env:
+          CARGO_HACK_VERSION: '0.6.45'
+        run: |
+          source "$HOME/.cargo/env"
+          if [ "$(cargo hack --version 2>/dev/null | awk '{print $2}')" != "$CARGO_HACK_VERSION" ]; then
+            cargo install cargo-hack --version "=$CARGO_HACK_VERSION" --locked
+          fi
+          cargo hack --version
+
+      - name: dry run
+        uses: thruputchain/actions/cargo-publish-dry-run@484be875e4e630d26594110bcc0ab6bf42eeaba7
         with:
-          skip-clippy: false
-          cargo-hack-feature-options: '--feature-powerset'
+          packages: ${{ env.PUBLISH_PACKAGES }}
+          cargo-hack-feature-options: --feature-powerset
+          registry-name: crates-io

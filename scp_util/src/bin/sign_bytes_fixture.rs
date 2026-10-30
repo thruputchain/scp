@@ -46,11 +46,11 @@ fn main() {
     let signature = sign_bytes(&secret_key, &message);
 
     let public_key_bytes = match &public_key {
-        scp_proto::SCPPublicKey::Ed25519 { ed25519 } => &ed25519[..],
+        thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => &ed25519[..],
         _ => panic!("unsupported key type"),
     };
     let signature_bytes = match &signature {
-        scp_proto::SCPSignature::Ed25519 { ed25519 } => &ed25519[..],
+        thruput_xdr::types::Signature::Ed25519 { ed25519 } => &ed25519[..],
         _ => panic!("unsupported signature type"),
     };
 

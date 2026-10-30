@@ -1,9 +1,8 @@
-use async_trait::async_trait;
-use rpc_driver::connect_client;
-use scp_proto::*;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+use thruput_rpc_driver::connect_client;
+use thruput_scp::*;
 use tokio;
 use tokio::sync::Mutex;
 use tracing_subscriber;
@@ -72,23 +71,27 @@ impl TestHandler {
     }
 }
 
-#[async_trait]
-impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
-    async fn scp_handle_null(&self) -> Result<(), ::rpc_driver::ProgramError> {
+// The handler trait returns `impl Future`; these async fns name their
+// concrete reply types.
+#[allow(refining_impl_trait)]
+impl thruput_scp::SCP_Handle_SCP_Handle1 for TestHandler {
+    async fn scp_handle_null(
+        &self,
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
     async fn scp_handle_get_quorum_set(
         &self,
         h: SCPHash,
-    ) -> Result<Option<SCPQuorumSet>, ::rpc_driver::ProgramError> {
+    ) -> Result<Option<SCPQuorumSet>, ::thruput_rpc_driver::ProgramError> {
         Ok(self.0.lock().await.quorum_sets.get(&h).cloned())
     }
 
     async fn scp_handle_emit_envelope(
         &self,
         env: SCPEnvelope,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         println!(
             "scp_handle_emit_envelope, slot {}",
             env.statement.slot_index,
@@ -104,7 +107,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
-    ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPValidationLevel, ::thruput_rpc_driver::ProgramError> {
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -112,7 +115,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
-    ) -> Result<SCPValidationLevel, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPValidationLevel, ::thruput_rpc_driver::ProgramError> {
         Ok(SCPValidationLevel::SCP_FULLY_VALID)
     }
 
@@ -120,7 +123,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         value: SCPValue,
-    ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptValue, ::thruput_rpc_driver::ProgramError> {
         Ok(Some(value))
     }
 
@@ -128,7 +131,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         mut values: SCPValues,
-    ) -> Result<SCPOptValue, ::rpc_driver::ProgramError> {
+    ) -> Result<SCPOptValue, ::thruput_rpc_driver::ProgramError> {
         if values.len() > 0 {
             values.0.sort();
             Ok(Some(values.0[0].clone()))
@@ -141,7 +144,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         slot_index: SCPSlotIndex,
         value: SCPValue,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         println!(
             "scp_handle_value_externalized, slot {}, value {}",
             slot_index, value
@@ -171,7 +174,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         slot_index: SCPSlotIndex,
         value: SCPValue,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         println!(
             "scp_handle_nominating_value, slot {}, value {}",
             slot_index, value
@@ -183,7 +186,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _value: SCPValue,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -191,7 +194,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -199,7 +202,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -207,7 +210,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -215,7 +218,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 
@@ -223,7 +226,7 @@ impl scp_proto::SCP_Handle_SCP_Handle1 for TestHandler {
         &self,
         _slot_index: SCPSlotIndex,
         _ballot: SCPBallot,
-    ) -> Result<(), ::rpc_driver::ProgramError> {
+    ) -> Result<(), ::thruput_rpc_driver::ProgramError> {
         Ok(())
     }
 }
@@ -262,7 +265,7 @@ async fn five() {
     // clients
 
     // let handler0_sockaddr: SocketAddr = "localhost:7770".parse().unwrap();
-    let client0 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client0 = thruput_scp::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler0_sockaddr)
             .await
             .unwrap()
@@ -270,7 +273,7 @@ async fn five() {
     );
 
     // let handler1_sockaddr: SocketAddr = "localhost:7771".parse().unwrap();
-    let client1 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client1 = thruput_scp::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler1_sockaddr)
             .await
             .unwrap()
@@ -278,7 +281,7 @@ async fn five() {
     );
 
     // let handler2_sockaddr: SocketAddr = "localhost:7772".parse().unwrap();
-    let client2 = scp_proto::SCP_Handle_SCP_Handle1_Client::new(
+    let client2 = thruput_scp::SCP_Handle_SCP_Handle1_Client::new(
         connect_client(&handler2_sockaddr)
             .await
             .unwrap()

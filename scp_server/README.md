@@ -37,8 +37,8 @@ Heap profiling is opt-in at build time and at run time:
 Restart scpd after changing these environment variables. Do not set
 `MALLOC_CONF=prof_active:true` when profiling should be off.
 
-Tests: `cargo test -p scp_server` covers the converter and HTTP routing on any
-platform. On Linux, `cargo test -p scp_server --features heap-profiling` also
+Tests: `cargo test -p thruput-scp-server` covers the converter and HTTP routing on any
+platform. On Linux, `cargo test -p thruput-scp-server --features heap-profiling` also
 takes a real jemalloc dump and checks that a retained allocation resolves by
 function name and that the test executable's mapping has a build ID.
 

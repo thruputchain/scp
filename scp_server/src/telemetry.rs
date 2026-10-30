@@ -804,7 +804,7 @@ mod tests {
     fn nomination_span_exports_integer_attributes() {
         use opentelemetry::trace::TracerProvider;
         use scp_kernel::{TestKernel, TestNode};
-        use scp_proto::{SCPQuorumSet, SCPValue};
+        use thruput_scp::{SCPQuorumSet, SCPValue};
         use tracing_subscriber::prelude::*;
         use xdr_common::VecM;
 

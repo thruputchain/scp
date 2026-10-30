@@ -3,10 +3,11 @@ mod stellar_tests {
     use crate::testkernel::*;
     use crate::testutil::*;
     use crate::*;
-    use scp_proto::*;
     use shfix::shfix;
     use std::collections::HashSet;
     use std::u32;
+    use thruput_scp::*;
+    use thruput_xdr::types::PublicKey;
     use xdr_common::VecM;
 
     #[test]
@@ -178,17 +179,17 @@ mod stellar_tests {
     }
 
     type GenEnvelope =
-        Box<dyn Fn(&scp_proto::SCPSecretKey) -> scp_proto::SCPEnvelope>;
+        Box<dyn Fn(&thruput_xdr::types::SecretKey) -> thruput_scp::SCPEnvelope>;
 
     fn make_prepare_gen(
-        qset_hash: scp_proto::SCPHash,
-        ballot: scp_proto::SCPBallot,
-        prepared: Option<scp_proto::SCPBallot>,
-        n_c: scp_proto::SCPCount,
-        n_h: scp_proto::SCPCount,
-        prepared_prime: Option<scp_proto::SCPBallot>,
+        qset_hash: thruput_scp::SCPHash,
+        ballot: thruput_scp::SCPBallot,
+        prepared: Option<thruput_scp::SCPBallot>,
+        n_c: thruput_scp::SCPCount,
+        n_h: thruput_scp::SCPCount,
+        prepared_prime: Option<thruput_scp::SCPBallot>,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
+        Box::new(move |secret_key: &thruput_xdr::types::SecretKey| {
             make_prepare(
                 secret_key,
                 qset_hash,
@@ -204,13 +205,13 @@ mod stellar_tests {
     }
 
     fn make_confirm_gen(
-        qset_hash: scp_proto::SCPHash,
-        prepare_counter: scp_proto::SCPCount,
-        ballot: scp_proto::SCPBallot,
-        n_c: scp_proto::SCPCount,
-        n_h: scp_proto::SCPCount,
+        qset_hash: thruput_scp::SCPHash,
+        prepare_counter: thruput_scp::SCPCount,
+        ballot: thruput_scp::SCPBallot,
+        n_c: thruput_scp::SCPCount,
+        n_h: thruput_scp::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
+        Box::new(move |secret_key: &thruput_xdr::types::SecretKey| {
             make_confirm(
                 secret_key,
                 qset_hash,
@@ -225,11 +226,11 @@ mod stellar_tests {
     }
 
     fn make_externalize_gen(
-        qset_hash: scp_proto::SCPHash,
-        commit_ballot: scp_proto::SCPBallot,
-        n_h: scp_proto::SCPCount,
+        qset_hash: thruput_scp::SCPHash,
+        commit_ballot: thruput_scp::SCPBallot,
+        n_h: thruput_scp::SCPCount,
     ) -> GenEnvelope {
-        Box::new(move |secret_key: &scp_proto::SCPSecretKey| {
+        Box::new(move |secret_key: &thruput_xdr::types::SecretKey| {
             make_externalize(
                 secret_key,
                 qset_hash,
@@ -4440,7 +4441,7 @@ mod stellar_tests {
                 nodes_all_pledge_to_commit(&mut tk);
                 assert_eq!(tk.driver().envelopes.len(), 3);
 
-                let b = scp_proto::SCPBallot {
+                let b = thruput_scp::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -4598,7 +4599,7 @@ mod stellar_tests {
                             by_value,
                             "bumpToBallot prevented once committed (by value)",
                             {
-                                let b2 = scp_proto::SCPBallot {
+                                let b2 = thruput_scp::SCPBallot {
                                     counter: 1,
                                     value: values.z_value.clone(),
                                 };
@@ -4660,7 +4661,7 @@ mod stellar_tests {
                             by_counter,
                             "bumpToBallot prevented once committed (by counter)",
                             {
-                                let b2 = scp_proto::SCPBallot {
+                                let b2 = thruput_scp::SCPBallot {
                                     counter: 2,
                                     value: values.x_value.clone(),
                                 };
@@ -4722,7 +4723,7 @@ mod stellar_tests {
                             by_value_and_counter,
                             "bumpToBallot prevented once committed (by value and counter)",
                             {
-                                let b2 = scp_proto::SCPBallot {
+                                let b2 = thruput_scp::SCPBallot {
                                     counter: 2,
                                     value: values.z_value.clone(),
                                 };
@@ -4787,7 +4788,7 @@ mod stellar_tests {
                 nodes_all_pledge_to_commit(&mut tk);
                 assert_eq!(tk.driver().envelopes.len(), 3);
 
-                let b = scp_proto::SCPBallot {
+                let b = thruput_scp::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -4865,7 +4866,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     4,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 4,
                         value: values.x_value.clone(),
                     },
@@ -4878,7 +4879,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     6,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 6,
                         value: values.x_value.clone(),
                     },
@@ -4892,7 +4893,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     5,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 5,
                         value: values.x_value.clone(),
                     },
@@ -4905,7 +4906,7 @@ mod stellar_tests {
                     qset_hash.into_inner(),
                     0,
                     6,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 6,
                         value: values.x_value.clone(),
                     },
@@ -4929,7 +4930,7 @@ mod stellar_tests {
                     qset_hash0,
                     0,
                     4,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 4,
                         value: values.x_value.clone(),
                     },
@@ -4954,7 +4955,7 @@ mod stellar_tests {
                     &v0_secret_key,
                     qset_hash0,
                     0,
-                    scp_proto::SCPBallot {
+                    thruput_scp::SCPBallot {
                         counter: 3,
                         value: values.x_value.clone(),
                     },
@@ -4966,7 +4967,7 @@ mod stellar_tests {
                 timeout_h_set,
                 "timeout when h is set -> stay locked on h",
                 {
-                    let bx = scp_proto::SCPBallot {
+                    let bx = thruput_scp::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -5002,7 +5003,7 @@ mod stellar_tests {
                     // now, see if we can timeout and move to a different value
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 4);
-                    let newbx = scp_proto::SCPBallot {
+                    let newbx = thruput_scp::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -5025,14 +5026,14 @@ mod stellar_tests {
                 "timeout when h exists but can't be set -> vote for h",
                 {
                     // start with (1,y)
-                    let by = scp_proto::SCPBallot {
+                    let by = thruput_scp::SCPBallot {
                         counter: 1,
                         value: values.y_value.clone(),
                     };
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 1);
 
-                    let bx = scp_proto::SCPBallot {
+                    let bx = thruput_scp::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -5079,7 +5080,7 @@ mod stellar_tests {
 
                     assert!(tk.bump_state(0, &values.y_value));
                     assert_eq!(tk.driver().envelopes.len(), 3);
-                    let newbx = scp_proto::SCPBallot {
+                    let newbx = thruput_scp::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -5103,7 +5104,7 @@ mod stellar_tests {
             section!(timeout_multiple_nodes, "timeout from multiple nodes", {
                 assert!(tk.bump_state(0, &values.x_value));
 
-                let x1 = scp_proto::SCPBallot {
+                let x1 = thruput_scp::SCPBallot {
                     counter: 1,
                     value: values.x_value.clone(),
                 };
@@ -5146,7 +5147,7 @@ mod stellar_tests {
                     None,
                 );
 
-                let x2 = scp_proto::SCPBallot {
+                let x2 = thruput_scp::SCPBallot {
                     counter: 2,
                     value: values.x_value.clone(),
                 };
@@ -5262,7 +5263,7 @@ mod stellar_tests {
                 {
                     assert!(tk.bump_state(0, &values.x_value));
 
-                    let x1 = scp_proto::SCPBallot {
+                    let x1 = thruput_scp::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -5334,7 +5335,7 @@ mod stellar_tests {
                         None,
                     );
 
-                    let x2 = scp_proto::SCPBallot {
+                    let x2 = thruput_scp::SCPBallot {
                         counter: 2,
                         value: values.x_value.clone(),
                     };
@@ -5354,7 +5355,7 @@ mod stellar_tests {
                         None,
                     );
 
-                    let x3 = scp_proto::SCPBallot {
+                    let x3 = thruput_scp::SCPBallot {
                         counter: 3,
                         value: values.x_value.clone(),
                     };
@@ -5459,7 +5460,7 @@ mod stellar_tests {
                     let qset_hash_nv =
                         tk_nv.proto().local_proto().get_qset_hash().clone();
 
-                    let b = scp_proto::SCPBallot {
+                    let b = thruput_scp::SCPBallot {
                         counter: 1,
                         value: values.x_value.clone(),
                     };
@@ -5527,7 +5528,7 @@ mod stellar_tests {
                         qset_hash_nv,
                         0,
                         u32::MAX,
-                        scp_proto::SCPBallot {
+                        thruput_scp::SCPBallot {
                             counter: u32::MAX,
                             value: values.x_value.clone(),
                         },
@@ -5556,7 +5557,7 @@ mod stellar_tests {
             );
 
             section!(restore_ballot_protocol, "restore ballot protocol", {
-                let b = scp_proto::SCPBallot {
+                let b = thruput_scp::SCPBallot {
                     counter: 2,
                     value: values.x_value.clone(),
                 };
@@ -5720,11 +5721,11 @@ mod stellar_tests {
             let a_value = &values.z_value;
             let b_value = &values.x_value;
 
-            let a1 = scp_proto::SCPBallot {
+            let a1 = thruput_scp::SCPBallot {
                 counter: 1,
                 value: a_value.clone(),
             };
-            let b1 = scp_proto::SCPBallot {
+            let b1 = thruput_scp::SCPBallot {
                 counter: 1,
                 value: b_value.clone(),
             };
@@ -5742,12 +5743,12 @@ mod stellar_tests {
             a5.counter += 1;
 
             #[allow(unused_variables)]
-            let a_inf = scp_proto::SCPBallot {
+            let a_inf = thruput_scp::SCPBallot {
                 counter: u32::MAX,
                 value: a_value.clone(),
             };
             #[allow(unused_variables)]
-            let b_inf = scp_proto::SCPBallot {
+            let b_inf = thruput_scp::SCPBallot {
                 counter: u32::MAX,
                 value: b_value.clone(),
             };
@@ -6089,7 +6090,7 @@ mod stellar_tests {
             #[allow(unused_variables)]
             let check_leaders =
                 |tk: &mut TestKernel,
-                 expected_leaders: &[scp_proto::SCPNodeID]| {
+                 expected_leaders: &[thruput_scp::SCPNodeID]| {
                     let leaders = tk.get_nomination_leaders(0);
                     let expected_set: HashSet<_> =
                         expected_leaders.iter().cloned().collect();
@@ -6232,7 +6233,7 @@ mod stellar_tests {
                                     &v0_secret_key,
                                     qset_hash0,
                                     0,
-                                    scp_proto::SCPBallot {
+                                    thruput_scp::SCPBallot {
                                         counter: 1,
                                         value: values.x_value.clone(),
                                     },
@@ -6457,7 +6458,7 @@ mod stellar_tests {
                                                     &v0_secret_key,
                                                     qset_hash0,
                                                     0,
-                                                    scp_proto::SCPBallot {
+                                                    thruput_scp::SCPBallot {
                                                         counter: 1,
                                                         value: values
                                                             .x_value
@@ -6479,7 +6480,7 @@ mod stellar_tests {
                                                     &v0_secret_key,
                                                     qset_hash0,
                                                     0,
-                                                    scp_proto::SCPBallot {
+                                                    thruput_scp::SCPBallot {
                                                         counter: 1,
                                                         value: values
                                                             .k_value
@@ -6541,7 +6542,7 @@ mod stellar_tests {
                                 // switch leader to v1
                                 let v1_node_id = nodes[1].node_id().clone();
                                 tk.driver().priority_lookup =
-                                    Box::new(move |n: &SCPPublicKey| {
+                                    Box::new(move |n: &PublicKey| {
                                         if n == &v1_node_id { 1000 } else { 1 }
                                     });
 
@@ -6576,7 +6577,7 @@ mod stellar_tests {
                                 // Update round leader to v1
                                 let v1_node_id = nodes[1].node_id().clone();
                                 tk.driver().priority_lookup =
-                                    Box::new(move |n: &SCPPublicKey| {
+                                    Box::new(move |n: &PublicKey| {
                                         if n == &v1_node_id { 1000 } else { 1 }
                                     });
 
@@ -6832,7 +6833,7 @@ mod stellar_tests {
                                 &v0_secret_key,
                                 qset_hash0,
                                 0,
-                                scp_proto::SCPBallot {
+                                thruput_scp::SCPBallot {
                                     counter: 1,
                                     value: values.y_value.clone(),
                                 },
@@ -6851,11 +6852,12 @@ mod stellar_tests {
 
             section!(v1_top_node, "v1 is top node", {
                 let v1_node_id = nodes[1].node_id().clone();
-                tk.driver().priority_lookup = Box::new(
-                    move |n: &SCPPublicKey| {
-                        if n == &v1_node_id { 1000 } else { 1 }
-                    },
-                );
+                tk.driver().priority_lookup =
+                    Box::new(
+                        move |n: &PublicKey| {
+                            if n == &v1_node_id { 1000 } else { 1 }
+                        },
+                    );
 
                 // Prepare vote vectors for different combinations
                 #[allow(unused_variables)]
@@ -6864,7 +6866,7 @@ mod stellar_tests {
                 let votes_y = vec![values.y_value.clone()];
                 #[allow(unused_variables)]
                 let votes_k = vec![values.k_value.clone()];
-                let empty_v: Vec<scp_proto::SCPValue> = vec![];
+                let empty_v: Vec<thruput_scp::SCPValue> = vec![];
 
                 let votes_xy =
                     vec![values.x_value.clone(), values.y_value.clone()];
@@ -6885,7 +6887,7 @@ mod stellar_tests {
                 values_hash.sort();
 
                 tk.driver().hash_value_calculator =
-                    Box::new(move |v: &scp_proto::SCPValue| -> u64 {
+                    Box::new(move |v: &thruput_scp::SCPValue| -> u64 {
                         if let Some(pos) =
                             values_hash.iter().position(|val| val == v)
                         {
@@ -7019,7 +7021,7 @@ mod stellar_tests {
                         // v0 is the new leader, but we already have a candidate
                         let v0_node_id = nodes[0].node_id().clone();
                         tk.driver().priority_lookup = Box::new(
-                            move |n: &SCPPublicKey| {
+                            move |n: &PublicKey| {
                                 if n == &v0_node_id { 1000 } else { 1 }
                             },
                         );
@@ -7076,7 +7078,7 @@ mod stellar_tests {
                     // a new value from v1
                     let v3_node_id = nodes[3].node_id().clone();
                     tk.driver().priority_lookup = Box::new(
-                        move |n: &SCPPublicKey| {
+                        move |n: &PublicKey| {
                             if n == &v3_node_id { 1000 } else { 1 }
                         },
                     );
@@ -7109,7 +7111,7 @@ mod stellar_tests {
                     section!(v0_new_top_node, "v0 is new top node", {
                         let v0_node_id = nodes[0].node_id().clone();
                         tk.driver().priority_lookup = Box::new(
-                            move |n: &SCPPublicKey| {
+                            move |n: &PublicKey| {
                                 if n == &v0_node_id { 1000 } else { 1 }
                             },
                         );
@@ -7137,7 +7139,7 @@ mod stellar_tests {
                     section!(v2_new_top_node, "v2 is new top node", {
                         let v2_node_id = nodes[2].node_id().clone();
                         tk.driver().priority_lookup = Box::new(
-                            move |n: &SCPPublicKey| {
+                            move |n: &PublicKey| {
                                 if n == &v2_node_id { 1000 } else { 1 }
                             },
                         );
@@ -7170,7 +7172,7 @@ mod stellar_tests {
                     section!(v3_new_top_node, "v3 is new top node", {
                         let v3_node_id = nodes[3].node_id().clone();
                         tk.driver().priority_lookup = Box::new(
-                            move |n: &SCPPublicKey| {
+                            move |n: &PublicKey| {
                                 if n == &v3_node_id { 1000 } else { 1 }
                             },
                         );

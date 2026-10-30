@@ -1,7 +1,7 @@
 use ed25519_dalek::SigningKey;
 use sha2::{Digest, Sha256};
 
-pub fn generate_secret_key(seed: &[u8]) -> scp_proto::SCPSecretKey {
+pub fn generate_secret_key(seed: &[u8]) -> thruput_xdr::types::SecretKey {
     let mut hasher = Sha256::new();
     hasher.update(seed);
     let hash = hasher.finalize();
@@ -14,36 +14,49 @@ pub fn generate_secret_key(seed: &[u8]) -> scp_proto::SCPSecretKey {
     secret_key_bytes[32..]
         .copy_from_slice(&signing_key.verifying_key().to_bytes());
 
-    scp_proto::SCPSecretKey::Ed25519 {
-        ed25519: scp_proto::SCPEd25519SecretKey::from(secret_key_bytes),
+    thruput_xdr::types::SecretKey::Ed25519 {
+        ed25519: thruput_xdr::types::Ed25519SecretKey::from(secret_key_bytes),
     }
 }
 
 pub fn derive_public_key(
-    secret_key: &scp_proto::SCPSecretKey,
-) -> scp_proto::SCPPublicKey {
+    secret_key: &thruput_xdr::types::SecretKey,
+) -> thruput_xdr::types::PublicKey {
     match secret_key {
-        scp_proto::SCPSecretKey::Ed25519 { ed25519 } => {
+        thruput_xdr::types::SecretKey::Ed25519 { ed25519 } => {
             let secret_bytes: &[u8; 32] = &ed25519[..32].try_into().unwrap();
             let signing_key = SigningKey::from_bytes(secret_bytes);
             let public_bytes = signing_key.verifying_key().to_bytes();
 
-            scp_proto::SCPPublicKey::Ed25519 {
-                ed25519: scp_proto::SCPEd25519PublicKey::from(public_bytes),
+            thruput_xdr::types::PublicKey::Ed25519 {
+                ed25519: thruput_xdr::types::Ed25519PublicKey::from(
+                    public_bytes,
+                ),
             }
         }
         _ => panic!("Unsupported secret key type"),
     }
 }
 
-pub fn derive_node_id(sk: &scp_proto::SCPSecretKey) -> scp_proto::SCPNodeID {
+/// The raw bytes of a public key, whatever its scheme.
+pub fn public_key_bytes(public_key: &thruput_xdr::types::PublicKey) -> &[u8] {
+    match public_key {
+        thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => &ed25519[..],
+        thruput_xdr::types::PublicKey::MlDsa65 { mldsa65 } => &mldsa65[..],
+        _ => &[],
+    }
+}
+
+pub fn derive_node_id(
+    sk: &thruput_xdr::types::SecretKey,
+) -> thruput_scp::SCPNodeID {
     derive_public_key(sk)
 }
 
 /// Parse a SecretKey from a Base64 standard encoded string of the 64-byte secret key
 pub fn parse_secret_key_from_base64(
     base64_str: &str,
-) -> Result<scp_proto::SCPSecretKey, String> {
+) -> Result<thruput_xdr::types::SecretKey, String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     if base64_str.is_empty() {
@@ -62,8 +75,8 @@ pub fn parse_secret_key_from_base64(
         .try_into()
         .map_err(|_| "failed to convert to 64-byte array".to_string())?;
 
-    Ok(scp_proto::SCPSecretKey::Ed25519 {
-        ed25519: scp_proto::SCPEd25519SecretKey::from(secret_key_bytes),
+    Ok(thruput_xdr::types::SecretKey::Ed25519 {
+        ed25519: thruput_xdr::types::Ed25519SecretKey::from(secret_key_bytes),
     })
 }
 
@@ -71,18 +84,28 @@ pub fn parse_secret_key_from_base64(
 mod tests {
     use super::*;
 
-    fn secret_bytes(sk: &scp_proto::SCPSecretKey) -> &[u8; 64] {
+    fn secret_bytes(sk: &thruput_xdr::types::SecretKey) -> &[u8; 64] {
         match sk {
-            scp_proto::SCPSecretKey::Ed25519 { ed25519 } => ed25519,
+            thruput_xdr::types::SecretKey::Ed25519 { ed25519 } => ed25519,
             _ => panic!("unexpected secret key variant"),
         }
     }
 
-    fn public_bytes(pk: &scp_proto::SCPPublicKey) -> &[u8; 32] {
+    fn public_bytes(pk: &thruput_xdr::types::PublicKey) -> &[u8; 32] {
         match pk {
-            scp_proto::SCPPublicKey::Ed25519 { ed25519 } => ed25519,
+            thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => ed25519,
             _ => panic!("unexpected public key variant"),
         }
+    }
+
+    #[test]
+    fn public_key_bytes_covers_every_scheme() {
+        let pk = derive_public_key(&generate_secret_key(b"seed-bytes"));
+        assert_eq!(public_key_bytes(&pk), &public_bytes(&pk)[..]);
+        let mldsa65 = thruput_xdr::types::PublicKey::MlDsa65 {
+            mldsa65: Box::new([7u8; 1952].into()),
+        };
+        assert_eq!(public_key_bytes(&mldsa65), &[7u8; 1952][..]);
     }
 
     #[test]

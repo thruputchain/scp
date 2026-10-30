@@ -1,7 +1,8 @@
 #[cfg(test)]
 use crate::qset::*;
-use scp_proto::*;
 use sha2::{Digest, Sha256};
+use thruput_scp::*;
+use thruput_xdr::types::{Ed25519PublicKey, PublicKey};
 use xdr_common::VecM;
 
 // Helper to create VecM from Vec easily
@@ -10,18 +11,18 @@ fn vecm<T>(vec: Vec<T>) -> VecM<T> {
 }
 
 // Helper function to create public keys like the C++ version
-fn make_public_key(i: i32) -> SCPPublicKey {
+fn make_public_key(i: i32) -> PublicKey {
     let seed_string = format!("NODE_SEED_{}", i);
     let hash = Sha256::digest(seed_string.as_bytes());
     let hash_bytes: [u8; 32] = hash.into();
-    let ed25519_key = SCPEd25519PublicKey::from(hash_bytes);
-    SCPPublicKey::Ed25519 {
+    let ed25519_key = Ed25519PublicKey::from(hash_bytes);
+    PublicKey::Ed25519 {
         ed25519: ed25519_key,
     }
 }
 
 // Helper function to create a singleton quorum set
-fn make_singleton(key: SCPPublicKey) -> SCPQuorumSet {
+fn make_singleton(key: PublicKey) -> SCPQuorumSet {
     SCPQuorumSet {
         threshold: 1,
         validators: vecm(vec![key]),
@@ -30,7 +31,7 @@ fn make_singleton(key: SCPPublicKey) -> SCPQuorumSet {
 }
 
 // Helper function to create keys and sort them like the C++ version
-fn create_sorted_keys(count: usize) -> Vec<SCPPublicKey> {
+fn create_sorted_keys(count: usize) -> Vec<PublicKey> {
     let mut keys = Vec::new();
     for i in 0..count {
         keys.push(make_public_key(i as i32));
@@ -193,7 +194,7 @@ fn test_nested_quorum_sets() {
 
     // Test deep nesting
     let test_nesting_level =
-        |keys: &[SCPPublicKey],
+        |keys: &[PublicKey],
          nesting_level: usize,
          expected_sanity: bool,
          expected_normalized_sanity: bool| {
@@ -207,7 +208,7 @@ fn test_nested_quorum_sets() {
             }
 
             // Create expected normalized version
-            let mut expected_normalized = scp_proto::SCPQuorumSet {
+            let mut expected_normalized = thruput_scp::SCPQuorumSet {
                 threshold: 1,
                 validators: VecM(vec![]),
                 inner_sets: VecM(vec![]),
@@ -316,4 +317,39 @@ fn test_complex_nested_normalization() {
     };
 
     check_qset(&qset, true, &expected_normalized, true);
+}
+
+#[test]
+fn compare_public_key_orders_ed25519_keys_by_bytes() {
+    let key = |bytes: [u8; 32]| PublicKey::Ed25519 {
+        ed25519: Ed25519PublicKey::from(bytes),
+    };
+    let mut low = [0xffu8; 32];
+    low[0] = 0x00;
+    let mut high = [0x00u8; 32];
+    high[0] = 0x01;
+    assert_eq!(
+        compare_public_key(&key(low), &key(high)),
+        std::cmp::Ordering::Less
+    );
+    assert_eq!(
+        compare_public_key(&key(high), &key(high)),
+        std::cmp::Ordering::Equal
+    );
+}
+
+#[test]
+fn compare_public_key_orders_other_schemes() {
+    let ed25519 = make_public_key(0);
+    let mldsa65 = PublicKey::MlDsa65 {
+        mldsa65: Box::new([0u8; 1952].into()),
+    };
+    assert_eq!(
+        compare_public_key(&ed25519, &mldsa65),
+        std::cmp::Ordering::Less
+    );
+    assert_eq!(
+        compare_public_key(&mldsa65, &ed25519),
+        std::cmp::Ordering::Greater
+    );
 }

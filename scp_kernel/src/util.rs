@@ -1,4 +1,5 @@
-use scp_proto::*;
+use thruput_scp::*;
+use thruput_xdr::types::{Ed25519PublicKey, PublicKey};
 use xdr_common::BytesM;
 
 /// Compute the sha256 hash of the given bytes and return the abbreviated hash as a hexadecimal string.
@@ -24,7 +25,7 @@ pub fn hex_full(bytes: &[u8]) -> String {
 
 pub fn parse_node_id_from_hex(
     hex_str: &str,
-) -> Result<scp_proto::SCPNodeID, String> {
+) -> Result<thruput_scp::SCPNodeID, String> {
     if hex_str.len() != 64 {
         return Err(format!(
             "Expected 64 hex characters for Ed25519 public key, got {}",
@@ -40,15 +41,15 @@ pub fn parse_node_id_from_hex(
         })?;
     }
 
-    let ed25519_key = SCPEd25519PublicKey::from(bytes);
-    Ok(SCPPublicKey::Ed25519 {
+    let ed25519_key = Ed25519PublicKey::from(bytes);
+    Ok(PublicKey::Ed25519 {
         ed25519: ed25519_key,
     })
 }
 
-pub fn get_hash_of_vec<F>(get_hash_of: F, v: &[BytesM]) -> scp_proto::SCPHash
+pub fn get_hash_of_vec<F>(get_hash_of: F, v: &[BytesM]) -> thruput_scp::SCPHash
 where
-    F: Fn(&[u8]) -> scp_proto::SCPHash,
+    F: Fn(&[u8]) -> thruput_scp::SCPHash,
 {
     let mut concatenated = Vec::new();
     for bytes_m in v {
@@ -83,7 +84,7 @@ where
     res
 }
 
-pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
+pub fn dbg_node_ids_to_str(ns: &[thruput_scp::SCPNodeID]) -> String {
     let mut s = "[".to_string();
     for (i, n) in ns.iter().enumerate() {
         s.push_str(&to_str_key(n, false));
@@ -95,11 +96,6 @@ pub fn dbg_node_ids_to_str(ns: &[scp_proto::SCPNodeID]) -> String {
     s
 }
 
-pub fn to_str_key(pk: &scp_proto::SCPNodeID, _full_key: bool) -> String {
-    match pk {
-        SCPPublicKey::Ed25519 { ed25519 } => {
-            hex_abbrev(&ed25519.into_inner()[..])
-        }
-        _ => panic!("unreachable"),
-    }
+pub fn to_str_key(pk: &thruput_scp::SCPNodeID, _full_key: bool) -> String {
+    hex_abbrev(scp_util::public_key_bytes(pk))
 }

@@ -1,39 +1,42 @@
 [workspace]
 resolver = "3"
-members = ["shfix", "scp_proto", "scp_util", "scp_kernel", "scp_server"]
+members = ["shfix", "scp_util", "scp_kernel", "scp_server"]
 
 # scpd previously shipped from the dev profile; keep overflow checks on for
-# every crate, dependencies included (as groundhog-rpc does), so moving to
-# release does not silently turn overflow panics into wrapping arithmetic.
+# every crate, dependencies included, so moving to release does not silently
+# turn overflow panics into wrapping arithmetic.
 [profile.release]
 debug = "line-tables-only"
 overflow-checks = true
 
 [workspace.package]
-version = "1.2.2"
+version = "2.0.0"
 edition = "2024"
-authors = ["Groundhog Team"]
+rust-version = "1.96"
+authors = ["Thruput Team"]
 license = "Apache-2.0"
-publish = ["groundhog"]
-description = "Groundhog SCP"
-repository = "https://github.com/groundhogchain/scp.git"
-homepage = "https://github.com/groundhogchain/scp.git"
-keywords = ["groundhog"]
-categories = ["blockchain"]
+publish = ["crates-io"]
+description = "Stellar Consensus Protocol (SCP) kernel and daemon"
+repository = "https://github.com/thruputchain/scp"
+homepage = "https://github.com/thruputchain/scp"
+readme = "README.md"
+keywords = ["scp", "consensus", "stellar", "byzantine"]
+categories = ["cryptography::cryptocurrencies"]
 
-# These version numbers need to be kept in sync with the workspace package version number
+# Cargo requires explicit versions for dependencies when publishing, as path
+# specifications are stripped out. Keep these in sync with the workspace
+# package version.
 [workspace.dependencies]
-shfix = { path = "shfix", version = "=1.2.2", registry = "groundhog" }
-scp_proto = { path = "scp_proto", version = "=1.2.2", registry = "groundhog" }
-scp_util = { path = "scp_util", version = "=1.2.2", registry = "groundhog" }
-scp_kernel = { path = "scp_kernel", version = "=1.2.2", registry = "groundhog" }
-scp_server = { path = "scp_server", version = "=1.2.2", registry = "groundhog" }
+shfix = { path = "shfix" }
+scp_util = { package = "thruput-scp-util", path = "scp_util", version = "=2.0.0" }
+scp_kernel = { package = "thruput-scp-kernel", path = "scp_kernel", version = "=2.0.0" }
 
-xdrs = { registry = "groundhog", version = "0.5.0", features = [
-    "int128",
-    "derive",
-    "ns",
-    "alloc",
-] }
-xdr-common = { version = "0.5.0", registry = "groundhog", features = ["alloc"] }
-rpc_driver = { version = "0.8.0", registry = "groundhog" }
+# The SCP protocol bindings and the key types they use, generated in
+# thruputchain/thruput-protocol-rs.
+thruput-scp = { version = "0.63.0", features = ["serde"] }
+thruput-xdr = { version = "0.63.0", features = ["std", "xdrs", "serde"] }
+# The xdrs dependency keys keep the library names; the RPC crates' library
+# names are their package names.
+xdrs = { package = "thruput-xdrs", version = "0.17.1", features = ["alloc"] }
+xdr-common = { package = "thruput-xdr-common", version = "0.17.1", features = ["alloc"] }
+thruput-rpc-driver = { version = "0.17.1" }

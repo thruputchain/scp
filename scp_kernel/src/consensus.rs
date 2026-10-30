@@ -12,68 +12,68 @@ pub enum ValidationLevel {
 pub trait Consensus: ConsensusNotify + Clone + Debug {
     fn validate_ballot_value(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        value: &scp_proto::SCPValue,
+        slot_index: thruput_scp::SCPSlotIndex,
+        value: &thruput_scp::SCPValue,
     ) -> ValidationLevel;
 
     fn validate_nomination_value(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        value: &scp_proto::SCPValue,
+        slot_index: thruput_scp::SCPSlotIndex,
+        value: &thruput_scp::SCPValue,
     ) -> ValidationLevel;
 
     fn extract_valid_value(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        value: &scp_proto::SCPValue,
-    ) -> Option<scp_proto::SCPValue>;
+        slot_index: thruput_scp::SCPSlotIndex,
+        value: &thruput_scp::SCPValue,
+    ) -> Option<thruput_scp::SCPValue>;
 
     fn combine_candidates(
         &self,
-        slot_index: scp_proto::SCPSlotIndex,
-        candidates: &HashSet<scp_proto::SCPValue>,
-    ) -> Option<scp_proto::SCPValue>;
+        slot_index: thruput_scp::SCPSlotIndex,
+        candidates: &HashSet<thruput_scp::SCPValue>,
+    ) -> Option<thruput_scp::SCPValue>;
 }
 
 pub trait ConsensusNotify {
     fn value_externalized(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     );
     fn started_ballot_proto(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     );
     fn accepted_ballot_prepared(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     );
     fn confirmed_ballot_prepared(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     );
     fn accepted_commit(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     );
     fn ballot_did_hear_from_quorum(
         &self,
         slot_index: SlotIndex,
-        ballot: &scp_proto::SCPBallot,
+        ballot: &thruput_scp::SCPBallot,
     );
     fn nominating_value(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     );
     fn updated_candidate_value(
         &self,
         slot_index: SlotIndex,
-        value: &scp_proto::SCPValue,
+        value: &thruput_scp::SCPValue,
     );
 }

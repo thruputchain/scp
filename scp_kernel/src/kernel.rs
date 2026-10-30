@@ -8,9 +8,9 @@ pub struct StellarKernel<C: Consensus, D: Driver> {
 
 impl<C: Consensus, D: Driver> StellarKernel<C, D> {
     pub fn new(
-        node_id: scp_proto::SCPNodeID,
+        node_id: thruput_scp::SCPNodeID,
         is_validator: bool,
-        qset: scp_proto::SCPQuorumSet,
+        qset: thruput_scp::SCPQuorumSet,
         consensus: C,
         driver: D,
     ) -> StellarKernel<C, D> {

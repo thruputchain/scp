@@ -81,9 +81,30 @@ struct Args {
     #[arg(
         long,
         default_value = "",
-        help = "Base64-std encoded secret key for this SCP node"
+        help = "Base64-std encoded secret key for this SCP node. Prefer --secret-key-file: command-line arguments are readable by every process on the host"
     )]
     secret_key: String,
+
+    #[arg(
+        long,
+        conflicts_with = "secret_key",
+        help = "Path to a file holding the base64-std encoded secret key for this SCP node, surrounding whitespace ignored"
+    )]
+    secret_key_file: Option<String>,
+}
+
+/// The secret key as base64 text, from --secret-key-file when given, else
+/// from --secret-key (which may be empty).
+fn secret_key_text(args: &Args) -> String {
+    match &args.secret_key_file {
+        Some(path) => std::fs::read_to_string(path)
+            .unwrap_or_else(|e| {
+                panic!("failed to read secret key file {path}: {e}")
+            })
+            .trim()
+            .to_string(),
+        None => args.secret_key.clone(),
+    }
 }
 
 #[tokio::main]
@@ -92,7 +113,8 @@ async fn main() {
     use tracing_subscriber::prelude::*;
 
     let args = Args::parse();
-    let instance_id = scp_util::parse_secret_key_from_base64(&args.secret_key)
+    let secret_key_text = secret_key_text(&args);
+    let instance_id = scp_util::parse_secret_key_from_base64(&secret_key_text)
         .ok()
         .and_then(|key| match scp_util::derive_node_id(&key) {
             thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => Some(
@@ -191,8 +213,9 @@ async fn run(args: Args) {
 
     // create server
 
-    assert!(!args.secret_key.is_empty(), "no secret key provided");
-    let secret_key = scp_util::parse_secret_key_from_base64(&args.secret_key)
+    let secret_key_text = secret_key_text(&args);
+    assert!(!secret_key_text.is_empty(), "no secret key provided");
+    let secret_key = scp_util::parse_secret_key_from_base64(&secret_key_text)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
     let service = start_service(

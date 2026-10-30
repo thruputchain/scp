@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   `Signature`, which also carry an ML-DSA-65 arm.
 - `shfix` is no longer published; it is a test-only dependency.
 
+### scp_server
+
+#### Added
+- `scpd --secret-key-file PATH` reads the base64 secret key from a file, so
+  it need not appear in the command line, which every process on the host
+  can read. `--secret-key` still works; the two are mutually exclusive.
+
 ### scp_util
 
 #### Changed

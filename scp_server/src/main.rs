@@ -80,10 +80,26 @@ struct Args {
 
     #[arg(
         long,
-        default_value = "",
-        help = "Base64-std encoded secret key for this SCP node"
+        help = "Inherited file descriptor to read the base64-std encoded secret key from, up to EOF; surrounding whitespace is ignored. A launcher passes a pipe that nothing else can read; from a shell, `scpd --secret-key-fd 3 3<key` reads a file. The key is never taken on the command line, which every process on the host can read"
     )]
-    secret_key: String,
+    secret_key_fd: i32,
+}
+
+/// The secret key as base64 text, read from --secret-key-fd. Read once: a
+/// descriptor can only be consumed once, and its number is reused afterwards.
+fn secret_key_text(args: &Args) -> String {
+    use std::io::Read;
+    let fd = args.secret_key_fd;
+    assert!(fd >= 0, "invalid secret key file descriptor {fd}");
+    // SAFETY: the launcher handed us this descriptor to read; taking
+    // ownership here closes it once the key is read.
+    let mut file =
+        unsafe { <std::fs::File as std::os::fd::FromRawFd>::from_raw_fd(fd) };
+    let mut text = String::new();
+    file.read_to_string(&mut text).unwrap_or_else(|e| {
+        panic!("failed to read secret key from fd {fd}: {e}")
+    });
+    text.trim().to_string()
 }
 
 #[tokio::main]
@@ -92,7 +108,8 @@ async fn main() {
     use tracing_subscriber::prelude::*;
 
     let args = Args::parse();
-    let instance_id = scp_util::parse_secret_key_from_base64(&args.secret_key)
+    let secret_key_text = secret_key_text(&args);
+    let instance_id = scp_util::parse_secret_key_from_base64(&secret_key_text)
         .ok()
         .and_then(|key| match scp_util::derive_node_id(&key) {
             thruput_xdr::types::PublicKey::Ed25519 { ed25519 } => Some(
@@ -142,7 +159,8 @@ async fn main() {
     }
 
     let termination = telemetry::termination_signal();
-    telemetry::run_until_termination(run(args), termination).await;
+    telemetry::run_until_termination(run(args, secret_key_text), termination)
+        .await;
     if let Some(provider) = provider {
         let termination = telemetry::termination_signal();
         // Shutdown drains the batch processor; keep its blocking wait off Tokio.
@@ -159,7 +177,7 @@ async fn main() {
     }
 }
 
-async fn run(args: Args) {
+async fn run(args: Args, secret_key_text: String) {
     info!(
         "control_addr={} handle_addr={} reuse={}",
         args.control_addr, args.handle_addr, args.reuse
@@ -191,8 +209,8 @@ async fn run(args: Args) {
 
     // create server
 
-    assert!(!args.secret_key.is_empty(), "no secret key provided");
-    let secret_key = scp_util::parse_secret_key_from_base64(&args.secret_key)
+    assert!(!secret_key_text.is_empty(), "no secret key provided");
+    let secret_key = scp_util::parse_secret_key_from_base64(&secret_key_text)
         .unwrap_or_else(|e| panic!("failed to parse secret key: {}", e));
 
     let service = start_service(
@@ -251,3 +269,44 @@ async fn bind_control_listener(
 
 #[cfg(test)]
 mod system_test;
+
+#[cfg(test)]
+mod secret_key_tests {
+    use super::*;
+    use std::io::Write;
+    use std::os::fd::IntoRawFd;
+
+    const KEY: &str = "bm9ib2R5";
+
+    fn parse(args: &[&str]) -> Result<Args, clap::Error> {
+        Args::try_parse_from(
+            std::iter::once("scpd").chain(args.iter().copied()),
+        )
+    }
+
+    #[test]
+    fn from_descriptor_trimmed() {
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        writeln!(writer, "  {KEY}").unwrap();
+        drop(writer);
+        // secret_key_text takes ownership of the descriptor and closes it.
+        let fd = reader.into_raw_fd();
+        let args = parse(&["--secret-key-fd", &fd.to_string()]).unwrap();
+        assert_eq!(secret_key_text(&args), KEY);
+    }
+
+    #[test]
+    fn descriptor_without_writer_is_empty() {
+        let (reader, writer) = std::io::pipe().unwrap();
+        drop(writer);
+        let fd = reader.into_raw_fd();
+        let args = parse(&["--secret-key-fd", &fd.to_string()]).unwrap();
+        assert_eq!(secret_key_text(&args), "");
+    }
+
+    #[test]
+    fn descriptor_is_required() {
+        let err = parse(&[]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+    }
+}

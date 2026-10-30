@@ -672,7 +672,7 @@ impl Consensus for HandleKernel {
         value: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         debug!(
-            "validate_ballot_value XXX: slot_index = {}, value = {}",
+            "validate_ballot_value: slot_index = {}, value = {}",
             slot_index,
             scp_kernel::hah(value)
         );
@@ -689,7 +689,7 @@ impl Consensus for HandleKernel {
         value: &thruput_scp::SCPValue,
     ) -> ValidationLevel {
         debug!(
-            "validate_nomination_value XXX: slot_index = {}, value = {}",
+            "validate_nomination_value: slot_index = {}, value = {}",
             slot_index,
             scp_kernel::hah(value)
         );

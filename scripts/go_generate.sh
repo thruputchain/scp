@@ -6,10 +6,12 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # generate pkg.go
 
-X_FILES=$(ls -1 $SCRIPT_DIR/../protocol/*.x | tr '\n' ' ')
+# Paths relative to go_scp/, so the generated header does not embed the
+# absolute path of whoever ran this script.
+X_FILES=$(cd "$SCRIPT_DIR/../go_scp" && ls -1 ../protocol/*.x | tr '\n' ' ')
 PKG_NAME="go_scp"
 
-cat <<EOF > $SCRIPT_DIR/../go_scp/pkg.go
+cat <<EOF > "$SCRIPT_DIR/../go_scp/pkg.go"
 package $PKG_NAME
 
 // XDR man page: https://xdrpp.github.io/goxdr/pkg/github.com/xdrpp/goxdr/cmd/goxdr/goxdr.1.html
@@ -19,7 +21,7 @@ EOF
 
 # build go
 
-cd $SCRIPT_DIR/../go_scp
+cd "$SCRIPT_DIR/../go_scp"
 
 go mod tidy
 go generate

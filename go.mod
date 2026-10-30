@@ -1,4 +1,4 @@
-module github.com/groundhogchain/scp
+module github.com/thruputchain/scp
 
 go 1.24.4
 

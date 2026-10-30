@@ -11,7 +11,12 @@ homepage.workspace = true
 readme = "README.md"
 keywords.workspace = true
 categories = ["cryptography::cryptocurrencies", "algorithms"]
-description = "SCP consensus kernel implementation"
+description = "Stellar Consensus Protocol (SCP) kernel: nomination, ballot protocol and quorum sets"
+
+# docs.rs builds the default features only; document the whole API.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # The kernel's test harness (TestKernel, UnitTestKernel and the envelope

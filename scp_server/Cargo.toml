@@ -11,7 +11,7 @@ homepage.workspace = true
 readme = "README.md"
 keywords.workspace = true
 categories = ["cryptography::cryptocurrencies", "network-programming"]
-description = "SCP consensus server"
+description = "scpd, a standalone Stellar Consensus Protocol (SCP) daemon serving the SCP kernel over ONC-RPC"
 
 [features]
 info_callbacks = []

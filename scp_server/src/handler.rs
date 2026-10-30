@@ -459,14 +459,22 @@ mod slot_tests {
             counter: 1,
             value: value.clone(),
         };
-        let envelope = scp_kernel::make_externalize(
-            &scp_util::generate_secret_key(b"handler-slot-test"),
-            [0; 32],
-            42,
-            ballot.clone(),
-            1,
-        )
-        .unwrap();
+        let secret_key = scp_util::generate_secret_key(b"handler-slot-test");
+        let statement = SCPStatement {
+            node_id: scp_util::derive_public_key(&secret_key),
+            slot_index: 42,
+            pledges: SCPStatement_pledges::SCP_ST_EXTERNALIZE {
+                externalize: SCPStatementExternalize {
+                    commit: ballot.clone(),
+                    n_h: 1,
+                    commit_quorum_set_hash: [0; 32],
+                },
+            },
+        };
+        let envelope = SCPEnvelope {
+            signature: scp_util::sign_xdr(&secret_key, &statement).unwrap(),
+            statement,
+        };
         let requests = [
             HandleRequest::EmitEnvelope(envelope),
             HandleRequest::ExtractValidValue(42, value.clone()),

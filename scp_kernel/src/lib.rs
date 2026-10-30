@@ -51,13 +51,21 @@ pub use heuristic::*;
 pub mod util;
 pub use util::*;
 
+// The test harness: the kernel's own tests use it, and downstream tests can
+// opt in with the `test-support` feature.
+#[cfg(any(test, feature = "test-support"))]
 pub mod unitkernel;
+#[cfg(any(test, feature = "test-support"))]
 pub use unitkernel::*;
 
+#[cfg(any(test, feature = "test-support"))]
 pub mod testkernel;
+#[cfg(any(test, feature = "test-support"))]
 pub use testkernel::*;
 
+#[cfg(any(test, feature = "test-support"))]
 pub mod testutil;
+#[cfg(any(test, feature = "test-support"))]
 pub use testutil::*;
 
 #[cfg(test)]

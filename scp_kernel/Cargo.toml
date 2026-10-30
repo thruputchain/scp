@@ -13,6 +13,12 @@ keywords.workspace = true
 categories = ["cryptography::cryptocurrencies", "algorithms"]
 description = "SCP consensus kernel implementation"
 
+[features]
+# The kernel's test harness (TestKernel, UnitTestKernel and the envelope
+# builders in testutil) for downstream tests. Not part of the protocol
+# implementation; off by default.
+test-support = ["dep:rand"]
+
 # Published as thruput-scp-kernel. The library keeps its name, so
 # `use scp_kernel::...` is unchanged.
 [lib]
@@ -27,9 +33,10 @@ serde_json = "1.0"
 tracing = "0.1"
 sha2 = "0.10"
 thiserror = "2.0"
-rand = "0.9.3"
+rand = { version = "0.9.3", optional = true }
 xdr-common = { workspace = true }
 
 [dev-dependencies]
+rand = "0.9.3"
 shfix = { workspace = true }
 tracing-subscriber = "0.3"

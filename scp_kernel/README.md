@@ -30,6 +30,6 @@ through `driver_calling_back` with the `DriverCallback` the driver was given
 when the timer was started. `scp_server` in this repository is a complete
 driver that exposes the kernel over ONC-RPC.
 
-The `testkernel`, `unitkernel` and `testutil` modules are the harness for the
-kernel's own test suite and for downstream tests; they are not part of the
-protocol implementation.
+The `test-support` feature exposes the kernel's test harness (`TestKernel`,
+`UnitTestKernel` and the envelope builders in `testutil`) for downstream
+tests. It is not part of the protocol implementation and is off by default.

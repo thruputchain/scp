@@ -52,6 +52,10 @@ opentelemetry-otlp = { version = "0.33", default-features = false, features = ["
 xdr-common = { workspace = true }
 thruput-rpc-driver = { workspace = true }
 
+[dev-dependencies]
+# The telemetry tests drive a TestKernel.
+scp_kernel = { workspace = true, features = ["test-support"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"], optional = true }
 tikv-jemalloc-sys = { version = "0.7", features = ["profiling"], optional = true }

@@ -29,7 +29,6 @@ signature.
 | `scp_util/` | XDR marshalling, SHA-256 hashing, Ed25519 signing and key helpers shared by the kernel and `scpd`. |
 | `scp_server/` | `scpd`. See [`scp_server/README.md`](scp_server/README.md) for its tracing and heap profiling options. |
 | `shfix/` | A test-only proc macro that unfolds CATCH2-style `section!` blocks into separate test functions. Not published. |
-| `protocol/` | The XDR definitions of the SCP types and of the `SCP_Control` and `SCP_Handle` RPC programs, for reference. The bindings are generated from the Thruput protocol's copy. |
 
 ## Building and testing
 
@@ -66,7 +65,8 @@ nominates values, forwards envelopes received from peers and updates quorum
 sets through `SCP_Control`; `scpd` asks the application to validate and
 combine values, hands it envelopes to broadcast and reports progress
 (prepared, committed, externalized) through `SCP_Handle`. Both interfaces are
-defined in `protocol/scp_control.x` and `protocol/scp_handle.x`.
+defined in the Thruput protocol's `scp_control.x` and `scp_handle.x`, and
+their Rust bindings are in [`thruput-scp`](https://docs.rs/thruput-scp).
 
 By default `scpd` binds the control API on `127.0.0.1:11055` and connects to
 the handler on `127.0.0.1:22022`. The control API has no authentication; keep

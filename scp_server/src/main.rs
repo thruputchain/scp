@@ -74,7 +74,7 @@ struct Args {
     #[arg(
         long,
         default_value = "config.json",
-        help = "Path to JSON config file with schema according to scp_config.x"
+        help = "Path to the JSON config file: the SCP timeouts and the local quorum set"
     )]
     config_path: String,
 

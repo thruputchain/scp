@@ -294,3 +294,79 @@ async fn bind_control_listener(
 
 #[cfg(test)]
 mod system_test;
+
+#[cfg(test)]
+mod secret_key_tests {
+    use super::*;
+    use std::io::Write;
+    use std::os::fd::IntoRawFd;
+
+    const KEY: &str = "bm9ib2R5";
+
+    fn parse(args: &[&str]) -> Result<Args, clap::Error> {
+        Args::try_parse_from(
+            std::iter::once("scpd").chain(args.iter().copied()),
+        )
+    }
+
+    #[test]
+    fn from_argument() {
+        let args = parse(&["--secret-key", KEY]).unwrap();
+        assert_eq!(secret_key_text(&args), KEY);
+    }
+
+    #[test]
+    fn absent_is_empty() {
+        let args = parse(&[]).unwrap();
+        assert_eq!(secret_key_text(&args), "");
+    }
+
+    #[test]
+    fn from_file_trimmed() {
+        let dir = std::env::temp_dir()
+            .join(format!("scpd-key-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("key");
+        std::fs::write(&path, format!("  {KEY}\n")).unwrap();
+        let args =
+            parse(&["--secret-key-file", path.to_str().unwrap()]).unwrap();
+        assert_eq!(secret_key_text(&args), KEY);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn from_descriptor_trimmed() {
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        writeln!(writer, "{KEY}").unwrap();
+        drop(writer);
+        // secret_key_text takes ownership of the descriptor and closes it.
+        let fd = reader.into_raw_fd();
+        let args = parse(&["--secret-key-fd", &fd.to_string()]).unwrap();
+        assert_eq!(secret_key_text(&args), KEY);
+    }
+
+    #[test]
+    fn descriptor_without_writer_is_empty() {
+        let (reader, writer) = std::io::pipe().unwrap();
+        drop(writer);
+        let fd = reader.into_raw_fd();
+        let args = parse(&["--secret-key-fd", &fd.to_string()]).unwrap();
+        assert_eq!(secret_key_text(&args), "");
+    }
+
+    #[test]
+    fn sources_are_mutually_exclusive() {
+        for pair in [
+            ["--secret-key", KEY, "--secret-key-file", "/dev/null"],
+            ["--secret-key", KEY, "--secret-key-fd", "0"],
+            ["--secret-key-file", "/dev/null", "--secret-key-fd", "0"],
+        ] {
+            let err = parse(&pair).unwrap_err();
+            assert_eq!(
+                err.kind(),
+                clap::error::ErrorKind::ArgumentConflict,
+                "{pair:?}"
+            );
+        }
+    }
+}

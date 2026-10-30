@@ -1,3 +1,26 @@
+//! The Stellar Consensus Protocol (SCP) kernel: federated voting, nomination
+//! and the ballot protocol, following stellar-core's implementation, over
+//! Thruput's protocol types from [`thruput_scp`].
+//!
+//! The application supplies two things. A [`Consensus`] validates and
+//! combines its values and receives progress notifications through
+//! [`ConsensusNotify`]. A [`Driver`] supplies quorum sets by hash, hashes and
+//! signs for the node, emits envelopes to peers and runs the timers.
+//! [`StellarKernel::new`] takes both, with the node ID, the validator flag
+//! and the local quorum set. [`StellarKernel::proto`] returns the
+//! [`StellarProto`] through which envelopes from peers arrive
+//! ([`DriverCb::received_envelope`]), values are nominated
+//! ([`StellarProto::nominate`]) and expired timers are delivered
+//! ([`DriverCb::driver_calling_back`]).
+//!
+//! The kernel does not verify envelope signatures. Envelopes must be
+//! authenticated before they reach it; see [`DriverCb`].
+//!
+//! [`verifier`] checks, outside a running kernel, that a set of
+//! `EXTERNALIZE` envelopes proves a slot externalized under a quorum set.
+//!
+//! Everything in [`scp_util`] is re-exported.
+
 pub use scp_util::*;
 
 mod consensus;

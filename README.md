@@ -68,9 +68,18 @@ combine values, hands it envelopes to broadcast and reports progress
 defined in the Thruput protocol's `scp_control.x` and `scp_handle.x`, and
 their Rust bindings are in [`thruput-scp`](https://docs.rs/thruput-scp).
 
+**The application must authenticate peer envelopes.** Neither `scpd` nor the
+kernel verifies envelope signatures: an envelope passed to
+`scp_control_received_envelope` or `scp_control_set_state_from_envelope` is
+processed as a genuine statement by `statement.node_id`, so forwarding an
+unverified one lets its sender speak for any node in the quorum set. Verify
+the Ed25519ph signature over the XDR of `statement` against `node_id` first
+(`scp_util::verify_envelope` does exactly this in Rust) and drop envelopes
+that fail.
+
 By default `scpd` binds the control API on `127.0.0.1:11055` and connects to
-the handler on `127.0.0.1:22022`. The control API has no authentication; keep
-it on loopback or on a network only the application can reach.
+the handler on `127.0.0.1:22022`. The control API has no authentication of
+its own; keep it on loopback or on a network only the application can reach.
 
 A node needs its secret key and a configuration file:
 
@@ -81,6 +90,8 @@ A node needs its secret key and a configuration file:
   set.
 - `--is-validator`: whether this node votes, or only follows consensus.
 
+A three-validator network where any two validators form a quorum:
+
 ```json
 {
   "max_timeout_ms": 30000,
@@ -90,22 +101,60 @@ A node needs its secret key and a configuration file:
   "increment_nomination_timeout_ms": 1000,
   "quorum_set": {
     "threshold": 2,
-    "validators": [[0, 1, 2, "...32 bytes of an Ed25519 public key..."]],
+    "validators": [
+      [211, 191, 176, 60, 94, 168, 170, 40, 132, 54, 59, 244, 214, 142, 189, 94, 56, 5, 155, 3, 184, 161, 81, 155, 14, 15, 90, 187, 98, 126, 59, 210],
+      [253, 78, 91, 115, 71, 210, 243, 198, 171, 210, 251, 84, 1, 64, 11, 125, 227, 243, 202, 29, 86, 250, 92, 124, 240, 73, 139, 32, 78, 62, 186, 201],
+      [207, 23, 227, 10, 22, 56, 61, 179, 62, 195, 188, 24, 27, 105, 125, 140, 163, 197, 168, 194, 125, 124, 138, 212, 240, 227, 52, 81, 243, 84, 159, 152]
+    ],
     "inner_sets": []
   }
 }
 ```
 
 Each validator is a 32-byte Ed25519 public key written as a JSON array of 32
-integers; `inner_sets` holds nested quorum sets of the same shape.
+integers; `inner_sets` holds nested quorum sets of the same shape, each of
+which counts as one member towards its parent's threshold.
 
 Logging is controlled with `RUST_LOG`. Tracing export and heap profiling are
 described in [`scp_server/README.md`](scp_server/README.md).
 
-## Compatibility with stellar-core
+### Build settings for profiling
 
-The wire format matches stellar-core's SCP implementation. Two behaviours
-differ; see [`scp_kernel/README.md`](scp_kernel/README.md).
+A plain `cargo install thruput-scp-server` builds with Cargo's default
+release profile. The repository's own builds, including the CI check, add
+frame pointers and a GNU build ID through `.cargo/config.toml`, and keep
+overflow checks and line tables in release through the workspace
+`[profile.release]`. Profilers and the heap profiler rely on the first two.
+`cargo install` ignores the repository's configuration and the published
+crate carries no profile, so pass them explicitly:
+
+```sh
+RUSTFLAGS="-C force-frame-pointers=yes -C link-arg=-Wl,--build-id=sha1" \
+cargo install thruput-scp-server \
+  --config 'profile.release.overflow-checks=true' \
+  --config 'profile.release.debug="line-tables-only"'
+```
+
+Add `--features heap-profiling` for the jemalloc heap profiler.
+
+## Relation to stellar-core
+
+The kernel follows stellar-core's SCP implementation (federated voting,
+nomination, the ballot protocol and its timeouts), and `scp_kernel`'s test
+suite is a port of stellar-core's. It is not wire compatible with
+stellar-core nodes:
+
+- Envelopes use Thruput's protocol types. Node IDs are `thruput-xdr`'s
+  `PublicKey` union and envelope signatures its `Signature` union, each with
+  Ed25519 and ML-DSA-65 arms, where stellar-core has its own `PublicKey` and
+  an opaque 64-byte signature.
+- Signatures are Ed25519ph (the statement's XDR pre-hashed with SHA-512) over
+  the `SCPStatement` alone. stellar-core signs the XDR of the network ID, an
+  envelope type tag and the statement with plain Ed25519.
+- Only Ed25519 keys sign and verify; an envelope with an ML-DSA-65 key or
+  signature fails verification.
+- Quorum set normalization and the hashing of value lists differ, as
+  described in [`scp_kernel/README.md`](scp_kernel/README.md).
 
 ## Releases
 

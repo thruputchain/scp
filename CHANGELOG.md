@@ -47,15 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   Ed25519 keys order and print as before.
 - No longer depends on `tokio`, `tokio-util` or `async-trait`, which it did
   not use.
+- The test harness (`TestKernel`, `UnitTestKernel`, `testutil`) is behind the
+  new `test-support` feature instead of always public.
 
 ### scp_server
 
 #### Added
 - `scpd` exports its `tracing` spans over OTLP/gRPC when
   `OTEL_EXPORTER_OTLP_ENDPOINT` is set; see `scp_server/README.md` for the
-  `OTEL_*` variables and `GROUNDHOG_NETWORK_HASH`.
+  `OTEL_*` variables and `THRUPUT_NETWORK_HASH`.
 - Opt-in jemalloc heap profiles on Linux, behind the `heap-profiling`
-  feature, `GROUNDHOG_HEAP_PROFILING=1` and `SCPD_PPROF_LISTEN`. The profile
+  feature, `THRUPUT_HEAP_PROFILING=1` and `SCPD_PPROF_LISTEN`. The profile
   listener accepts loopback addresses only unless `SCPD_PPROF_ALLOW_REMOTE=1`.
 - `--reuse` (default on) sets `SO_REUSEADDR`/`SO_REUSEPORT` on the control
   listener.
@@ -67,6 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   below the lowest non-externalized slot are ignored.
 - Release builds keep overflow checks and line tables.
 - Logs print values as `hov:<sha256 prefix>` instead of raw bytes.
+- The `GROUNDHOG_HEAP_PROFILING` and `GROUNDHOG_NETWORK_HASH` variables and
+  the `groundhog.block.height` span attribute are renamed to
+  `THRUPUT_HEAP_PROFILING`, `THRUPUT_NETWORK_HASH` and
+  `thruput.block.height`. The application launching scpd must set the new
+  names; the old ones are not read.
 
 ## [1.0.1] to [1.2.2] - 2026-03-11 to 2026-04-20
 

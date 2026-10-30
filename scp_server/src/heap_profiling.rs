@@ -16,13 +16,13 @@ pub async fn start_from_env() -> io::Result<()> {
     let addr = std::env::var_os("SCPD_PPROF_LISTEN");
     let allow_remote = std::env::var_os("SCPD_PPROF_ALLOW_REMOTE")
         .is_some_and(|value| value == "1");
-    let enabled = std::env::var_os("GROUNDHOG_HEAP_PROFILING")
+    let enabled = std::env::var_os("THRUPUT_HEAP_PROFILING")
         .is_some_and(|value| value == "1");
     #[cfg(not(all(target_os = "linux", feature = "heap-profiling")))]
     if enabled {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "GROUNDHOG_HEAP_PROFILING=1 needs a Linux scpd built with the heap-profiling feature",
+            "THRUPUT_HEAP_PROFILING=1 needs a Linux scpd built with the heap-profiling feature",
         ));
     }
     // Leave allocator profiling controls untouched when sampling is disabled.
@@ -484,7 +484,7 @@ mod tests {
         let _guard = TEST_LOCK.lock().await;
         // SAFETY: TEST_LOCK serializes tests that access these variables.
         unsafe {
-            std::env::remove_var("GROUNDHOG_HEAP_PROFILING");
+            std::env::remove_var("THRUPUT_HEAP_PROFILING");
             std::env::remove_var("SCPD_PPROF_ALLOW_REMOTE");
             std::env::set_var("SCPD_PPROF_LISTEN", "0.0.0.0:0");
         }
@@ -496,7 +496,7 @@ mod tests {
         unsafe {
             std::env::remove_var("SCPD_PPROF_LISTEN");
             std::env::remove_var("SCPD_PPROF_ALLOW_REMOTE");
-            std::env::remove_var("GROUNDHOG_HEAP_PROFILING");
+            std::env::remove_var("THRUPUT_HEAP_PROFILING");
         }
         assert_eq!(
             refused.unwrap_err().kind(),
@@ -825,10 +825,10 @@ mod tests {
     async fn activation_requires_linux_feature_build() {
         let _guard = TEST_LOCK.lock().await;
         // SAFETY: TEST_LOCK serializes tests that access this variable.
-        unsafe { std::env::set_var("GROUNDHOG_HEAP_PROFILING", "1") };
+        unsafe { std::env::set_var("THRUPUT_HEAP_PROFILING", "1") };
         let result = start_from_env().await;
         // SAFETY: the test still owns TEST_LOCK.
-        unsafe { std::env::remove_var("GROUNDHOG_HEAP_PROFILING") };
+        unsafe { std::env::remove_var("THRUPUT_HEAP_PROFILING") };
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Unsupported);
     }
 

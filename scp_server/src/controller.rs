@@ -203,7 +203,7 @@ impl thruput_scp::SCP_Control_SCP_Control1 for ControlService {
             target: "scpd::slot",
             "scp_control_received_envelope",
             slot_index = height,
-            "groundhog.block.height" = height
+            "thruput.block.height" = height
         );
         link_slot(&span, env.statement.slot_index);
         self.control_received_envelope(env).instrument(span).await
@@ -398,7 +398,7 @@ impl ControlKernel {
                             target: "scpd::slot",
                             "slot_externalized",
                             slot_index = height,
-                            "groundhog.block.height" = height
+                            "thruput.block.height" = height
                         );
                         link_slot(&span, slot_index);
                         span.in_scope(|| {
@@ -528,7 +528,7 @@ impl ControlKernel {
             target: "scpd::slot",
             "handle_timer_expired",
             slot_index = height,
-            "groundhog.block.height" = height
+            "thruput.block.height" = height
         );
         link_slot(&span, x.slot_index);
         span.in_scope(|| self.handle_timer_expired_in_slot(x));

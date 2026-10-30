@@ -26,9 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 ### scp_server
 
 #### Added
-- `scpd --secret-key-file PATH` reads the base64 secret key from a file, so
-  it need not appear in the command line, which every process on the host
-  can read. `--secret-key` still works; the two are mutually exclusive.
+- `scpd --secret-key-file PATH` reads the base64 secret key from a file, and
+  `scpd --secret-key-fd N` from an inherited file descriptor such as a pipe
+  from the launcher, so it need not appear in the command line, which every
+  process on the host can read. `--secret-key` still works; the three are
+  mutually exclusive.
 
 ### scp_util
 

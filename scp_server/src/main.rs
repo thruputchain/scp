@@ -87,24 +87,43 @@ struct Args {
 
     #[arg(
         long,
-        conflicts_with = "secret_key",
+        conflicts_with_all = ["secret_key", "secret_key_fd"],
         help = "Path to a file holding the base64-std encoded secret key for this SCP node, surrounding whitespace ignored"
     )]
     secret_key_file: Option<String>,
+
+    #[arg(
+        long,
+        conflicts_with_all = ["secret_key", "secret_key_file"],
+        help = "Inherited file descriptor to read the base64-std encoded secret key from, up to EOF; for launchers, which can pass a pipe that nothing else can read"
+    )]
+    secret_key_fd: Option<i32>,
 }
 
-/// The secret key as base64 text, from --secret-key-file when given, else
-/// from --secret-key (which may be empty).
+/// The secret key as base64 text, from --secret-key-file or --secret-key-fd
+/// when given, else from --secret-key (which may be empty).
 fn secret_key_text(args: &Args) -> String {
-    match &args.secret_key_file {
-        Some(path) => std::fs::read_to_string(path)
-            .unwrap_or_else(|e| {
-                panic!("failed to read secret key file {path}: {e}")
-            })
-            .trim()
-            .to_string(),
-        None => args.secret_key.clone(),
-    }
+    use std::io::Read;
+    let text = if let Some(path) = &args.secret_key_file {
+        std::fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!("failed to read secret key file {path}: {e}")
+        })
+    } else if let Some(fd) = args.secret_key_fd {
+        assert!(fd >= 0, "invalid secret key file descriptor {fd}");
+        // SAFETY: the launcher handed us this descriptor to read; taking
+        // ownership here closes it once the key is read.
+        let mut file = unsafe {
+            <std::fs::File as std::os::fd::FromRawFd>::from_raw_fd(fd)
+        };
+        let mut text = String::new();
+        file.read_to_string(&mut text).unwrap_or_else(|e| {
+            panic!("failed to read secret key from fd {fd}: {e}")
+        });
+        text
+    } else {
+        args.secret_key.clone()
+    };
+    text.trim().to_string()
 }
 
 #[tokio::main]

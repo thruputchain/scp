@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::Instrument;
-use tracing::info;
+use tracing::{debug, info};
 use xdr_common::*;
 
 #[derive(Clone)]
@@ -505,7 +505,7 @@ impl ControlKernel {
     }
 
     fn call_received_envelope(&mut self, env: &thruput_scp::SCPEnvelope) {
-        info!(
+        debug!(
             "---> control kernel calling scp received envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
@@ -516,7 +516,7 @@ impl ControlKernel {
             self.kernel.proto().received_envelope(env);
             self.flush_timer_switches();
         }
-        info!(
+        debug!(
             "<--- control kernel called scp receive envelope {}",
             self.kernel.proto().envelope_to_str(env, false),
         );
@@ -535,13 +535,13 @@ impl ControlKernel {
     }
 
     fn handle_timer_expired_in_slot(&mut self, x: TimerExpired) {
-        info!("---> timer expired, driver calling back {}", x);
+        debug!("---> timer expired, driver calling back {}", x);
         self.stop_timer(x.slot_index, x.timer);
         if self.handler.is_above_highest_externalized(x.slot_index) {
             self.kernel.proto().driver_calling_back(x.cb.clone());
             self.flush_timer_switches();
         }
-        info!("<--- timer expired, driver called back {}", x);
+        debug!("<--- timer expired, driver called back {}", x);
     }
 
     fn handle_request(&mut self, req: ControlRequest) {
@@ -607,7 +607,7 @@ impl ControlKernel {
                     .unwrap()
             }
             ControlRequest::ReceivedEnvelope(env) => {
-                info!(
+                debug!(
                     "control kernel received envelope {}",
                     self.kernel.proto().envelope_to_str(&env, false)
                 );
